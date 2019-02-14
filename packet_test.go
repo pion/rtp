@@ -29,7 +29,6 @@ func TestBasic(t *testing.T) {
 			SSRC:             476325762,
 			CSRC:             []uint32{},
 		},
-
 		Payload: rawPkt[20:],
 		Raw:     rawPkt,
 	}
@@ -67,4 +66,51 @@ func TestExtension(t *testing.T) {
 		t.Fatal("Unmarshal did not error on packet with invalid extension length")
 	}
 
+}
+
+func BenchmarkMarshal(b *testing.B) {
+	rawPkt := []byte{
+		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+
+	p := &Packet{}
+	err := p.Unmarshal(rawPkt)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err = p.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkMarshalTo(b *testing.B) {
+	rawPkt := []byte{
+		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+
+	p := &Packet{}
+
+	err := p.Unmarshal(rawPkt)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	buf := make([]byte, 0, len(rawPkt))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		buf, err = p.MarshalTo(buf[:0])
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }
