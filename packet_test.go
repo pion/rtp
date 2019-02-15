@@ -22,7 +22,6 @@ func TestBasic(t *testing.T) {
 			ExtensionProfile: 1,
 			ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
 			Version:          2,
-			PayloadOffset:    20,
 			PayloadType:      96,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -30,7 +29,6 @@ func TestBasic(t *testing.T) {
 			CSRC:             []uint32{},
 		},
 		Payload: rawPkt[20:],
-		Raw:     rawPkt,
 	}
 
 	if err := p.Unmarshal(rawPkt); err != nil {

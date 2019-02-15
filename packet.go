@@ -7,16 +7,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO(@kixelated) Remove Header.PayloadOffset and Packet.Raw
-
 // Header represents an RTP packet header
-// NOTE: PayloadOffset is populated by Marshal/Unmarshal and should not be modified
 type Header struct {
 	Version          uint8
 	Padding          bool
 	Extension        bool
 	Marker           bool
-	PayloadOffset    int
 	PayloadType      uint8
 	SequenceNumber   uint16
 	Timestamp        uint32
@@ -27,10 +23,8 @@ type Header struct {
 }
 
 // Packet represents an RTP Packet
-// NOTE: Raw is populated by Marshal/Unmarshal and should not be modified
 type Packet struct {
 	Header
-	Raw     []byte
 	Payload []byte
 }
 
@@ -129,9 +123,7 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 		}
 
 		h.ExtensionPayload = rawPacket[currOffset : currOffset+extensionLength]
-		currOffset += len(h.ExtensionPayload)
 	}
-	h.PayloadOffset = currOffset
 
 	return nil
 }
@@ -142,14 +134,16 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	p.Payload = rawPacket[p.PayloadOffset:]
-	p.Raw = rawPacket
+	// Calculate the offset at which the header ends and the payload starts.
+	payloadOffset := p.Header.MarshalSize()
+
+	p.Payload = rawPacket[payloadOffset:]
 	return nil
 }
 
 // Marshal serializes the header into bytes.
 func (h *Header) Marshal() ([]byte, error) {
-	buf := make([]byte, 0, h.marshalSize())
+	buf := make([]byte, 0, h.MarshalSize())
 	return h.MarshalTo(buf)
 }
 
@@ -169,9 +163,6 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 	 * |                             ....                              |
 	 * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	 */
-
-	// Get the initial size of the buffer.
-	origLen := len(buf)
 
 	b0 := (h.Version << versionShift) | uint8(len(h.CSRC))
 	if h.Padding {
@@ -224,15 +215,11 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 		buf = append(buf, h.ExtensionPayload...)
 	}
 
-	// Calculate the size of the header by seeing how many bytes we're written.
-	// This should be the same as h.marshalSize()
-	h.PayloadOffset = len(buf) - origLen
-
 	return buf, nil
 }
 
-// marshalSize returns the size of the header once marshaled.
-func (h *Header) marshalSize() int {
+// MarshalSize returns the size of the header once marshaled.
+func (h *Header) MarshalSize() int {
 	// NOTE: Be careful to match the MarshalTo() method.
 	size := 12 + (len(h.CSRC) * csrcLength)
 
@@ -245,7 +232,7 @@ func (h *Header) marshalSize() int {
 
 // Marshal serializes the packet into bytes.
 func (p *Packet) Marshal() ([]byte, error) {
-	buf := make([]byte, 0, p.marshalSize())
+	buf := make([]byte, 0, p.MarshalSize())
 	return p.MarshalTo(buf)
 }
 
@@ -257,12 +244,10 @@ func (p *Packet) MarshalTo(buf []byte) ([]byte, error) {
 	}
 
 	buf = append(buf, p.Payload...)
-	p.Raw = buf
-
 	return buf, nil
 }
 
-// marshalSize returns the size of the packet once marshaled.
-func (p *Packet) marshalSize() int {
-	return p.Header.marshalSize() + len(p.Payload)
+// MarshalSize returns the size of the packet once marshaled.
+func (p *Packet) MarshalSize() int {
+	return p.Header.MarshalSize() + len(p.Payload)
 }
