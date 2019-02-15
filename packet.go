@@ -3,8 +3,6 @@ package rtp
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/pkg/errors"
 )
 
 // Header represents an RTP packet header
@@ -70,7 +68,7 @@ func (p Packet) String() string {
 // Unmarshal parses the passed byte slice and stores the result in the Header this method is called upon
 func (h *Header) Unmarshal(rawPacket []byte) error {
 	if len(rawPacket) < headerLength {
-		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), headerLength)
+		return fmt.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), headerLength)
 	}
 
 	/*
@@ -102,7 +100,7 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 
 	currOffset := csrcOffset + (len(h.CSRC) * csrcLength)
 	if len(rawPacket) < currOffset {
-		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), currOffset)
+		return fmt.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), currOffset)
 	}
 
 	for i := range h.CSRC {
@@ -112,7 +110,7 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 
 	if h.Extension {
 		if len(rawPacket) < currOffset+4 {
-			return errors.Errorf("RTP header size insufficient for extension; %d < %d", len(rawPacket), currOffset)
+			return fmt.Errorf("RTP header size insufficient for extension; %d < %d", len(rawPacket), currOffset)
 		}
 
 		h.ExtensionProfile = binary.BigEndian.Uint16(rawPacket[currOffset:])
@@ -121,7 +119,7 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 		currOffset += 2
 
 		if len(rawPacket) < currOffset+extensionLength {
-			return errors.Errorf("RTP header size insufficient for extension length; %d < %d", len(rawPacket), currOffset+extensionLength)
+			return fmt.Errorf("RTP header size insufficient for extension length; %d < %d", len(rawPacket), currOffset+extensionLength)
 		}
 
 		h.ExtensionPayload = rawPacket[currOffset : currOffset+extensionLength]
