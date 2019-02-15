@@ -37,6 +37,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
 * [Woodrow Douglass](https://github.com/wdouglass) *RTCP, RTP improvements, G.722 support, Bugfixes*
 * [Michael MacDonald](https://github.com/mjmac)
+* [Luke Curley](https://github.com/kixelated) *nothing tbh*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
