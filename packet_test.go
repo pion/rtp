@@ -45,11 +45,20 @@ func TestBasic(t *testing.T) {
 		t.Errorf("wrong computed marshal size")
 	}
 
+	if p.PayloadOffset != 20 {
+		t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
+	}
+
 	raw, err := p.Marshal()
 	if err != nil {
 		t.Error(err)
 	} else if !reflect.DeepEqual(raw, rawPkt) {
 		t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
+	}
+
+	// TODO This is a BUG but without it, stuff breaks.
+	if p.PayloadOffset != 12 {
+		t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 12)
 	}
 }
 

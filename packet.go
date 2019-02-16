@@ -209,6 +209,10 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 		)
 	}
 
+	// Calculate the size of the header by seeing how many bytes we're written.
+	// TODO This is a BUG but fixing it causes more issues.
+	h.PayloadOffset = len(buf) - origLen
+
 	if h.Extension {
 		extSize := len(h.ExtensionPayload) / 4
 
@@ -221,10 +225,6 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 
 		buf = append(buf, h.ExtensionPayload...)
 	}
-
-	// Calculate the size of the header by seeing how many bytes we're written.
-	// This should be the same as h.MarshalSize()
-	h.PayloadOffset = len(buf) - origLen
 
 	return buf, nil
 }
