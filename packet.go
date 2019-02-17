@@ -182,7 +182,7 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 
 	b1 := h.PayloadType
 	if h.Marker {
-		b1 = 1 << markerShift
+		b1 |= 1 << markerShift
 	}
 
 	buf = append(buf,
