@@ -171,6 +171,7 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 	// Get the initial size of the buffer.
 	origLen := len(buf)
 
+	// The first byte contains the version, padding bit, extension bit, and csrc size
 	b0 := (h.Version << versionShift) | uint8(len(h.CSRC))
 	if h.Padding {
 		b0 |= 1 << paddingShift
@@ -180,33 +181,20 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 		b0 |= 1 << extensionShift
 	}
 
+	// The second byte contains the marker bit and payload type.
 	b1 := h.PayloadType
 	if h.Marker {
 		b1 |= 1 << markerShift
 	}
 
-	buf = append(buf,
-		b0,
-		b1,
-		byte(h.SequenceNumber>>8),
-		byte(h.SequenceNumber),
-		byte(h.Timestamp>>24),
-		byte(h.Timestamp>>16),
-		byte(h.Timestamp>>8),
-		byte(h.Timestamp),
-		byte(h.SSRC>>24),
-		byte(h.SSRC>>16),
-		byte(h.SSRC>>8),
-		byte(h.SSRC),
-	)
+	// Append the first two bytes and start doing the rest of the header.
+	buf = append(buf, b0, b1)
+	buf = appendUint16(buf, h.SequenceNumber)
+	buf = appendUint32(buf, h.Timestamp)
+	buf = appendUint32(buf, h.SSRC)
 
 	for _, csrc := range h.CSRC {
-		buf = append(buf,
-			byte(csrc>>24),
-			byte(csrc>>16),
-			byte(csrc>>8),
-			byte(csrc),
-		)
+		buf = appendUint32(buf, csrc)
 	}
 
 	// Calculate the size of the header by seeing how many bytes we're written.
@@ -214,15 +202,10 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 	h.PayloadOffset = len(buf) - origLen
 
 	if h.Extension {
-		extSize := len(h.ExtensionPayload) / 4
+		extSize := uint16(len(h.ExtensionPayload) / 4)
 
-		buf = append(buf,
-			byte(h.ExtensionProfile>>8),
-			byte(h.ExtensionProfile),
-			byte(extSize>>8),
-			byte(extSize),
-		)
-
+		buf = appendUint16(buf, h.ExtensionProfile)
+		buf = appendUint16(buf, extSize)
 		buf = append(buf, h.ExtensionPayload...)
 	}
 
