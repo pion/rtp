@@ -1,6 +1,10 @@
 package codecs
 
-import "github.com/pions/rtp"
+import (
+	"fmt"
+
+	"github.com/pions/rtp"
+)
 
 // VP8Payloader payloads VP8 packets
 type VP8Payloader struct{}
@@ -78,6 +82,11 @@ type VP8Packet struct {
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon
 func (p *VP8Packet) Unmarshal(packet *rtp.Packet) ([]byte, error) {
 	payload := packet.Payload
+
+	// If lower than the required header size, malformed header
+	if len(payload) < 4 {
+		return nil, fmt.Errorf("empty payload")
+	}
 
 	payloadIndex := 0
 
