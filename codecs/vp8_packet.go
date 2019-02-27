@@ -82,10 +82,10 @@ type VP8Packet struct {
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon
 func (p *VP8Packet) Unmarshal(packet *rtp.Packet) ([]byte, error) {
 	payload := packet.Payload
+	payloadLen := len(payload)
 
-	// If lower than the required header size, malformed header
-	if len(payload) < 4 {
-		return nil, fmt.Errorf("empty payload")
+	if payloadLen < 4 {
+		return nil, fmt.Errorf("Payload is not large enough to container header")
 	}
 
 	payloadIndex := 0
@@ -121,6 +121,9 @@ func (p *VP8Packet) Unmarshal(packet *rtp.Packet) ([]byte, error) {
 		payloadIndex++
 	}
 
+	if payloadIndex >= payloadLen {
+		return nil, fmt.Errorf("Payload is not large enough")
+	}
 	p.Payload = payload[payloadIndex:]
 	return p.Payload, nil
 }
