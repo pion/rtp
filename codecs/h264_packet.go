@@ -46,6 +46,9 @@ func emitNalus(nals []byte, emit func([]byte)) {
 func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 
 	var payloads [][]byte
+	if payload == nil {
+		return payloads
+	}
 
 	emitNalus(payload, func(nalu []byte) {
 		naluType := nalu[0] & 0x1F
@@ -82,6 +85,10 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 		naluDataIndex := 1
 		naluDataLength := len(nalu) - naluDataIndex
 		naluDataRemaining := naluDataLength
+
+		if min(maxFragmentSize, naluDataRemaining) <= 0 {
+			return
+		}
 
 		for naluDataRemaining > 0 {
 			currentFragmentSize := min(maxFragmentSize, naluDataRemaining)

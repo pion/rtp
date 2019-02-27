@@ -44,4 +44,41 @@ func TestG722Payloader(t *testing.T) {
 	if !bytes.Equal(samplesIn, samplesOut) {
 		t.Fatal("Output samples don't match")
 	}
+
+	payload := []byte{0x90, 0x90, 0x90}
+	// Nil payload
+	res := p.Payload(-1, nil)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Negative MTU, small payload
+	res = p.Payload(-1, payload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// 0 MTU, small payload
+	res = p.Payload(0, payload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, small payload
+	res = p.Payload(1, payload)
+	if len(res) != len(payload) {
+		t.Fatal("Generated payload should be the same size as original payload size")
+	}
+
+	// Positive MTU, small payload
+	res = p.Payload(len(payload)-1, payload)
+	if len(res) != len(payload)-1 {
+		t.Fatal("Generated payload should be the same smaller than original payload size")
+	}
+
+	// Positive MTU, small payload
+	res = p.Payload(10, payload)
+	if len(res) != 1 {
+		t.Fatal("Generated payload should be 1")
+	}
 }

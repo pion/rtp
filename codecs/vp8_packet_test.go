@@ -10,21 +10,20 @@ import (
 func TestVP8Packet_Unmarshal(t *testing.T) {
 	pck := VP8Packet{}
 
+	errNilPacket := fmt.Errorf("invalid nil packet")
 	errSmallerThanHeaderLen := fmt.Errorf("Payload is not large enough to container header")
 	errPayloadTooSmall := fmt.Errorf("Payload is not large enough")
 
-	// Nil payload
-	raw, err := pck.Unmarshal(&rtp.Packet{
-		Payload: nil,
-	})
+	// Nil packet
+	raw, err := pck.Unmarshal(nil)
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
-	if err == nil || err.Error() != errSmallerThanHeaderLen.Error() {
-		t.Fatal("Error should be:", errSmallerThanHeaderLen)
+	if err == nil || err.Error() != errNilPacket.Error() {
+		t.Fatal("Error should be:", errNilPacket)
 	}
 
-	// Empty payload
+	// Nil payload
 	raw, err = pck.Unmarshal(&rtp.Packet{
 		Payload: nil,
 	})
@@ -132,5 +131,35 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 	if err == nil || err.Error() != errPayloadTooSmall.Error() {
 		t.Fatal("Error should be:", errPayloadTooSmall)
+	}
+}
+
+func TestVP8Payloader_Payload(t *testing.T) {
+	pck := VP8Payloader{}
+	payload := []byte{0x90, 0x90, 0x90}
+
+	// Positive MTU, nil payload
+	res := pck.Payload(1, nil)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, small payload
+	// MTU of 1 results in fragment size of 0
+	res = pck.Payload(1, payload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Negative MTU, small payload
+	res = pck.Payload(-1, payload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, small payload
+	res = pck.Payload(2, payload)
+	if len(res) != len(payload) {
+		t.Fatal("Generated payload should be the same size as original payload size")
 	}
 }
