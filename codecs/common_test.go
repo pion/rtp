@@ -2,19 +2,21 @@ package codecs
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCommon_Min(t *testing.T) {
-	assert := assert.New(t)
-
 	res := min(1, -1)
-	assert.Equal(res, -1, "-1 < 1")
+	if res != -1 {
+		t.Fatal("Error: -1 < 1")
+	}
 
 	res = min(1, 2)
-	assert.Equal(res, 1, "1 < 2")
+	if res != 1 {
+		t.Fatal("Error: 1 < 2")
+	}
 
 	res = min(3, 3)
-	assert.Equal(res, 3, "3 == 3")
+	if res != 3 {
+		t.Fatal("Error: 3 == 3")
+	}
 }
