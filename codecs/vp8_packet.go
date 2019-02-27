@@ -41,8 +41,14 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 
 	payloadData := payload
 	payloadDataRemaining := len(payload)
+
 	payloadDataIndex := 0
 	var payloads [][]byte
+
+	// Make sure the fragment/payload size is correct
+	if min(maxFragmentSize, payloadDataRemaining) <= 0 {
+		return payloads
+	}
 	for payloadDataRemaining > 0 {
 		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
 		out := make([]byte, vp8HeaderSize+currentFragmentSize)
@@ -81,6 +87,9 @@ type VP8Packet struct {
 
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon
 func (p *VP8Packet) Unmarshal(packet *rtp.Packet) ([]byte, error) {
+	if packet == nil {
+		return nil, fmt.Errorf("invalid nil packet")
+	}
 	payload := packet.Payload
 	payloadLen := len(payload)
 
