@@ -3,6 +3,7 @@ package rtp
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 )
 
 // TODO(@kixelated) Remove Header.PayloadOffset and Packet.Raw
@@ -146,13 +147,19 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 }
 
 // Marshal serializes the header into bytes.
-func (h *Header) Marshal() ([]byte, error) {
-	buf := make([]byte, 0, h.MarshalSize())
-	return h.MarshalTo(buf)
+func (h *Header) Marshal() (buf []byte, err error) {
+	buf = make([]byte, h.MarshalSize())
+
+	n, err := h.MarshalTo(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf[:n], nil
 }
 
-// MarshalTo serializes the header and appends to the buffer.
-func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
+// MarshalTo serializes the header and writes to the buffer.
+func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 	/*
 	 *  0                   1                   2                   3
 	 *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -168,48 +175,52 @@ func (h *Header) MarshalTo(buf []byte) ([]byte, error) {
 	 * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	 */
 
-	// Get the initial size of the buffer.
-	origLen := len(buf)
+	size := h.MarshalSize()
+	if size > len(buf) {
+		return 0, io.ErrShortBuffer
+	}
 
 	// The first byte contains the version, padding bit, extension bit, and csrc size
-	b0 := (h.Version << versionShift) | uint8(len(h.CSRC))
+	buf[0] = (h.Version << versionShift) | uint8(len(h.CSRC))
 	if h.Padding {
-		b0 |= 1 << paddingShift
+		buf[0] |= 1 << paddingShift
 	}
 
 	if h.Extension {
-		b0 |= 1 << extensionShift
+		buf[0] |= 1 << extensionShift
 	}
 
 	// The second byte contains the marker bit and payload type.
-	b1 := h.PayloadType
+	buf[1] = h.PayloadType
 	if h.Marker {
-		b1 |= 1 << markerShift
+		buf[1] |= 1 << markerShift
 	}
 
-	// Append the first two bytes and start doing the rest of the header.
-	buf = append(buf, b0, b1)
-	buf = appendUint16(buf, h.SequenceNumber)
-	buf = appendUint32(buf, h.Timestamp)
-	buf = appendUint32(buf, h.SSRC)
+	binary.BigEndian.PutUint16(buf[2:4], h.SequenceNumber)
+	binary.BigEndian.PutUint32(buf[4:8], h.Timestamp)
+	binary.BigEndian.PutUint32(buf[8:12], h.SSRC)
 
+	n = 12
 	for _, csrc := range h.CSRC {
-		buf = appendUint32(buf, csrc)
+		binary.BigEndian.PutUint32(buf[n:n+4], csrc)
+		n += 4
 	}
 
 	// Calculate the size of the header by seeing how many bytes we're written.
 	// TODO This is a BUG but fixing it causes more issues.
-	h.PayloadOffset = len(buf) - origLen
+	h.PayloadOffset = n
 
 	if h.Extension {
 		extSize := uint16(len(h.ExtensionPayload) / 4)
 
-		buf = appendUint16(buf, h.ExtensionProfile)
-		buf = appendUint16(buf, extSize)
-		buf = append(buf, h.ExtensionPayload...)
+		binary.BigEndian.PutUint16(buf[n+0:n+2], h.ExtensionProfile)
+		binary.BigEndian.PutUint16(buf[n+2:n+4], extSize)
+		n += 4
+
+		n += copy(buf[n:], h.ExtensionPayload)
 	}
 
-	return buf, nil
+	return n, nil
 }
 
 // MarshalSize returns the size of the header once marshaled.
@@ -225,22 +236,33 @@ func (h *Header) MarshalSize() int {
 }
 
 // Marshal serializes the packet into bytes.
-func (p *Packet) Marshal() ([]byte, error) {
-	buf := make([]byte, 0, p.MarshalSize())
-	return p.MarshalTo(buf)
-}
+func (p *Packet) Marshal() (buf []byte, err error) {
+	buf = make([]byte, p.MarshalSize())
 
-// MarshalTo serializes the packet and appends to the buffer.
-func (p *Packet) MarshalTo(buf []byte) ([]byte, error) {
-	buf, err := p.Header.MarshalTo(buf)
+	n, err := p.MarshalTo(buf)
 	if err != nil {
 		return nil, err
 	}
 
-	buf = append(buf, p.Payload...)
-	p.Raw = buf
+	return buf[:n], nil
+}
 
-	return buf, nil
+// MarshalTo serializes the packet and writes to the buffer.
+func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
+	n, err = p.Header.MarshalTo(buf)
+	if err != nil {
+		return 0, err
+	}
+
+	// Make sure the buffer is large enough to hold the packet.
+	if n+len(p.Payload) > len(buf) {
+		return 0, io.ErrShortBuffer
+	}
+
+	m := copy(buf[n:], p.Payload)
+	p.Raw = buf[n : n+m]
+
+	return n + m, nil
 }
 
 // MarshalSize returns the size of the packet once marshaled.
