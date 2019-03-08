@@ -119,12 +119,12 @@ func BenchmarkMarshalTo(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	buf := make([]byte, 0, len(rawPkt))
+	buf := [100]byte{}
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		buf, err = p.MarshalTo(buf[:0])
+		_, err = p.MarshalTo(buf[:])
 		if err != nil {
 			b.Fatal(err)
 		}
