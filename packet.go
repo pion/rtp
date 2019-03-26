@@ -211,6 +211,10 @@ func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 	h.PayloadOffset = n
 
 	if h.Extension {
+		if len(h.ExtensionPayload)%4 != 0 {
+			//the payload must be in 32-bit words.
+			return 0, io.ErrShortBuffer
+		}
 		extSize := uint16(len(h.ExtensionPayload) / 4)
 
 		binary.BigEndian.PutUint16(buf[n+0:n+2], h.ExtensionProfile)
