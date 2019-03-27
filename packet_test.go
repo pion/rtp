@@ -82,6 +82,17 @@ func TestExtension(t *testing.T) {
 		t.Fatal("Unmarshal did not error on packet with invalid extension length")
 	}
 
+	p = &Packet{Header: Header{
+		Extension:        true,
+		ExtensionProfile: 3,
+		ExtensionPayload: []byte{0},
+	},
+		Payload: []byte{},
+	}
+	if _, err := p.Marshal(); err == nil {
+		t.Fatal("Marshal did not error on packet with invalid extension length")
+	}
+
 }
 
 func BenchmarkMarshal(b *testing.B) {
