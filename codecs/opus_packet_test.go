@@ -3,8 +3,6 @@ package codecs
 import (
 	"fmt"
 	"testing"
-
-	"github.com/pions/rtp"
 )
 
 func TestOpusPacket_Unmarshal(t *testing.T) {
@@ -23,9 +21,7 @@ func TestOpusPacket_Unmarshal(t *testing.T) {
 	}
 
 	// Empty packet
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: nil,
-	})
+	raw, err = pck.Unmarshal([]byte{})
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
@@ -34,9 +30,7 @@ func TestOpusPacket_Unmarshal(t *testing.T) {
 	}
 
 	// Normal packet
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x90},
-	})
+	raw, err = pck.Unmarshal([]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x90})
 	if raw == nil {
 		t.Fatal("Result shouldn't be nil in case of success")
 	}
@@ -55,7 +49,6 @@ func TestOpusPayloader_Payload(t *testing.T) {
 		t.Fatal("Generated payload should be empty")
 	}
 
-	// Note: MTU has no effect
 	// Positive MTU, small payload
 	res = pck.Payload(1, payload)
 	if len(res) != 1 {

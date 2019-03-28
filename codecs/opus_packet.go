@@ -2,8 +2,6 @@ package codecs
 
 import (
 	"fmt"
-
-	"github.com/pions/rtp"
 )
 
 // OpusPayloader payloads Opus packets
@@ -26,13 +24,12 @@ type OpusPacket struct {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the OpusPacket this method is called upon
-func (p *OpusPacket) Unmarshal(packet *rtp.Packet) ([]byte, error) {
+func (p *OpusPacket) Unmarshal(packet []byte) ([]byte, error) {
 	if packet == nil {
 		return nil, fmt.Errorf("invalid nil packet")
 	}
-	if packet.Payload == nil {
+	if len(packet) == 0 {
 		return nil, fmt.Errorf("Payload is not large enough")
 	}
-	p.Payload = packet.Payload
-	return p.Payload, nil
+	return packet, nil
 }

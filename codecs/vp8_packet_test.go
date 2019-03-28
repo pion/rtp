@@ -3,8 +3,6 @@ package codecs
 import (
 	"fmt"
 	"testing"
-
-	"github.com/pions/rtp"
 )
 
 func TestVP8Packet_Unmarshal(t *testing.T) {
@@ -24,9 +22,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Nil payload
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: nil,
-	})
+	raw, err = pck.Unmarshal([]byte{})
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
@@ -35,9 +31,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Payload smaller than header size
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x00, 0x11, 0x22},
-	})
+	raw, err = pck.Unmarshal([]byte{0x00, 0x11, 0x22})
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
@@ -46,9 +40,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Normal payload
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x90},
-	})
+	raw, err = pck.Unmarshal([]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x90})
 	if raw == nil {
 		t.Fatal("Result shouldn't be nil in case of success")
 	}
@@ -57,9 +49,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Header size, only X
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x80, 0x00, 0x00, 0x00},
-	})
+	raw, err = pck.Unmarshal([]byte{0x80, 0x00, 0x00, 0x00})
 	if raw == nil {
 		t.Fatal("Result shouldn't be nil in case of success")
 	}
@@ -68,9 +58,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Header size, X and I
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x80, 0x80, 0x00, 0x00},
-	})
+	raw, err = pck.Unmarshal([]byte{0x80, 0x80, 0x00, 0x00})
 	if raw == nil {
 		t.Fatal("Result shouldn't be nil in case of success")
 	}
@@ -79,9 +67,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Header size, X and I, PID 16bits
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x80, 0x80, 0x81, 0x00},
-	})
+	raw, err = pck.Unmarshal([]byte{0x80, 0x80, 0x81, 0x00})
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
@@ -90,9 +76,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Header size, X and L
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x80, 0x40, 0x00, 0x00},
-	})
+	raw, err = pck.Unmarshal([]byte{0x80, 0x40, 0x00, 0x00})
 	if raw == nil {
 		t.Fatal("Result shouldn't be nil in case of success")
 	}
@@ -101,9 +85,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Header size, X and T
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x80, 0x20, 0x00, 0x00},
-	})
+	raw, err = pck.Unmarshal([]byte{0x80, 0x20, 0x00, 0x00})
 	if raw == nil {
 		t.Fatal("Result shouldn't be nil in case of success")
 	}
@@ -112,9 +94,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Header size, X and K
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0x80, 0x10, 0x00, 0x00},
-	})
+	raw, err = pck.Unmarshal([]byte{0x80, 0x10, 0x00, 0x00})
 	if raw == nil {
 		t.Fatal("Result shouldn't be nil in case of success")
 	}
@@ -123,9 +103,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 
 	// Header size, all flags
-	raw, err = pck.Unmarshal(&rtp.Packet{
-		Payload: []byte{0xff, 0xff, 0x00, 0x00},
-	})
+	raw, err = pck.Unmarshal([]byte{0xff, 0xff, 0x00, 0x00})
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
