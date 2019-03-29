@@ -17,14 +17,17 @@ type Packetizer interface {
 }
 
 type packetizer struct {
-	MTU         int
-	PayloadType uint8
-	SSRC        uint32
-	Payloader   Payloader
-	Sequencer   Sequencer
-	Timestamp   uint32
-	ClockRate   uint32
-	AbsSendTime int //if this is nonzero, then it's the extension number that's applied to http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+	MTU              int
+	PayloadType      uint8
+	SSRC             uint32
+	Payloader        Payloader
+	Sequencer        Sequencer
+	Timestamp        uint32
+	ClockRate        uint32
+	extensionNumbers struct { //put extension numbers in here. If they're 0, the extension is disabled (0 is not a legal extension number)
+		AbsSendTime int //http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+	}
+	timegen func() time.Time
 }
 
 // NewPacketizer returns a new instance of a Packetizer for a specific payloader
@@ -40,11 +43,12 @@ func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequence
 		Sequencer:   sequencer,
 		Timestamp:   r.Uint32(),
 		ClockRate:   clockRate,
+		timegen:     time.Now,
 	}
 }
 
 func (p *packetizer) EnableAbsSendTime(value int) {
-	p.AbsSendTime = value
+	p.extensionNumbers.AbsSendTime = value
 }
 
 func toNtpTime(t time.Time) uint64 {
@@ -88,21 +92,21 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	}
 	p.Timestamp += samples
 
-	if p.AbsSendTime != 0 {
-		t := toNtpTime(time.Now()) >> 14
+	if len(packets) != 0 && p.extensionNumbers.AbsSendTime != 0 {
+		t := toNtpTime(p.timegen()) >> 14
 		//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
-		packets[len(payloads)-1].Header.Extension = true
-		packets[len(payloads)-1].ExtensionProfile = 0xBEDE
-		packets[len(payloads)-1].ExtensionPayload = []byte{
+		packets[len(packets)-1].Header.Extension = true
+		packets[len(packets)-1].ExtensionProfile = 0xBEDE
+		packets[len(packets)-1].ExtensionPayload = []byte{
 			//the first byte is
 			// 0 1 2 3 4 5 6 7
 			//+-+-+-+-+-+-+-+-+
 			//|  ID   |  len  |
 			//+-+-+-+-+-+-+-+-+
-			//per RFC65285
+			//per RFC 5285
 			//Len is the number of bytes in the extension - 1
 
-			byte((p.AbsSendTime << 4) | 2),
+			byte((p.extensionNumbers.AbsSendTime << 4) | 2),
 			byte(t & 0xFF0000 >> 16),
 			byte(t & 0xFF00 >> 8),
 			byte(t & 0xFF),
