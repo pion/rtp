@@ -39,6 +39,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Michael MacDonald](https://github.com/mjmac)
 * [Luke Curley](https://github.com/kixelated) *Performance*
 * [Antoine Baché](https://github.com/Antonito) *Fixed crashes*
+* [Hugo Arregui](https://github.com/hugoArregui)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
