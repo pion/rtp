@@ -11,7 +11,6 @@ notifications:
 
 before_script:
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.13
-  - go get github.com/mattn/goveralls
 
 script:
   - golangci-lint run ./...
