@@ -17,8 +17,6 @@
 </p>
 <br>
 
-See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
-
 ### Roadmap
 The library is used as a part of our WebRTC implementation. Please refer to that [roadmap](https://github.com/pion/webrtc/issues/9) to track our major milestones.
 
