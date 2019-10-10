@@ -9,6 +9,8 @@ linters:
   disable:
     - lll
     - maligned
+    - funlen
+    - dupl
 
 issues:
   exclude-use-default: false
