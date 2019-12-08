@@ -38,6 +38,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Antoine Baché](https://github.com/Antonito) *Fixed crashes*
 * [Hugo Arregui](https://github.com/hugoArregui)
 * [Raphael Derosso Pereira](https://github.com/raphaelpereira)
+* [Atsushi Watanabe](https://github.com/at-wat)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

@@ -34,3 +34,15 @@ func (p *OpusPacket) Unmarshal(packet []byte) ([]byte, error) {
 	p.Payload = packet
 	return packet, nil
 }
+
+// OpusPartitionHeadChecker checks Opus partition head
+type OpusPartitionHeadChecker struct{}
+
+// IsPartitionHead checks whether if this is a head of the Opus partition
+func (*OpusPartitionHeadChecker) IsPartitionHead(packet []byte) bool {
+	p := &OpusPacket{}
+	if _, err := p.Unmarshal(packet); err != nil {
+		return false
+	}
+	return true
+}
