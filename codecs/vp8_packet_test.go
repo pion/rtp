@@ -141,3 +141,22 @@ func TestVP8Payloader_Payload(t *testing.T) {
 		t.Fatal("Generated payload should be the same size as original payload size")
 	}
 }
+
+func TestVP8PartitionHeadChecker_IsPartitionHead(t *testing.T) {
+	checker := &VP8PartitionHeadChecker{}
+	t.Run("SmallPacket", func(t *testing.T) {
+		if checker.IsPartitionHead([]byte{0x00}) {
+			t.Fatal("Small packet should not be the head of a new partition")
+		}
+	})
+	t.Run("SFlagON", func(t *testing.T) {
+		if !checker.IsPartitionHead([]byte{0x10, 0x00, 0x00, 0x00}) {
+			t.Fatal("Packet with S flag should be the head of a new partition")
+		}
+	})
+	t.Run("SFlagOFF", func(t *testing.T) {
+		if checker.IsPartitionHead([]byte{0x00, 0x00, 0x00, 0x00}) {
+			t.Fatal("Packet without S flag should not be the head of a new partition")
+		}
+	})
+}

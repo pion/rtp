@@ -134,3 +134,15 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) {
 	p.Payload = payload[payloadIndex:]
 	return p.Payload, nil
 }
+
+// VP8PartitionHeadChecker checks VP8 partition head
+type VP8PartitionHeadChecker struct{}
+
+// IsPartitionHead checks whether if this is a head of the VP8 partition
+func (*VP8PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
+	p := &VP8Packet{}
+	if _, err := p.Unmarshal(packet); err != nil {
+		return false
+	}
+	return p.S == 1
+}
