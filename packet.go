@@ -264,7 +264,7 @@ func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
 	}
 
 	m := copy(buf[n:], p.Payload)
-	p.Raw = buf[n : n+m]
+	p.Raw = buf[:n+m]
 
 	return n + m, nil
 }
