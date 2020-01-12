@@ -111,7 +111,6 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 			byte(t & 0xFF00 >> 8),
 			byte(t & 0xFF),
 		}
-
 	}
 
 	return packets

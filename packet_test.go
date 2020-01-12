@@ -92,7 +92,6 @@ func TestExtension(t *testing.T) {
 	if _, err := p.Marshal(); err == nil {
 		t.Fatal("Marshal did not error on packet with invalid extension length")
 	}
-
 }
 
 func BenchmarkMarshal(b *testing.B) {

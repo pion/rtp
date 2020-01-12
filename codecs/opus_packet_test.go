@@ -66,7 +66,6 @@ func TestOpusPayloader_Payload(t *testing.T) {
 	if len(res) != 1 {
 		t.Fatal("Generated payload should be the 1")
 	}
-
 }
 
 func TestOpusPartitionHeadChecker_IsPartitionHead(t *testing.T) {
