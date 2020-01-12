@@ -13,7 +13,6 @@ const (
 
 // Payload fragments a VP8 packet across one or more byte arrays
 func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
-
 	/*
 	 * https://tools.ietf.org/html/rfc7741#section-4.2
 	 *

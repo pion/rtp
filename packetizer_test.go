@@ -40,5 +40,4 @@ func TestPacketizer(t *testing.T) {
 		}
 		t.Fatalf("Generated %d packets instead of 2\n%s", len(packets), packetlengths)
 	}
-
 }

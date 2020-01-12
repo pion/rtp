@@ -7,10 +7,11 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+    - dupl
+    - funlen
+    - godox
     - lll
     - maligned
-    - funlen
-    - dupl
 
 issues:
   exclude-use-default: false
