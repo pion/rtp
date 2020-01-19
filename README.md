@@ -40,6 +40,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Raphael Derosso Pereira](https://github.com/raphaelpereira)
 * [Atsushi Watanabe](https://github.com/at-wat)
 * [adwpc](https://github.com/adwpc) *add transport-cc extension*
+* [Bao Nguyen](https://github.com/sysbot) *add VP9 noop, bug fixes.
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
