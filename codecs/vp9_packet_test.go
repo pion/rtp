@@ -1,6 +1,8 @@
 package codecs
 
 import (
+	"fmt"
+	"math/rand"
 	"reflect"
 	"testing"
 )
@@ -19,40 +21,33 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 			b:   []byte{},
 			err: errShortPacket,
 		},
-		"Flexible": {
-			b: []byte{0x00, 0x01, 0xAA},
+		"NonFlexible": {
+			b: []byte{0x00, 0xAA},
 			pkt: VP9Packet{
-				TL0PICIDX: 0x01,
-				Payload:   []byte{0xAA},
+				Payload: []byte{0xAA},
 			},
 		},
 		"NonFlexiblePictureID": {
-			b: []byte{0x80, 0x02, 0x01, 0xAA},
+			b: []byte{0x80, 0x02, 0xAA},
 			pkt: VP9Packet{
 				I:         true,
 				PictureID: 0x02,
-				TL0PICIDX: 0x01,
 				Payload:   []byte{0xAA},
 			},
 		},
 		"NonFlexiblePictureIDExt": {
-			b: []byte{0x80, 0x81, 0xFF, 0x01, 0xAA},
+			b: []byte{0x80, 0x81, 0xFF, 0xAA},
 			pkt: VP9Packet{
 				I:         true,
 				PictureID: 0x01FF,
-				TL0PICIDX: 0x01,
 				Payload:   []byte{0xAA},
 			},
 		},
 		"NonFlexiblePictureIDExt_ShortPacket0": {
-			b:   []byte{0x80, 0x81, 0xFF},
-			err: errShortPacket,
-		},
-		"NonFlexiblePictureIDExt_ShortPacket1": {
 			b:   []byte{0x80, 0x81},
 			err: errShortPacket,
 		},
-		"NonFlexiblePictureIDExt_ShortPacket2": {
+		"NonFlexiblePictureIDExt_ShortPacket1": {
 			b:   []byte{0x80},
 			err: errShortPacket,
 		},
@@ -67,6 +62,19 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 				D:         true,
 				TL0PICIDX: 0x01,
 				Payload:   []byte{0xAA},
+			},
+		},
+		"FlexibleLayerIndicePictureID": {
+			b: []byte{0xB0, 0x02, 0x23, 0x01, 0xAA},
+			pkt: VP9Packet{
+				F:         true,
+				I:         true,
+				L:         true,
+				PictureID: 0x02,
+				TID:       0x01,
+				SID:       0x01,
+				D:         true,
+				Payload:   []byte{0x01, 0xAA},
 			},
 		},
 		"NonFlexibleLayerIndicePictureID_ShortPacket0": {
@@ -144,32 +152,104 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 }
 
 func TestVP9Payloader_Payload(t *testing.T) {
-	pck := VP9Payloader{}
-	payload := []byte{0x90, 0x90, 0x90}
-
-	// Positive MTU, nil payload
-	res := pck.Payload(1, nil)
-	if len(res) != 0 {
-		t.Fatal("Generated payload should be empty")
+	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF))
+	var rands [][2]byte
+	for i := 0; i < 10; i++ {
+		rands = append(rands, [2]byte{byte(r0>>8) | 0x80, byte(r0 & 0xFF)})
+		r0++
 	}
 
-	// Positive MTU, small payload
-	res = pck.Payload(1, payload)
-	if len(res) != 1 {
-		t.Fatal("Generated payload should be the 1")
+	cases := map[string]struct {
+		b   [][]byte
+		mtu int
+		res [][]byte
+	}{
+		"NilPayload": {
+			b:   [][]byte{nil},
+			mtu: 100,
+			res: [][]byte{},
+		},
+		"SmallMTU": {
+			b:   [][]byte{{0x00, 0x00}},
+			mtu: 1,
+			res: [][]byte{},
+		},
+		"NegativeMTU": {
+			b:   [][]byte{{0x00, 0x00}},
+			mtu: -1,
+			res: [][]byte{},
+		},
+		"OnePacket": {
+			b:   [][]byte{{0x01, 0x02}},
+			mtu: 10,
+			res: [][]byte{
+				{0x9C, rands[0][0], rands[0][1], 0x01, 0x02},
+			},
+		},
+		"TwoPackets": {
+			b:   [][]byte{{0x01, 0x02}},
+			mtu: 4,
+			res: [][]byte{
+				{0x98, rands[0][0], rands[0][1], 0x01},
+				{0x94, rands[0][0], rands[0][1], 0x02},
+			},
+		},
+		"ThreePackets": {
+			b:   [][]byte{{0x01, 0x02, 0x03}},
+			mtu: 4,
+			res: [][]byte{
+				{0x98, rands[0][0], rands[0][1], 0x01},
+				{0x90, rands[0][0], rands[0][1], 0x02},
+				{0x94, rands[0][0], rands[0][1], 0x03},
+			},
+		},
+		"TwoFramesFourPackets": {
+			b:   [][]byte{{0x01, 0x02, 0x03}, {0x04}},
+			mtu: 5,
+			res: [][]byte{
+				{0x98, rands[0][0], rands[0][1], 0x01, 0x02},
+				{0x94, rands[0][0], rands[0][1], 0x03},
+				{0x9C, rands[1][0], rands[1][1], 0x04},
+			},
+		},
 	}
+	for name, c := range cases {
+		pck := VP9Payloader{Rand: rand.New(rand.NewSource(0))}
+		c := c
+		t.Run(fmt.Sprintf("%s_MTU%d", name, c.mtu), func(t *testing.T) {
+			res := [][]byte{}
+			for _, b := range c.b {
+				res = append(res, pck.Payload(c.mtu, b)...)
+			}
+			if !reflect.DeepEqual(c.res, res) {
+				t.Errorf("Payloaded packet expected to be:\n %v\ngot:\n %v", c.res, res)
+			}
+		})
+	}
+	t.Run("PictureIDOverflow", func(t *testing.T) {
+		pck := VP9Payloader{Rand: rand.New(rand.NewSource(0))}
+		pPrev := VP9Packet{}
+		for i := 0; i < 0x8000; i++ {
+			res := pck.Payload(4, []byte{0x01})
+			p := VP9Packet{}
+			_, err := p.Unmarshal(res[0])
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
 
-	// Negative MTU, small payload
-	res = pck.Payload(-1, payload)
-	if len(res) != 1 {
-		t.Fatal("Generated payload should be the 1")
-	}
+			if i > 0 {
+				if pPrev.PictureID == 0x7FFF {
+					if p.PictureID != 0 {
+						t.Errorf("Picture ID next to 0x7FFF must be 0, got %d", p.PictureID)
+					}
+				} else if pPrev.PictureID+1 != p.PictureID {
+					t.Errorf("Picture ID next must be incremented by 1: %d -> %d", pPrev.PictureID, p.PictureID)
+				}
+			}
 
-	// Positive MTU, small payload
-	res = pck.Payload(2, payload)
-	if len(res) != 1 {
-		t.Fatal("Generated payload should be the 1")
-	}
+			pPrev = p
+		}
+	})
 }
 
 func TestVP9PartitionHeadChecker_IsPartitionHead(t *testing.T) {

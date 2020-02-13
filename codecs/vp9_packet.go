@@ -2,10 +2,20 @@ package codecs
 
 import (
 	"errors"
+	"math/rand"
+	"time"
 )
 
 // VP9Payloader payloads VP9 packets
-type VP9Payloader struct{}
+type VP9Payloader struct {
+	pictureID   uint16
+	initialized bool
+	Rand        *rand.Rand
+}
+
+const (
+	vp9HeaderSize = 3 // Flexible mode 15 bit picture ID
+)
 
 // Payload fragments an VP9 packet across one or more byte arrays
 func (p *VP9Payloader) Payload(mtu int, payload []byte) [][]byte {
@@ -29,7 +39,7 @@ func (p *VP9Payloader) Payload(mtu int, payload []byte) [][]byte {
 	 *       | ..            |
 	 *       +-+-+-+-+-+-+-+-+
 	 *
-	 * Non-flexible mode (F=1)
+	 * Non-flexible mode (F=0)
 	 *        0 1 2 3 4 5 6 7
 	 *       +-+-+-+-+-+-+-+-+
 	 *       |I|P|L|F|B|E|V|-| (REQUIRED)
@@ -47,13 +57,51 @@ func (p *VP9Payloader) Payload(mtu int, payload []byte) [][]byte {
 	 *       +-+-+-+-+-+-+-+-+
 	 */
 
+	if !p.initialized {
+		if p.Rand == nil {
+			p.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+		}
+		p.pictureID = uint16(p.Rand.Int31n(0x7FFF))
+		p.initialized = true
+	}
 	if payload == nil {
 		return [][]byte{}
 	}
 
-	out := make([]byte, len(payload))
-	copy(out, payload)
-	return [][]byte{out}
+	maxFragmentSize := mtu - vp9HeaderSize
+	payloadDataRemaining := len(payload)
+	payloadDataIndex := 0
+
+	if min(maxFragmentSize, payloadDataRemaining) <= 0 {
+		return [][]byte{}
+	}
+
+	var payloads [][]byte
+	for payloadDataRemaining > 0 {
+		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
+		out := make([]byte, vp9HeaderSize+currentFragmentSize)
+
+		out[0] = 0x90 // F=1 I=1
+		if payloadDataIndex == 0 {
+			out[0] |= 0x08 // B=1
+		}
+		if payloadDataRemaining == currentFragmentSize {
+			out[0] |= 0x04 // E=1
+		}
+		out[1] = byte(p.pictureID>>8) | 0x80
+		out[2] = byte(p.pictureID)
+		copy(out[vp9HeaderSize:], payload[payloadDataIndex:payloadDataIndex+currentFragmentSize])
+		payloads = append(payloads, out)
+
+		payloadDataRemaining -= currentFragmentSize
+		payloadDataIndex += currentFragmentSize
+	}
+	p.pictureID++
+	if p.pictureID >= 0x8000 {
+		p.pictureID = 0
+	}
+
+	return payloads
 }
 
 // VP9Packet represents the VP9 header that is stored in the payload of an RTP Packet
@@ -117,6 +165,9 @@ func (p *VP9Packet) Unmarshal(packet []byte) ([]byte, error) {
 		p.PictureID = uint16(packet[pos] & 0x7F)
 		if packet[pos]&0x80 != 0 {
 			pos++
+			if len(packet) <= pos {
+				return nil, errShortPacket
+			}
 			p.PictureID = p.PictureID<<8 | uint16(packet[pos])
 		}
 		pos++
@@ -131,14 +182,13 @@ func (p *VP9Packet) Unmarshal(packet []byte) ([]byte, error) {
 		p.SID = (packet[pos] >> 1) & 0x7
 		p.D = packet[pos]&0x01 != 0
 		pos++
-	}
-
-	if !p.F {
-		if len(packet) <= pos {
-			return nil, errShortPacket
+		if !p.F {
+			if len(packet) <= pos {
+				return nil, errShortPacket
+			}
+			p.TL0PICIDX = packet[pos]
+			pos++
 		}
-		p.TL0PICIDX = packet[pos]
-		pos++
 	}
 
 	if p.F && p.P {
