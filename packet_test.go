@@ -66,7 +66,7 @@ func TestBasic(t *testing.T) {
 	}
 
 	absTime := time.Now().Add(-5 * time.Second)
-	p.SetAbsTime(1, absTime)
+	p.SetAbsTime(15, absTime)
 	time := p.GetAbsTime()
 	log.Printf("%d | %d", absTime.Unix(), time.Unix())
 }

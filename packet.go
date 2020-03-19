@@ -153,7 +153,10 @@ func toNtpTime(t time.Time) uint64 {
 
 // SetAbsTime will set the absolute time extension with the given time.
 func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
-	t := toNtpTime(setTime) >> 14
+	// t := toNtpTime(setTime) << 14
+	log.Printf("orig: %b", setTime.UnixNano())
+	timeUint := ((uint64(setTime.UnixNano()) << 18) / 1000000) & 0x00FFFFFF
+	log.Printf("t: %d | %b", timeUint, timeUint)
 	//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	p.Header.Extension = true
 	p.ExtensionProfile = 0xBEDE
@@ -167,16 +170,31 @@ func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
 		//Len is the number of bytes in the extension - 1
 
 		byte((extensionNo << 4) | 2),
-		byte(t & 0xFF0000 >> 16),
-		byte(t & 0xFF00 >> 8),
-		byte(t & 0xFF),
+		byte(timeUint & 0xFF0000 >> 16),
+		byte(timeUint & 0xFF00 >> 8),
+		byte(timeUint & 0xFF),
 	}
 }
 
 // GetAbsTime will get the absolute time extension and parse into time or zero time.
 func (p *Packet) GetAbsTime() time.Time {
-	log.Printf("first byte: %b | %d", (p.ExtensionPayload[0] >> 4), (p.ExtensionPayload[0] >> 4))
-	log.Printf("second byte: %b | %d", p.ExtensionPayload[1], p.ExtensionPayload[1])
+	log.Printf("extension payload: %b", p.ExtensionPayload[1:])
+	list := []byte{
+		0x00,
+		p.ExtensionPayload[1],
+		p.ExtensionPayload[2],
+		p.ExtensionPayload[3],
+	}
+
+	val := binary.BigEndian.Uint32(list)
+	log.Printf("%b", val<<8)
+	log.Printf("%d", val<<8)
+	// log.Printf("val: %+v", 0x00ffffff&(val<<14))
+
+	// log.Printf("first byte: %d | %d", ((2 | p.ExtensionPayload[0]) >> 4), (p.ExtensionPayload[0] >> 4))
+	log.Println()
+
+	log.Printf("second byte: %b", p.ExtensionPayload[1])
 	log.Printf("third byte: %b", p.ExtensionPayload[2])
 	log.Printf("fourth byte: %b", p.ExtensionPayload[3])
 	return time.Now()
