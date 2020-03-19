@@ -2,8 +2,10 @@ package rtp
 
 import (
 	"bytes"
+	"log"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestBasic(t *testing.T) {
@@ -62,6 +64,11 @@ func TestBasic(t *testing.T) {
 	if p.PayloadOffset != 12 {
 		t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 12)
 	}
+
+	absTime := time.Now().Add(-5 * time.Second)
+	p.SetAbsTime(1, absTime)
+	time := p.GetAbsTime()
+	log.Printf("%d | %d", absTime.Unix(), time.Unix())
 }
 
 func TestExtension(t *testing.T) {

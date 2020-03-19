@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
+	"time"
 )
 
 // TODO(@kixelated) Remove Header.PayloadOffset and Packet.Raw
@@ -133,6 +135,51 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 	h.PayloadOffset = currOffset
 
 	return nil
+}
+
+func toNtpTime(t time.Time) uint64 {
+	var s uint64
+	var f uint64
+	u := uint64(t.UnixNano())
+	s = u / 1e9
+	s += 0x83AA7E80 //offset in seconds between unix epoch and ntp epoch
+	f = u % 1e9
+	f <<= 32
+	f /= 1e9
+	s <<= 32
+
+	return s | f
+}
+
+// SetAbsTime will set the absolute time extension with the given time.
+func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
+	t := toNtpTime(setTime) >> 14
+	//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+	p.Header.Extension = true
+	p.ExtensionProfile = 0xBEDE
+	p.ExtensionPayload = []byte{
+		//the first byte is
+		// 0 1 2 3 4 5 6 7
+		//+-+-+-+-+-+-+-+-+
+		//|  ID   |  len  |
+		//+-+-+-+-+-+-+-+-+
+		//per RFC 5285
+		//Len is the number of bytes in the extension - 1
+
+		byte((extensionNo << 4) | 2),
+		byte(t & 0xFF0000 >> 16),
+		byte(t & 0xFF00 >> 8),
+		byte(t & 0xFF),
+	}
+}
+
+// GetAbsTime will get the absolute time extension and parse into time or zero time.
+func (p *Packet) GetAbsTime() time.Time {
+	log.Printf("first byte: %b | %d", (p.ExtensionPayload[0] >> 4), (p.ExtensionPayload[0] >> 4))
+	log.Printf("second byte: %b | %d", p.ExtensionPayload[1], p.ExtensionPayload[1])
+	log.Printf("third byte: %b", p.ExtensionPayload[2])
+	log.Printf("fourth byte: %b", p.ExtensionPayload[3])
+	return time.Now()
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the Packet this method is called upon
