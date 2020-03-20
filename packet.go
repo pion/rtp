@@ -138,35 +138,19 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 }
 
 func toNtpTime(t time.Time) uint64 {
-	var s uint64
 	var f uint64
 	u := uint64(t.UnixNano())
-	s = u / 1e9
+	s := u / 1e9
 	s += 0x83AA7E80 //offset in seconds between unix epoch and ntp epoch
-	f = u % 1e9
-	f <<= 32
-	f /= 1e9
 	s <<= 32
-
+	f = ((u % 1e9) << 32) / 1e9
 	return s | f
-}
-
-// Divisor ...
-const Divisor = 1000000
-
-// Fraction ...
-const Fraction = 18
-
-func asUnixMilli(t time.Time) uint64 {
-	return uint64(t.UnixNano() / 1e9)
 }
 
 // SetAbsTime will set the absolute time extension with the given time.
 func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
-	value := ((((asUnixMilli(setTime) << Fraction) + 500000) / Divisor) & 0x00FFFFFF) << 8
-	log.Printf("webrtc : %b", value)
-	output := (((value << Fraction) + (Divisor >> 1)) / Divisor) & 0x00ffffff
-	log.Printf("webrtc out: %b | %d | %d | %d", output, output, asUnixMilli(setTime), asUnixMilli(setTime))
+	t := toNtpTime(setTime)
+	value := (t >> 14) & 0xFFFFFF
 	//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	p.Header.Extension = true
 	p.ExtensionProfile = 0xBEDE
@@ -180,14 +164,14 @@ func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
 		//Len is the number of bytes in the extension - 1
 
 		byte((extensionNo << 4) | 2),
-		byte((0xFF0000 & output) >> 16),
-		byte(output & 0xFF00 >> 8),
-		byte(output & 0xFF),
+		byte((0xFF0000 & value) >> 16),
+		byte(value & 0xFF00 >> 8),
+		byte(value & 0xFF),
 	}
 }
 
 // GetAbsTime will get the absolute time extension and parse into time or zero time.
-func (p *Packet) GetAbsTime() time.Time {
+func (p *Packet) GetAbsTime() uint32 {
 	log.Printf("extension payload: %b", p.ExtensionPayload[1:])
 	list := []byte{
 		0x00,
@@ -196,14 +180,7 @@ func (p *Packet) GetAbsTime() time.Time {
 		p.ExtensionPayload[3],
 	}
 
-	val := binary.BigEndian.Uint32(list)
-	log.Printf(">> other end %b", val)
-	log.Printf("%d", val)
-
-	log.Printf("second byte: %b", p.ExtensionPayload[1])
-	log.Printf("third byte: %b", p.ExtensionPayload[2])
-	log.Printf("fourth byte: %b", p.ExtensionPayload[3])
-	return time.Now()
+	return binary.BigEndian.Uint32(list)
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the Packet this method is called upon

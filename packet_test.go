@@ -67,8 +67,21 @@ func TestBasic(t *testing.T) {
 
 	absTime := time.Now().Add(-5 * time.Second)
 	p.SetAbsTime(1, absTime)
-	time := p.GetAbsTime()
-	log.Printf("%d | %d", absTime.Unix(), time.Unix())
+	output := p.GetAbsTime()
+	nowNTP := uint32((toNtpTime(time.Now()) >> 14) & 0xFFFFFF)
+	nowNTPSeconds := nowNTP >> 18
+	seconds := output >> 18
+	delta := nowNTP - output
+	deltaSeconds := delta >> 18
+	if nowNTPSeconds < seconds {
+		deltaSeconds = (uint32(128) - nowNTPSeconds) - seconds
+		log.Printf("wraparound: %d", deltaSeconds)
+	}
+	deltaFractionsOfSeconds := (delta & 0x03ffff)
+	if deltaSeconds != 5 {
+		t.Errorf("Delta seconds was not 5 seconds as expected %d (fractions: %d)", deltaSeconds, deltaFractionsOfSeconds)
+	}
+	log.Printf("second: %d | fractions: %d", deltaSeconds, deltaFractionsOfSeconds)
 }
 
 func TestExtension(t *testing.T) {
