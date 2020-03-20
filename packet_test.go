@@ -65,7 +65,7 @@ func TestBasic(t *testing.T) {
 		t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 12)
 	}
 
-	absTime := time.Now().Add(-5 * time.Second)
+	absTime := time.Now().Add(-5 * time.Second).Add(-9 * 1e8 * time.Nanosecond)
 	p.SetAbsTime(1, absTime)
 	output := p.GetAbsTime()
 	nowNTP := uint32((toNtpTime(time.Now()) >> 14) & 0xFFFFFF)
@@ -73,8 +73,8 @@ func TestBasic(t *testing.T) {
 	seconds := output >> 18
 	delta := nowNTP - output
 	deltaSeconds := delta >> 18
-	if nowNTPSeconds < seconds {
-		deltaSeconds = (uint32(128) - nowNTPSeconds) - seconds
+	if nowNTP < output {
+		deltaSeconds = (uint32(128) - nowNTPSeconds) - uint32(128) + seconds
 		log.Printf("wraparound: %d", deltaSeconds)
 	}
 	deltaFractionsOfSeconds := (delta & 0x03ffff)
