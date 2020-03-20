@@ -152,28 +152,21 @@ func toNtpTime(t time.Time) uint64 {
 }
 
 // Divisor ...
-const Divisor = 1000000000
+const Divisor = 1000000
 
 // Fraction ...
 const Fraction = 18
 
 func asUnixMilli(t time.Time) uint64 {
-	return uint64(t.UnixNano() / 1e6)
+	return uint64(t.UnixNano() / 1e9)
 }
 
 // SetAbsTime will set the absolute time extension with the given time.
 func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
-	t := toNtpTime(setTime) << 14
-	log.Printf("%b", t)
-
-	value := ((((asUnixMilli(setTime) << 18) + 500000) / 1000000) & 0x00FFFFFF) << 8
+	value := ((((asUnixMilli(setTime) << Fraction) + 500000) / Divisor) & 0x00FFFFFF) << 8
 	log.Printf("webrtc : %b", value)
-	output := (((value << 18) + (1000000 >> 1)) / 1000000) & 0x00ffffff
-	log.Printf("webrtc out: %b | %d | %d", output, output, asUnixMilli(setTime)/uint64(time.Microsecond))
-	// log.Printf("%b", (asUnixMilli(setTime) << Fraction) + 500000)/1000000 & 0x00FFFFFFul;
-	// log.Printf("%d", time.Now().UnixNano()/1e9)
-	// timeUint := ((asUnixMilli(setTime) << Fraction) / Divisor) & 0x00FFFFFF
-	// log.Printf("t: %d | %b", timeUint, timeUint)
+	output := (((value << Fraction) + (Divisor >> 1)) / Divisor) & 0x00ffffff
+	log.Printf("webrtc out: %b | %d | %d | %d", output, output, asUnixMilli(setTime), asUnixMilli(setTime))
 	//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	p.Header.Extension = true
 	p.ExtensionProfile = 0xBEDE
