@@ -151,12 +151,29 @@ func toNtpTime(t time.Time) uint64 {
 	return s | f
 }
 
+// Divisor ...
+const Divisor = 1000000000
+
+// Fraction ...
+const Fraction = 18
+
+func asUnixMilli(t time.Time) uint64 {
+	return uint64(t.UnixNano() / 1e6)
+}
+
 // SetAbsTime will set the absolute time extension with the given time.
 func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
-	// t := toNtpTime(setTime) << 14
-	log.Printf("orig: %b", setTime.UnixNano())
-	timeUint := ((uint64(setTime.UnixNano()) << 18) / 1000000) & 0x00FFFFFF
-	log.Printf("t: %d | %b", timeUint, timeUint)
+	t := toNtpTime(setTime) << 14
+	log.Printf("%b", t)
+
+	value := ((((asUnixMilli(setTime) << 18) + 500000) / 1000000) & 0x00FFFFFF) << 8
+	log.Printf("webrtc : %b", value)
+	output := (((value << 18) + (1000000 >> 1)) / 1000000) & 0x00ffffff
+	log.Printf("webrtc out: %b | %d | %d", output, output, asUnixMilli(setTime)/uint64(time.Microsecond))
+	// log.Printf("%b", (asUnixMilli(setTime) << Fraction) + 500000)/1000000 & 0x00FFFFFFul;
+	// log.Printf("%d", time.Now().UnixNano()/1e9)
+	// timeUint := ((asUnixMilli(setTime) << Fraction) / Divisor) & 0x00FFFFFF
+	// log.Printf("t: %d | %b", timeUint, timeUint)
 	//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	p.Header.Extension = true
 	p.ExtensionProfile = 0xBEDE
@@ -170,9 +187,9 @@ func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
 		//Len is the number of bytes in the extension - 1
 
 		byte((extensionNo << 4) | 2),
-		byte(timeUint & 0xFF0000 >> 16),
-		byte(timeUint & 0xFF00 >> 8),
-		byte(timeUint & 0xFF),
+		byte((0xFF0000 & output) >> 16),
+		byte(output & 0xFF00 >> 8),
+		byte(output & 0xFF),
 	}
 }
 
@@ -187,12 +204,8 @@ func (p *Packet) GetAbsTime() time.Time {
 	}
 
 	val := binary.BigEndian.Uint32(list)
-	log.Printf("%b", val<<8)
-	log.Printf("%d", val<<8)
-	// log.Printf("val: %+v", 0x00ffffff&(val<<14))
-
-	// log.Printf("first byte: %d | %d", ((2 | p.ExtensionPayload[0]) >> 4), (p.ExtensionPayload[0] >> 4))
-	log.Println()
+	log.Printf(">> other end %b", val)
+	log.Printf("%d", val)
 
 	log.Printf("second byte: %b", p.ExtensionPayload[1])
 	log.Printf("third byte: %b", p.ExtensionPayload[2])
