@@ -65,23 +65,28 @@ func TestBasic(t *testing.T) {
 		t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 12)
 	}
 
-	absTime := time.Now().Add(-5 * time.Second).Add(-9 * 1e8 * time.Nanosecond)
-	p.SetAbsTime(1, absTime)
-	output := p.GetAbsTime()
-	nowNTP := uint32((toNtpTime(time.Now()) >> 14) & 0xFFFFFF)
-	nowNTPSeconds := nowNTP >> 18
-	seconds := output >> 18
-	delta := nowNTP - output
-	deltaSeconds := delta >> 18
-	if nowNTP < output {
-		deltaSeconds = (uint32(128) - nowNTPSeconds) - uint32(128) + seconds
-		log.Printf("wraparound: %d", deltaSeconds)
+	now := time.Now()
+
+	for {
+		absTime := now.Add(-5 * time.Second).Add(-520 * time.Millisecond)
+		p.SetAbsTime(1, absTime)
+		output := p.GetAbsTime()
+		nowNTP := uint32((toNtpTime(now) >> 14) & 0xFFFFFF)
+		nowNTPSeconds := nowNTP >> 18
+		seconds := output >> 18
+		delta := nowNTP - output
+		deltaSeconds := delta >> 18
+		if nowNTP < output {
+			deltaSeconds = (uint32(128) - nowNTPSeconds) - uint32(128) + seconds
+			log.Printf("wraparound: %d", deltaSeconds)
+		}
+		deltaFractionsOfSeconds := (delta & 0x03ffff) >> 8
+		if deltaSeconds != 5 {
+			t.Errorf("Delta seconds was not 5 seconds as expected %d (fractions: %d)", deltaSeconds, deltaFractionsOfSeconds)
+		}
+		log.Printf("second: %d | fractions: %d", deltaSeconds, deltaFractionsOfSeconds)
+		time.Sleep(500 * time.Millisecond)
 	}
-	deltaFractionsOfSeconds := (delta & 0x03ffff)
-	if deltaSeconds != 5 {
-		t.Errorf("Delta seconds was not 5 seconds as expected %d (fractions: %d)", deltaSeconds, deltaFractionsOfSeconds)
-	}
-	log.Printf("second: %d | fractions: %d", deltaSeconds, deltaFractionsOfSeconds)
 }
 
 func TestExtension(t *testing.T) {
