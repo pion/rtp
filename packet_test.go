@@ -2,6 +2,7 @@ package rtp
 
 import (
 	"bytes"
+	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -68,9 +69,11 @@ func TestBasic(t *testing.T) {
 	absTime := now.Add(-5 * time.Second).Add(-20 * time.Millisecond)
 	p.SetAbsTime(1, absTime)
 	output := p.GetAbsTime()
-	msDiff := AbsSendTimeCompareMS(TimeToAbsSendTime(now), output)
-	if msDiff < 5020 || msDiff > 5030 {
-		t.Errorf("Incorrect delta expected around 5020ms diff got %d", msDiff)
+	delta := AbsSendTimeDelta(TimeToAbsSendTime(now), output)
+	log.Printf("delta: seconds: %d | fractions: %d", AbsSendTimeSeconds(delta), AbsSendTimeFractionsToRoughMillis(delta))
+	cmp := AbsSendTimeCompareMS(TimeToAbsSendTime(now), output)
+	if cmp < 5019 || cmp > 5021 {
+		t.Errorf("delta should be within 5019ms and 5021ms , found: %d", cmp)
 	}
 }
 
