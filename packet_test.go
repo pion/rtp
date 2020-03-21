@@ -65,16 +65,10 @@ func TestBasic(t *testing.T) {
 	}
 
 	now := time.Now()
-	compareMS := func(now uint32, absSendTime uint32) uint64 {
-		secondAsMS := (AbsSendTimeSeconds(now) - AbsSendTimeSeconds(absSendTime)) * 1000
-		ms := AbsSendTimeFractions(now) - AbsSendTimeFractions(absSendTime)
-		return uint64(secondAsMS + ms)
-	}
-
 	absTime := now.Add(-5 * time.Second).Add(-20 * time.Millisecond)
 	p.SetAbsTime(1, absTime)
 	output := p.GetAbsTime()
-	msDiff := compareMS(TimeToAbsSendTime(now), output)
+	msDiff := AbsSendTimeCompareMS(TimeToAbsSendTime(now), output)
 	if msDiff < 5020 || msDiff > 5030 {
 		t.Errorf("Incorrect delta expected around 5020ms diff got %d", msDiff)
 	}

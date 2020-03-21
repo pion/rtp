@@ -27,3 +27,11 @@ func AbsSendTimeSeconds(abs uint32) uint32 {
 func AbsSendTimeFractions(abs uint32) uint32 {
 	return ((abs & 0x03ffff) >> 8)
 }
+
+// AbsSendTimeCompareMS ...
+func AbsSendTimeCompareMS(now uint32, incomingPacketTime uint32) uint64 {
+	// TODO: Handle wraparound.
+	secondAsMS := (AbsSendTimeSeconds(now) - AbsSendTimeSeconds(incomingPacketTime)) * 1000
+	ms := AbsSendTimeFractions(now) - AbsSendTimeFractions(incomingPacketTime)
+	return uint64(secondAsMS + ms)
+}
