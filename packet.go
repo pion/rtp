@@ -149,8 +149,7 @@ func toNtpTime(t time.Time) uint64 {
 
 // SetAbsTime will set the absolute time extension with the given time.
 func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
-	t := toNtpTime(setTime)
-	value := (t >> 14) & 0xFFFFFF
+	t := TimeToAbsSendTime(setTime)
 	//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	p.Header.Extension = true
 	p.ExtensionProfile = 0xBEDE
@@ -164,9 +163,9 @@ func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
 		//Len is the number of bytes in the extension - 1
 
 		byte((extensionNo << 4) | 2),
-		byte((0xFF0000 & value) >> 16),
-		byte(value & 0xFF00 >> 8),
-		byte(value & 0xFF),
+		byte((0xFF0000 & t) >> 16),
+		byte(t & 0xFF00 >> 8),
+		byte(t & 0xFF),
 	}
 }
 
