@@ -2,7 +2,6 @@ package rtp
 
 import (
 	"bytes"
-	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -66,38 +65,18 @@ func TestBasic(t *testing.T) {
 	}
 
 	now := time.Now()
-
 	compareMS := func(now uint32, absSendTime uint32) uint64 {
 		secondAsMS := (AbsSendTimeSeconds(now) - AbsSendTimeSeconds(absSendTime)) * 1000
 		ms := AbsSendTimeFractions(now) - AbsSendTimeFractions(absSendTime)
 		return uint64(secondAsMS + ms)
 	}
 
-	for {
-		absTime := now.Add(-5 * time.Second).Add(-20 * time.Millisecond)
-		p.SetAbsTime(1, absTime)
-		output := p.GetAbsTime()
-		nowNTP := TimeToAbsSendTime(now)
-
-		var delta uint32
-		if nowNTP < output {
-			// TODO: FIX
-			delta = nowNTP - output
-			log.Printf("wraparound: %d", delta)
-		} else {
-			delta = nowNTP - output
-		}
-		deltaSeconds := AbsSendTimeSeconds(delta)
-		deltaFractionsOfSeconds := AbsSendTimeFractions(delta)
-		if deltaSeconds != 5 || deltaFractionsOfSeconds < 520 {
-			t.Errorf("Delta seconds was not 5 seconds as expected %d (fractions: %d)", deltaSeconds, deltaFractionsOfSeconds)
-		}
-		log.Printf("(%d) second: %d | fractions: %d", delta, deltaSeconds, deltaFractionsOfSeconds)
-		log.Printf("(now) second: %d | fractions: %d", AbsSendTimeSeconds(nowNTP), AbsSendTimeFractions(nowNTP))
-		log.Printf("(output) second: %d | fractions: %d", AbsSendTimeSeconds(output), AbsSendTimeFractions(output))
-		log.Printf("diff in ms: %d", compareMS(nowNTP, output))
-		time.Sleep(50 * time.Millisecond)
-		now = now.Add(50 * time.Millisecond)
+	absTime := now.Add(-5 * time.Second).Add(-20 * time.Millisecond)
+	p.SetAbsTime(1, absTime)
+	output := p.GetAbsTime()
+	msDiff := compareMS(TimeToAbsSendTime(now), output)
+	if msDiff < 5020 || msDiff > 5030 {
+		t.Errorf("Incorrect delta expected around 5020ms diff got %d", msDiff)
 	}
 }
 
