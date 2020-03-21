@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"time"
 )
 
@@ -137,16 +136,6 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 	return nil
 }
 
-func toNtpTime(t time.Time) uint64 {
-	var f uint64
-	u := uint64(t.UnixNano())
-	s := u / 1e9
-	s += 0x83AA7E80 //offset in seconds between unix epoch and ntp epoch
-	s <<= 32
-	f = ((u % 1e9) << 32) / 1e9
-	return s | f
-}
-
 // SetAbsTime will set the absolute time extension with the given time.
 func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
 	t := TimeToAbsSendTime(setTime)
@@ -171,7 +160,6 @@ func (p *Packet) SetAbsTime(extensionNo int, setTime time.Time) {
 
 // GetAbsTime will get the absolute time extension and parse into time or zero time.
 func (p *Packet) GetAbsTime() uint32 {
-	log.Printf("extension payload: %b", p.ExtensionPayload[1:])
 	list := []byte{
 		0x00,
 		p.ExtensionPayload[1],

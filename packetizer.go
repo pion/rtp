@@ -79,24 +79,7 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	p.Timestamp += samples
 
 	if len(packets) != 0 && p.extensionNumbers.AbsSendTime != 0 {
-		t := toNtpTime(p.timegen()) >> 14
-		//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
-		packets[len(packets)-1].Header.Extension = true
-		packets[len(packets)-1].ExtensionProfile = 0xBEDE
-		packets[len(packets)-1].ExtensionPayload = []byte{
-			//the first byte is
-			// 0 1 2 3 4 5 6 7
-			//+-+-+-+-+-+-+-+-+
-			//|  ID   |  len  |
-			//+-+-+-+-+-+-+-+-+
-			//per RFC 5285
-			//Len is the number of bytes in the extension - 1
-
-			byte((p.extensionNumbers.AbsSendTime << 4) | 2),
-			byte(t & 0xFF0000 >> 16),
-			byte(t & 0xFF00 >> 8),
-			byte(t & 0xFF),
-		}
+		packets[len(packets)-1].SetAbsTime(p.extensionNumbers.AbsSendTime, p.timegen())
 	}
 
 	return packets
