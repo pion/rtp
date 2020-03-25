@@ -51,20 +51,6 @@ func (p *packetizer) EnableAbsSendTime(value int) {
 	p.extensionNumbers.AbsSendTime = value
 }
 
-func toNtpTime(t time.Time) uint64 {
-	var s uint64
-	var f uint64
-	u := uint64(t.UnixNano())
-	s = u / 1e9
-	s += 0x83AA7E80 //offset in seconds between unix epoch and ntp epoch
-	f = u % 1e9
-	f <<= 32
-	f /= 1e9
-	s <<= 32
-
-	return s | f
-}
-
 // Packetize packetizes the payload of an RTP packet and returns one or more RTP packets
 func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	// Guard against an empty payload
@@ -97,20 +83,14 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 		//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 		packets[len(packets)-1].Header.Extension = true
 		packets[len(packets)-1].ExtensionProfile = 0xBEDE
-		packets[len(packets)-1].ExtensionPayload = []byte{
-			//the first byte is
-			// 0 1 2 3 4 5 6 7
-			//+-+-+-+-+-+-+-+-+
-			//|  ID   |  len  |
-			//+-+-+-+-+-+-+-+-+
-			//per RFC 5285
-			//Len is the number of bytes in the extension - 1
-
-			byte((p.extensionNumbers.AbsSendTime << 4) | 2),
-			byte(t & 0xFF0000 >> 16),
-			byte(t & 0xFF00 >> 8),
-			byte(t & 0xFF),
+		b, err := (&AbsSendTimeExtension{
+			ID:        uint8(p.extensionNumbers.AbsSendTime),
+			Timestamp: t,
+		}).Marshal()
+		if err != nil {
+			return nil // never happens
 		}
+		packets[len(packets)-1].ExtensionPayload = b
 	}
 
 	return packets
