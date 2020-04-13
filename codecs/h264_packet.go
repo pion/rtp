@@ -1,11 +1,27 @@
 package codecs
 
+import (
+	"encoding/binary"
+	"fmt"
+)
+
 // H264Payloader payloads H264 packets
 type H264Payloader struct{}
 
 const (
-	fuaHeaderSize = 2
+	stapaNALUType = 24
+	fuaNALUType   = 28
+
+	fuaHeaderSize       = 2
+	stapaHeaderSize     = 1
+	stapaNALULengthSize = 2
+
+	naluTypeBitmask   = 0x1F
+	naluRefIdcBitmask = 0x60
+	fuaStartBitmask   = 0x80
 )
+
+func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
 
 func emitNalus(nals []byte, emit func([]byte)) {
 	nextInd := func(nalu []byte, start int) (indStart int, indLen int) {
@@ -50,8 +66,8 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 	}
 
 	emitNalus(payload, func(nalu []byte) {
-		naluType := nalu[0] & 0x1F
-		naluRefIdc := nalu[0] & 0x60
+		naluType := nalu[0] & naluTypeBitmask
+		naluRefIdc := nalu[0] & naluRefIdcBitmask
 
 		if naluType == 9 || naluType == 12 {
 			return
@@ -98,7 +114,7 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 			// +-+-+-+-+-+-+-+-+
 			// |F|NRI|  Type   |
 			// +---------------+
-			out[0] = 28
+			out[0] = fuaNALUType
 			out[0] |= naluRefIdc
 
 			// +---------------+
@@ -125,4 +141,61 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 	})
 
 	return payloads
+}
+
+// H264Packet represents the H264 header that is stored in the payload of an RTP Packet
+type H264Packet struct {
+}
+
+// Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon
+func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("invalid nil packet")
+	} else if len(payload) <= 2 {
+		return nil, fmt.Errorf("Payload is not large enough to container header and payload")
+	}
+
+	// NALU Types
+	// https://tools.ietf.org/html/rfc6184#section-5.4
+	naluType := payload[0] & naluTypeBitmask
+	switch {
+	case naluType > 0 && naluType < 24:
+		return append(annexbNALUStartCode(), payload...), nil
+
+	case naluType == stapaNALUType:
+		currOffset := int(stapaHeaderSize)
+		result := []byte{}
+		for currOffset < len(payload) {
+			naluSize := int(binary.BigEndian.Uint16(payload[currOffset:]))
+			currOffset += stapaNALULengthSize
+
+			if currOffset+len(payload) < currOffset+naluSize {
+				return nil, fmt.Errorf("STAP-A declared size(%d) is larger then buffer(%d)", naluSize, len(payload)-currOffset)
+			}
+
+			result = append(result, annexbNALUStartCode()...)
+			result = append(result, payload[currOffset:currOffset+naluSize]...)
+			currOffset += naluSize
+		}
+		return result, nil
+
+	case naluType == fuaNALUType:
+		if len(payload) < fuaHeaderSize {
+			return nil, fmt.Errorf("Payload is not large enough to be FU-A")
+		}
+
+		if payload[1]&fuaStartBitmask != 0 {
+			naluRefIdc := payload[0] & naluRefIdcBitmask
+			fragmentedNaluType := payload[1] & naluTypeBitmask
+
+			// Take a copy of payload since we are mutating it.
+			payloadCopy := append([]byte{}, payload...)
+			payloadCopy[fuaHeaderSize-1] = naluRefIdc | fragmentedNaluType
+			return append(annexbNALUStartCode(), payloadCopy[fuaHeaderSize-1:]...), nil
+		}
+
+		return payload[fuaHeaderSize:], nil
+	}
+
+	return nil, fmt.Errorf("nalu type %d is currently not handled", naluType)
 }
