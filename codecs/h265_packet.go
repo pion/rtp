@@ -942,8 +942,7 @@ func (p *H265Packet) Unmarshal(payload []byte) ([]byte, error) { // nolint:cyclo
 // - *H265SingleNALUnitPacket
 // - *H265FragmentationUnitPacket
 // - *H265AggregationPacket
-// - *H265PACIPacket
-// nolint:golint
+// - *H265PACIPacket.
 func (p *H265Packet) Packet() isH265Packet {
 	return p.packet
 }
