@@ -22,14 +22,18 @@ func TestBasic(t *testing.T) {
 			Marker:           true,
 			Extension:        true,
 			ExtensionProfile: 1,
-			ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
-			Version:          2,
-			PayloadOffset:    20,
-			PayloadType:      96,
-			SequenceNumber:   27023,
-			Timestamp:        3653407706,
-			SSRC:             476325762,
-			CSRC:             []uint32{},
+			Extensions: Extensions{
+				0: []byte{
+					0xFF, 0xFF, 0xFF, 0xFF,
+				},
+			},
+			Version:        2,
+			PayloadOffset:  20,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
 		Raw:     rawPkt,
@@ -86,7 +90,11 @@ func TestExtension(t *testing.T) {
 	p = &Packet{Header: Header{
 		Extension:        true,
 		ExtensionProfile: 3,
-		ExtensionPayload: []byte{0},
+		Extensions: Extensions{
+			0: []byte{
+				0,
+			},
+		},
 	},
 		Payload: []byte{},
 	}
@@ -95,6 +103,336 @@ func TestExtension(t *testing.T) {
 	}
 }
 
+func TestRFC8285Extension(t *testing.T) {
+	p := &Packet{}
+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01, 0x50, 0xAA, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	if err := p.Unmarshal(rawPkt); err != nil {
+		t.Fatal("Unmarshal err for valid extension")
+	}
+
+	p = &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0xBEDE,
+		Extensions: Extensions{
+			5: []byte{
+				0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  18,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: rawPkt[18:],
+		Raw:     rawPkt,
+	}
+
+	dstData, _ := p.Marshal()
+	if !bytes.Equal(dstData, rawPkt) {
+		t.Error("Marshal failed")
+	}
+}
+
+func TestRFC8285MultipleExtensionsWithPadding(t *testing.T) {
+	p := &Packet{}
+
+	//  0                   1                   2                   3
+	//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |       0xBE    |    0xDE       |           length=3            |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |  ID   | L=0   |     data      |  ID   |  L=1  |   data...
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	//       ...data   |    0 (pad)    |    0 (pad)    |  ID   | L=3   |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |                          data                                 |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x03, 0x10, 0xAA, 0x21, 0xBB,
+		0xBB, 0x00, 0x00, 0x33, 0xCC, 0xCC, 0xCC, 0xCC, 0x98,
+		0x36, 0xbe, 0x88, 0x9e,
+	}
+	if err := p.Unmarshal(rawPkt); err != nil {
+		t.Fatal("Unmarshal err for valid extension")
+	}
+
+	ext1 := p.GetExtension(1)
+	ext1Expect := []byte{0xAA}
+	if !bytes.Equal(ext1, ext1Expect) {
+		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext1, ext1Expect)
+	}
+
+	ext2 := p.GetExtension(2)
+	ext2Expect := []byte{0xBB, 0xBB}
+	if !bytes.Equal(ext2, ext2Expect) {
+		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext2, ext2Expect)
+	}
+
+	ext3 := p.GetExtension(3)
+	ext3Expect := []byte{0xCC, 0xCC, 0xCC, 0xCC}
+	if !bytes.Equal(ext3, ext3Expect) {
+		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
+	}
+}
+
+func TestRFC8285MultipleExtensions(t *testing.T) {
+	//  0                   1                   2                   3
+	//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |       0xBE    |    0xDE       |           length=3            |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |  ID=1 | L=0   |     data      |  ID=2 |  L=1  |   data...
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	//       ...data   |  ID=3 | L=3   |           data...
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	//             ...data             |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x03, 0x10, 0xAA, 0x21, 0xBB,
+		0xBB, 0x33, 0xCC, 0xCC, 0xCC, 0xCC,
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0xBEDE,
+		Extensions: Extensions{
+			1: []byte{
+				0xAA,
+			},
+			2: []byte{
+				0xBB, 0xBB,
+			},
+			3: []byte{
+				0xCC, 0xCC, 0xCC, 0xCC,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: rawPkt[26:],
+		Raw:     rawPkt,
+	}
+
+	dstData, _ := p.Marshal()
+	if !bytes.Equal(dstData, rawPkt) {
+		t.Errorf("Marshal failed raw \nMarshaled: %+v,\nrawPkt:     %+v", dstData, rawPkt)
+	}
+}
+
+func TestRFC8285SetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:         true,
+		Extension:      false,
+		Extensions:     Extensions{},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	extension := []byte{0xAA, 0xAA}
+	err := p.SetExtension(1, extension)
+	if err != nil {
+		t.Error("Error setting extension")
+	}
+
+	if p.Extension != true {
+		t.Error("Extension should be set to true")
+	}
+
+	if len(p.Extensions) != 1 {
+		t.Error("Extensions should be set to 1")
+	}
+
+	if !bytes.Equal(p.GetExtension(1), extension) {
+		t.Error("Extension value is not set")
+	}
+}
+
+func TestRFC8285SetExtensionShouldUpdateExistingExension(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0xBEDE,
+		Extensions: Extensions{
+			1: []byte{
+				0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	if !bytes.Equal(p.GetExtension(1), []byte{0xAA}) {
+		t.Error("Extension value not initialize properly")
+	}
+
+	extension := []byte{0xBB}
+	err := p.SetExtension(1, extension)
+	if err != nil {
+		t.Error("Error setting extension")
+	}
+
+	if !bytes.Equal(p.GetExtension(1), extension) {
+		t.Error("Extension value was not set")
+	}
+}
+
+func TestRFC8285SetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0xBEDE,
+		Extensions: Extensions{
+			1: []byte{
+				0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	if p.SetExtension(0, []byte{0xBB}) == nil {
+		t.Error("SetExtension did not error on invalid id")
+	}
+
+	if p.SetExtension(15, []byte{0xBB}) == nil {
+		t.Error("SetExtension did not error on invalid id")
+	}
+}
+
+func TestRFC8285ExtensionTermianteProcessingWhenReservedIDEncountered(t *testing.T) {
+	p := &Packet{}
+
+	reservedIDPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01, 0xF0, 0xAA, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	if err := p.Unmarshal(reservedIDPkt); err != nil {
+		t.Error("Unmarshal error on packet with reserved extension id")
+	}
+
+	if len(p.Extensions) != 0 {
+		t.Error("Extensions should be empty for invalid id")
+	}
+
+	payload := reservedIDPkt[17:]
+	if !bytes.Equal(p.Payload, payload) {
+		t.Errorf("p.Payload must be same as payload.\n  p.Payload: %+v,\n payload: %+v",
+			p.Payload, payload,
+		)
+	}
+}
+
+func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0x1111,
+		Extensions: Extensions{
+			0: []byte{
+				0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	expect := []byte{0xBB}
+	if p.SetExtension(0, expect) != nil {
+		t.Error("SetExtension should not error on valid id")
+	}
+
+	actual := p.GetExtension(0)
+	if !bytes.Equal(actual, expect) {
+		t.Error("p.GetExtension returned incorrect value.")
+	}
+}
+
+func TestRFC3550SetExtensionShouldSetExtension(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0x1111,
+		Version:          2,
+		PayloadOffset:    26,
+		PayloadType:      96,
+		SequenceNumber:   27023,
+		Timestamp:        3653407706,
+		SSRC:             476325762,
+		CSRC:             []uint32{},
+	},
+		Payload: payload,
+	}
+
+	if p.SetExtension(1, []byte{0xBB}) == nil {
+		t.Error("SetExtension did not error on invalid id")
+	}
+}
 func TestRoundtrip(t *testing.T) {
 	rawPkt := []byte{
 		0x00, 0x10, 0x23, 0x45, 0x12, 0x34, 0x45, 0x67, 0xCC, 0xDD, 0xEE, 0xFF,
