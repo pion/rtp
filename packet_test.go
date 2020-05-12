@@ -103,7 +103,7 @@ func TestExtension(t *testing.T) {
 	}
 }
 
-func TestRFC8285Extension(t *testing.T) {
+func TestRFC8285OneByteExtension(t *testing.T) {
 	p := &Packet{}
 
 	rawPkt := []byte{
@@ -141,7 +141,7 @@ func TestRFC8285Extension(t *testing.T) {
 	}
 }
 
-func TestRFC8285MultipleExtensionsWithPadding(t *testing.T) {
+func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
 	p := &Packet{}
 
 	//  0                   1                   2                   3
@@ -184,7 +184,7 @@ func TestRFC8285MultipleExtensionsWithPadding(t *testing.T) {
 	}
 }
 
-func TestRFC8285MultipleExtensions(t *testing.T) {
+func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 	//  0                   1                   2                   3
 	//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -237,7 +237,152 @@ func TestRFC8285MultipleExtensions(t *testing.T) {
 	}
 }
 
-func TestRFC8285SetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
+func TestRFC8285TwoByteExtension(t *testing.T) {
+	p := &Packet{}
+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x10, 0x00, 0x00, 0x01, 0x05, 0x18, 0xAA, 0xAA,
+		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+		0xAA, 0xAA, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	if err := p.Unmarshal(rawPkt); err != nil {
+		t.Fatal("Unmarshal err for valid extension")
+	}
+
+	p = &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0x1000,
+		Extensions: Extensions{
+			5: []byte{
+				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  42,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: rawPkt[42:],
+		Raw:     rawPkt,
+	}
+
+	dstData, _ := p.Marshal()
+	if !bytes.Equal(dstData, rawPkt) {
+		t.Errorf("Marshal failed \nExpected %v+ \nActual:  %v+", rawPkt, dstData)
+	}
+}
+
+func TestRFC8285TwoByteMultipleExtensionsWithPadding(t *testing.T) {
+	p := &Packet{}
+
+	// 0                   1                   2                   3
+	// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |       0x10    |    0x00       |           length=3            |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |      ID=1     |     L=0       |     ID=2      |     L=1       |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |       data    |    0 (pad)    |       ID=3    |      L=4      |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |                          data                                 |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x10, 0x00, 0x00, 0x03, 0x01, 0x00, 0x02, 0x01,
+		0xBB, 0x00, 0x03, 0x04, 0xCC, 0xCC, 0xCC, 0xCC, 0x98, 0x36,
+		0xbe, 0x88, 0x9e,
+	}
+	if err := p.Unmarshal(rawPkt); err != nil {
+		t.Fatal("Unmarshal err for valid extension")
+	}
+
+	ext1 := p.GetExtension(1)
+	ext1Expect := []byte{}
+	if !bytes.Equal(ext1, ext1Expect) {
+		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext1, ext1Expect)
+	}
+
+	ext2 := p.GetExtension(2)
+	ext2Expect := []byte{0xBB}
+	if !bytes.Equal(ext2, ext2Expect) {
+		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext2, ext2Expect)
+	}
+
+	ext3 := p.GetExtension(3)
+	ext3Expect := []byte{0xCC, 0xCC, 0xCC, 0xCC}
+	if !bytes.Equal(ext3, ext3Expect) {
+		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
+	}
+}
+
+func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
+	// 0                   1                   2                   3
+	// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |       0x10    |    0x00       |           length=3            |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |      ID=1     |     L=0       |     ID=2      |     L=1       |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	// |       data    |       ID=3    |      L=17      |    data...
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	//                            ...data...
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	//                            ...data...
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	//                            ...data...
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	//                            ...data...                           |
+	// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x10, 0x00, 0x00, 0x03, 0x01, 0x00, 0x02, 0x01,
+		0xBB, 0x03, 0x11, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+		0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0x1000,
+		Extensions: Extensions{
+			1: []byte{},
+			2: []byte{
+				0xBB,
+			},
+			3: []byte{
+				0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+				0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  40,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: rawPkt[40:],
+		Raw:     rawPkt,
+	}
+
+	dstData, _ := p.Marshal()
+	if !bytes.Equal(dstData, rawPkt) {
+		t.Errorf("Marshal failed raw \nMarshaled: %+v,\nrawPkt:    %+v", dstData, rawPkt)
+	}
+}
+
+func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
 	payload := []byte{
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
@@ -267,6 +412,10 @@ func TestRFC8285SetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
 		t.Error("Extension should be set to true")
 	}
 
+	if p.ExtensionProfile != 0xBEDE {
+		t.Error("Extension profile should be set to 0xBEDE")
+	}
+
 	if len(p.Extensions) != 1 {
 		t.Error("Extensions should be set to 1")
 	}
@@ -276,7 +425,7 @@ func TestRFC8285SetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
 	}
 }
 
-func TestRFC8285SetExtensionShouldUpdateExistingExension(t *testing.T) {
+func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 	payload := []byte{
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
@@ -316,7 +465,7 @@ func TestRFC8285SetExtensionShouldUpdateExistingExension(t *testing.T) {
 	}
 }
 
-func TestRFC8285SetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T) {
+func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T) {
 	payload := []byte{
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
@@ -350,7 +499,7 @@ func TestRFC8285SetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T) {
 	}
 }
 
-func TestRFC8285ExtensionTermianteProcessingWhenReservedIDEncountered(t *testing.T) {
+func TestRFC8285OneByteExtensionTermianteProcessingWhenReservedIDEncountered(t *testing.T) {
 	p := &Packet{}
 
 	reservedIDPkt := []byte{
@@ -370,6 +519,185 @@ func TestRFC8285ExtensionTermianteProcessingWhenReservedIDEncountered(t *testing
 		t.Errorf("p.Payload must be same as payload.\n  p.Payload: %+v,\n payload: %+v",
 			p.Payload, payload,
 		)
+	}
+}
+
+func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0xBEDE,
+		Extensions: Extensions{
+			1: []byte{
+				0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	if p.SetExtension(1, []byte{
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+	}) == nil {
+		t.Error("SetExtension did not error on too large payload")
+	}
+}
+
+func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:         true,
+		Extension:      false,
+		Extensions:     Extensions{},
+		Version:        2,
+		PayloadOffset:  31,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	extension := []byte{
+		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+	}
+	err := p.SetExtension(1, extension)
+	if err != nil {
+		t.Error("Error setting extension")
+	}
+
+	if p.Extension != true {
+		t.Error("Extension should be set to true")
+	}
+
+	if p.ExtensionProfile != 0x1000 {
+		t.Error("Extension profile should be set to 0xBEDE")
+	}
+
+	if len(p.Extensions) != 1 {
+		t.Error("Extensions should be set to 1")
+	}
+
+	if !bytes.Equal(p.GetExtension(1), extension) {
+		t.Error("Extension value is not set")
+	}
+}
+
+func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0x1000,
+		Extensions: Extensions{
+			1: []byte{
+				0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	if !bytes.Equal(p.GetExtension(1), []byte{0xAA}) {
+		t.Error("Extension value not initialize properly")
+	}
+
+	extension := []byte{
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+	}
+	err := p.SetExtension(1, extension)
+	if err != nil {
+		t.Error("Error setting extension")
+	}
+
+	if !bytes.Equal(p.GetExtension(1), extension) {
+		t.Error("Extension value was not set")
+	}
+}
+
+func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0xBEDE,
+		Extensions: Extensions{
+			1: []byte{
+				0xAA,
+			},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	if p.SetExtension(1, []byte{
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+	}) == nil {
+		t.Error("SetExtension did not error on too large payload")
 	}
 }
 
@@ -409,7 +737,7 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 	}
 }
 
-func TestRFC3550SetExtensionShouldSetExtension(t *testing.T) {
+func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 	payload := []byte{
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
