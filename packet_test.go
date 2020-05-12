@@ -22,10 +22,10 @@ func TestBasic(t *testing.T) {
 			Marker:           true,
 			Extension:        true,
 			ExtensionProfile: 1,
-			Extensions: Extensions{
-				0: []byte{
+			Extensions: []Extension{
+				{0, []byte{
 					0xFF, 0xFF, 0xFF, 0xFF,
-				},
+				}},
 			},
 			Version:        2,
 			PayloadOffset:  20,
@@ -90,10 +90,10 @@ func TestExtension(t *testing.T) {
 	p = &Packet{Header: Header{
 		Extension:        true,
 		ExtensionProfile: 3,
-		Extensions: Extensions{
-			0: []byte{
+		Extensions: []Extension{
+			{0, []byte{
 				0,
-			},
+			}},
 		},
 	},
 		Payload: []byte{},
@@ -118,10 +118,10 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0xBEDE,
-		Extensions: Extensions{
-			5: []byte{
+		Extensions: []Extension{
+			{5, []byte{
 				0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  18,
@@ -208,16 +208,16 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0xBEDE,
-		Extensions: Extensions{
-			1: []byte{
+		Extensions: []Extension{
+			{1, []byte{
 				0xAA,
-			},
-			2: []byte{
+			}},
+			{2, []byte{
 				0xBB, 0xBB,
-			},
-			3: []byte{
+			}},
+			{3, []byte{
 				0xCC, 0xCC, 0xCC, 0xCC,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  26,
@@ -255,12 +255,12 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0x1000,
-		Extensions: Extensions{
-			5: []byte{
+		Extensions: []Extension{
+			{5, []byte{
 				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  42,
@@ -354,15 +354,15 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0x1000,
-		Extensions: Extensions{
-			1: []byte{},
-			2: []byte{
+		Extensions: []Extension{
+			{1, []byte{}},
+			{2, []byte{
 				0xBB,
-			},
-			3: []byte{
+			}},
+			{3, []byte{
 				0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
 				0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  40,
@@ -390,7 +390,6 @@ func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 	p := &Packet{Header: Header{
 		Marker:         true,
 		Extension:      false,
-		Extensions:     Extensions{},
 		Version:        2,
 		PayloadOffset:  26,
 		PayloadType:    96,
@@ -434,10 +433,10 @@ func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0xBEDE,
-		Extensions: Extensions{
-			1: []byte{
+		Extensions: []Extension{
+			{1, []byte{
 				0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  26,
@@ -474,10 +473,10 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0xBEDE,
-		Extensions: Extensions{
-			1: []byte{
+		Extensions: []Extension{
+			{1, []byte{
 				0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  26,
@@ -531,10 +530,10 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0xBEDE,
-		Extensions: Extensions{
-			1: []byte{
+		Extensions: []Extension{
+			{1, []byte{
 				0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  26,
@@ -563,7 +562,6 @@ func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 	p := &Packet{Header: Header{
 		Marker:         true,
 		Extension:      false,
-		Extensions:     Extensions{},
 		Version:        2,
 		PayloadOffset:  31,
 		PayloadType:    96,
@@ -610,10 +608,10 @@ func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0x1000,
-		Extensions: Extensions{
-			1: []byte{
+		Extensions: []Extension{
+			{1, []byte{
 				0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  26,
@@ -653,10 +651,10 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0xBEDE,
-		Extensions: Extensions{
-			1: []byte{
+		Extensions: []Extension{
+			{1, []byte{
 				0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  26,
@@ -710,10 +708,10 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 		Marker:           true,
 		Extension:        true,
 		ExtensionProfile: 0x1111,
-		Extensions: Extensions{
-			0: []byte{
+		Extensions: []Extension{
+			{0, []byte{
 				0xAA,
-			},
+			}},
 		},
 		Version:        2,
 		PayloadOffset:  26,
