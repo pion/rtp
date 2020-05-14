@@ -129,15 +129,14 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 
 		h.ExtensionProfile = binary.BigEndian.Uint16(rawPacket[currOffset:])
 		currOffset += 2
+		extensionLength := int(binary.BigEndian.Uint16(rawPacket[currOffset:])) * 4
+		currOffset += 2
 
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
 		case extensionProfileOneByte:
-			extensionLength := int(binary.BigEndian.Uint16(rawPacket[currOffset:]))
-			currOffset += 2
-
-			i := 0
-			for i < extensionLength {
+			end := currOffset + extensionLength
+			for currOffset < end {
 				if rawPacket[currOffset] == 0x00 { // padding
 					currOffset++
 					continue
@@ -154,15 +153,12 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 				extension := Extension{id: extid, payload: rawPacket[currOffset : currOffset+len]}
 				h.Extensions = append(h.Extensions, extension)
 				currOffset += len
-				i++
 			}
+
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
-			extensionLength := int(binary.BigEndian.Uint16(rawPacket[currOffset:]))
-			currOffset += 2
-
-			i := 0
-			for i < extensionLength {
+			end := currOffset + extensionLength
+			for currOffset < end {
 				if rawPacket[currOffset] == 0x00 { // padding
 					currOffset++
 					continue
@@ -177,14 +173,9 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 				extension := Extension{id: extid, payload: rawPacket[currOffset : currOffset+len]}
 				h.Extensions = append(h.Extensions, extension)
 				currOffset += len
-
-				i++
 			}
 
 		default: // RFC3550 Extension
-			extensionLength := int(binary.BigEndian.Uint16(rawPacket[currOffset:])) * 4
-			currOffset += 2
-
 			if len(rawPacket) < currOffset+extensionLength {
 				return fmt.Errorf("RTP header size insufficient for extension length; %d < %d", len(rawPacket), currOffset+extensionLength)
 			}
@@ -271,21 +262,15 @@ func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 		n += 4
 	}
 
-	// Calculate the size of the header by seeing how many bytes we're written.
-	// TODO This is a BUG but fixing it causes more issues.
-	h.PayloadOffset = n
-
 	if h.Extension {
+		extHeaderPos := n
 		binary.BigEndian.PutUint16(buf[n+0:n+2], h.ExtensionProfile)
-		n += 2
+		n += 4
+		startExtensionsPos := n
 
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
 		case extensionProfileOneByte:
-			extSize := uint16(len(h.Extensions))
-			binary.BigEndian.PutUint16(buf[n:n+2], extSize)
-			n += 2
-
 			for _, extension := range h.Extensions {
 				buf[n] = extension.id<<4 | (uint8(len(extension.payload)) - 1)
 				n++
@@ -293,10 +278,6 @@ func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 			}
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
-			extSize := uint16(len(h.Extensions))
-			binary.BigEndian.PutUint16(buf[n:n+2], extSize)
-			n += 2
-
 			for _, extension := range h.Extensions {
 				buf[n] = extension.id
 				n++
@@ -310,12 +291,20 @@ func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 				//the payload must be in 32-bit words.
 				return 0, io.ErrShortBuffer
 			}
-			extSize := uint16(extlen / 4)
-			binary.BigEndian.PutUint16(buf[n:n+2], extSize)
-			n += 2
 			n += copy(buf[n:], h.Extensions[0].payload)
 		}
+
+		// calculate extensions size and round to 4 bytes boundaries
+		extSize := n - startExtensionsPos
+		roundedExtSize := ((extSize + 3) / 4) * 4
+
+		binary.BigEndian.PutUint16(buf[extHeaderPos+2:extHeaderPos+4], uint16(roundedExtSize/4))
+
+		// add padding to reach 4 bytes boundaries
+		n += roundedExtSize - extSize
 	}
+
+	h.PayloadOffset = n
 
 	return n, nil
 }
@@ -326,23 +315,27 @@ func (h *Header) MarshalSize() int {
 	size := 12 + (len(h.CSRC) * csrcLength)
 
 	if h.Extension {
-		size += 4
+		extSize := 4
 
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
 		case extensionProfileOneByte:
 			for _, extension := range h.Extensions {
-				size += 1 + len(extension.payload)
+				extSize += 1 + len(extension.payload)
 			}
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
 			for _, extension := range h.Extensions {
-				size += 2 + len(extension.payload)
+				extSize += 2 + len(extension.payload)
 			}
 		default:
-			size += len(h.Extensions[0].payload)
+			extSize += len(h.Extensions[0].payload)
 		}
+
+		// extensions size must have 4 bytes boundaries
+		size += ((extSize + 3) / 4) * 4
 	}
+
 	return size
 }
 
