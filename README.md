@@ -42,6 +42,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [adwpc](https://github.com/adwpc) *add transport-cc extension*
 * [Bao Nguyen](https://github.com/sysbot) *add VP9 noop, bug fixes.
 * [Tarrence van As](https://github.com/tarrencev) *add audio level extension*
+* [Simone Gotti](https://github.com/sgotti)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
