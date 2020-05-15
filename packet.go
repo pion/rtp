@@ -354,10 +354,10 @@ func (h *Header) SetExtension(id uint8, payload []byte) error {
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
 			if id < 1 || id > 255 {
-				return fmt.Errorf("header extension id must be between 1 and 14 for RFC 5285 extensions")
+				return fmt.Errorf("header extension id must be between 1 and 255 for RFC 5285 extensions")
 			}
-			if len(payload) > 256 {
-				return fmt.Errorf("header extension payload must be 256bytes or less for RFC 5285 two byte extensions")
+			if len(payload) > 255 {
+				return fmt.Errorf("header extension payload must be 255bytes or less for RFC 5285 two byte extensions")
 			}
 		default: // RFC3550 Extension
 			if id != 0 {
@@ -392,12 +392,29 @@ func (h *Header) SetExtension(id uint8, payload []byte) error {
 
 // GetExtension returns an RTP header extension
 func (h *Header) GetExtension(id uint8) []byte {
+	if !h.Extension {
+		return nil
+	}
 	for _, extension := range h.Extensions {
 		if extension.id == id {
 			return extension.payload
 		}
 	}
 	return nil
+}
+
+// DelExtension Removes an RTP Header extension
+func (h *Header) DelExtension(id uint8) error {
+	if !h.Extension {
+		return fmt.Errorf("h.Extension not enabled")
+	}
+	for i, extension := range h.Extensions {
+		if extension.id == id {
+			h.Extensions = append(h.Extensions[:i], h.Extensions[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("extension not found")
 }
 
 // Marshal serializes the packet into bytes.

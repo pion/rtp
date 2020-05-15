@@ -447,6 +447,102 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 	}
 }
 
+func TestRFC8285GetExtensionReturnsNilWhenExtensionsDisabled(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:         true,
+		Extension:      false,
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	err := p.GetExtension(1)
+	if err != nil {
+		t.Error("Should return nil on GetExtension when h.Extension: false")
+	}
+}
+
+func TestRFC8285DelExtension(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:           true,
+		Extension:        true,
+		ExtensionProfile: 0xBEDE,
+		Extensions: []Extension{
+			{1, []byte{
+				0xAA,
+			}},
+		},
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	ext := p.GetExtension(1)
+	if ext == nil {
+		t.Error("Extension should exist")
+	}
+
+	err := p.DelExtension(1)
+	if err != nil {
+		t.Error("Should successfully delete extension")
+	}
+
+	ext = p.GetExtension(1)
+	if ext != nil {
+		t.Error("Extension should not exist")
+	}
+
+	err = p.DelExtension(1)
+	if err == nil {
+		t.Error("Should return error when deleting extension that doesnt exist")
+	}
+}
+
+func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:         true,
+		Extension:      false,
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	err := p.DelExtension(1)
+	if err == nil {
+		t.Error("Should return error on DelExtension when h.Extension: false")
+	}
+}
+
 func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
 	payload := []byte{
 		// Payload
