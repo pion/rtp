@@ -41,11 +41,9 @@ func TestNtpConversion(t *testing.T) {
 func TestAbsSendTimeExtension_Roundtrip(t *testing.T) {
 	tests := []AbsSendTimeExtension{
 		{
-			ID:        1,
 			Timestamp: 123456,
 		},
 		{
-			ID:        2,
 			Timestamp: 654321,
 		},
 	}
@@ -57,9 +55,6 @@ func TestAbsSendTimeExtension_Roundtrip(t *testing.T) {
 		var out AbsSendTimeExtension
 		if err = out.Unmarshal(b); err != nil {
 			t.Fatal(err)
-		}
-		if in.ID != out.ID {
-			t.Errorf("[%d] ID differs, expected: %d, got: %d", i, in.ID, out.ID)
 		}
 		if in.Timestamp != out.Timestamp {
 			t.Errorf("[%d] Timestamp differs, expected: %d, got: %d", i, in.Timestamp, out.Timestamp)
@@ -77,7 +72,7 @@ func TestAbsSendTimeExtension_Estimate(t *testing.T) {
 	}
 	for i, in := range tests {
 		inTime := toTime(in.sendNTP)
-		send := &AbsSendTimeExtension{0, in.sendNTP >> 14}
+		send := &AbsSendTimeExtension{in.sendNTP >> 14}
 		b, err := send.Marshal()
 		if err != nil {
 			t.Fatal(err)
