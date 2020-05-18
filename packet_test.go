@@ -3,6 +3,7 @@ package rtp
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -920,6 +921,69 @@ func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 		t.Error("SetExtension did not error on invalid id")
 	}
 }
+
+func TestUnmarshal_ErrorHandling(t *testing.T) {
+	cases := map[string]struct {
+		input []byte
+		err   error
+	}{
+		"ShortHeader": {
+			input: []byte{
+				0x80, 0xe0, 0x69, 0x8f,
+				0xd9, 0xc2, 0x93, 0xda, // timestamp
+				0x1c, 0x64, 0x27, // SSRC (one byte missing)
+			},
+			err: errHeaderSizeInsufficient,
+		},
+		"MissingCSRC": {
+			input: []byte{
+				0x81, 0xe0, 0x69, 0x8f,
+				0xd9, 0xc2, 0x93, 0xda, // timestamp
+				0x1c, 0x64, 0x27, 0x82, // SSRC
+			},
+			err: errHeaderSizeInsufficient,
+		},
+		"MissingExtension": {
+			input: []byte{
+				0x90, 0xe0, 0x69, 0x8f,
+				0xd9, 0xc2, 0x93, 0xda, // timestamp
+				0x1c, 0x64, 0x27, 0x82, // SSRC
+			},
+			err: errHeaderSizeInsufficientForExtension,
+		},
+		"MissingExtensionData": {
+			input: []byte{
+				0x90, 0xe0, 0x69, 0x8f,
+				0xd9, 0xc2, 0x93, 0xda, // timestamp
+				0x1c, 0x64, 0x27, 0x82, // SSRC
+				0xBE, 0xDE, 0x00, 0x03, // specified to have 3 extensions, but actually not
+			},
+			err: errHeaderSizeInsufficientForExtension,
+		},
+		"MissingExtensionDataPayload": {
+			input: []byte{
+				0x90, 0xe0, 0x69, 0x8f,
+				0xd9, 0xc2, 0x93, 0xda, // timestamp
+				0x1c, 0x64, 0x27, 0x82, // SSRC
+				0xBE, 0xDE, 0x00, 0x01, // have 1 extension
+				0x12, 0x00, // length of the payload is expected to be 3, but actually have only 1
+			},
+			err: errHeaderSizeInsufficientForExtension,
+		},
+	}
+
+	for name, testCase := range cases {
+		testCase := testCase
+		t.Run(name, func(t *testing.T) {
+			h := &Header{}
+			err := h.Unmarshal(testCase.input)
+			if !errors.Is(err, testCase.err) {
+				t.Errorf("Expected error: %v, got: %v", testCase.err, err)
+			}
+		})
+	}
+}
+
 func TestRoundtrip(t *testing.T) {
 	rawPkt := []byte{
 		0x00, 0x10, 0x23, 0x45, 0x12, 0x34, 0x45, 0x67, 0xCC, 0xDD, 0xEE, 0xFF,
