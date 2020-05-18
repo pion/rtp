@@ -393,7 +393,7 @@ func (h *Header) SetExtension(id uint8, payload []byte) error {
 	h.Extension = true
 
 	switch len := len(payload); {
-	case len < 16:
+	case len <= 16:
 		h.ExtensionProfile = extensionProfileOneByte
 	case len > 16 && len < 256:
 		h.ExtensionProfile = extensionProfileTwoByte

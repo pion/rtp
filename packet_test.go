@@ -613,6 +613,41 @@ func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 	}
 }
 
+func TestRFC8285OneByteSetExtensionShouldSetCorrectExtensionProfileFor16ByteExtension(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{Header: Header{
+		Marker:         true,
+		Extension:      false,
+		Version:        2,
+		PayloadOffset:  26,
+		PayloadType:    96,
+		SequenceNumber: 27023,
+		Timestamp:      3653407706,
+		SSRC:           476325762,
+		CSRC:           []uint32{},
+	},
+		Payload: payload,
+	}
+
+	extension := []byte{
+		0xAA, 0xAA, 0xAA, 0xAA,
+		0xAA, 0xAA, 0xAA, 0xAA,
+		0xAA, 0xAA, 0xAA, 0xAA,
+		0xAA, 0xAA, 0xAA, 0xAA,
+	}
+	err := p.SetExtension(1, extension)
+	if err != nil {
+		t.Error("Error setting extension")
+	}
+
+	if p.ExtensionProfile != 0xBEDE {
+		t.Error("Extension profile should be set to 0xBEDE")
+	}
+}
+
 func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 	payload := []byte{
 		// Payload
