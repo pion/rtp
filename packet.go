@@ -105,6 +105,11 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 	h.Extension = (rawPacket[0] >> extensionShift & extensionMask) > 0
 	h.CSRC = make([]uint32, rawPacket[0]&ccMask)
 
+	currOffset := csrcOffset + (len(h.CSRC) * csrcLength)
+	if len(rawPacket) < currOffset {
+		return fmt.Errorf("size %d < %d: %w", len(rawPacket), currOffset, errHeaderSizeInsufficient)
+	}
+
 	h.Marker = (rawPacket[1] >> markerShift & markerMask) > 0
 	h.PayloadType = rawPacket[1] & ptMask
 
@@ -112,25 +117,30 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 	h.Timestamp = binary.BigEndian.Uint32(rawPacket[timestampOffset : timestampOffset+timestampLength])
 	h.SSRC = binary.BigEndian.Uint32(rawPacket[ssrcOffset : ssrcOffset+ssrcLength])
 
-	currOffset := csrcOffset + (len(h.CSRC) * csrcLength)
-	if len(rawPacket) < currOffset {
-		return fmt.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), currOffset)
-	}
-
 	for i := range h.CSRC {
 		offset := csrcOffset + (i * csrcLength)
 		h.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:])
 	}
 
 	if h.Extension {
-		if len(rawPacket) < currOffset+4 {
-			return fmt.Errorf("RTP header size insufficient for extension; %d < %d", len(rawPacket), currOffset)
+		if expected := currOffset + 4; len(rawPacket) < expected {
+			return fmt.Errorf("size %d < %d: %w",
+				len(rawPacket), expected,
+				errHeaderSizeInsufficientForExtension,
+			)
 		}
 
 		h.ExtensionProfile = binary.BigEndian.Uint16(rawPacket[currOffset:])
 		currOffset += 2
 		extensionLength := int(binary.BigEndian.Uint16(rawPacket[currOffset:])) * 4
 		currOffset += 2
+
+		if expected := currOffset + extensionLength; len(rawPacket) < expected {
+			return fmt.Errorf("size %d < %d: %w",
+				len(rawPacket), expected,
+				errHeaderSizeInsufficientForExtension,
+			)
+		}
 
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
