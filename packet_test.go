@@ -247,6 +247,33 @@ func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
 	if !bytes.Equal(ext3, ext3Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
 	}
+
+	rawPktReMarshal := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x03, 0x10, 0xAA, 0x21, 0xBB,
+		0xBB, 0x33, 0xCC, 0xCC, 0xCC, 0xCC, 0x00, 0x00, // padding is moved to the end by re-marshaling
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	dstBuf := map[string][]byte{
+		"CleanBuffer": make([]byte, 1000),
+		"DirtyBuffer": make([]byte, 1000),
+	}
+	for i := range dstBuf["DirtyBuffer"] {
+		dstBuf["DirtyBuffer"][i] = 0xFF
+	}
+	for name, buf := range dstBuf {
+		buf := buf
+		t.Run(name, func(t *testing.T) {
+			n, err := p.MarshalTo(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(buf[:n], rawPktReMarshal) {
+				t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(buf[:n]), hex.Dump(rawPktReMarshal))
+			}
+		})
+	}
 }
 
 func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
