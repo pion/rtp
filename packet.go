@@ -301,7 +301,10 @@ func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 		binary.BigEndian.PutUint16(buf[extHeaderPos+2:extHeaderPos+4], uint16(roundedExtSize/4))
 
 		// add padding to reach 4 bytes boundaries
-		n += roundedExtSize - extSize
+		for i := 0; i < roundedExtSize-extSize; i++ {
+			buf[n] = 0
+			n++
+		}
 	}
 
 	h.PayloadOffset = n
