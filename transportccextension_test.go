@@ -19,7 +19,7 @@ func TestTransportCCExtension(t *testing.T) {
 	t1 := TransportCCExtension{}
 
 	rawData := []byte{
-		0x31, 0x00, 0x02, 0x00,
+		0x00, 0x02,
 	}
 
 	if err := t1.Unmarshal(rawData); err != nil {
@@ -27,7 +27,6 @@ func TestTransportCCExtension(t *testing.T) {
 	}
 
 	t2 := TransportCCExtension{
-		ID:                3,
 		TransportSequence: 2,
 	}
 
@@ -45,7 +44,7 @@ func TestTransportCCExtensionExtraBytes(t *testing.T) {
 	t1 := TransportCCExtension{}
 
 	rawData := []byte{
-		0x31, 0x00, 0x02, 0x00, 0xff, 0xff,
+		0x00, 0x02, 0x00, 0xff, 0xff,
 	}
 
 	if err := t1.Unmarshal(rawData); err != nil {
@@ -53,7 +52,6 @@ func TestTransportCCExtensionExtraBytes(t *testing.T) {
 	}
 
 	t2 := TransportCCExtension{
-		ID:                3,
 		TransportSequence: 2,
 	}
 
