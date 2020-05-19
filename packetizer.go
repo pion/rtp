@@ -79,11 +79,9 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	p.Timestamp += samples
 
 	if len(packets) != 0 && p.extensionNumbers.AbsSendTime != 0 {
-		t := toNtpTime(p.timegen()) >> 14
+		sendTime := NewAbsSendTimeExtension(p.timegen())
 		//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
-		b, err := (&AbsSendTimeExtension{
-			Timestamp: t,
-		}).Marshal()
+		b, err := sendTime.Marshal()
 		if err != nil {
 			return nil // never happens
 		}
