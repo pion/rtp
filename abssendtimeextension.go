@@ -45,6 +45,13 @@ func (t *AbsSendTimeExtension) Estimate(receive time.Time) time.Time {
 	return toTime(ntp)
 }
 
+// NewAbsSendTimeExtension makes new AbsSendTimeExtension from time.Time.
+func NewAbsSendTimeExtension(sendTime time.Time) *AbsSendTimeExtension {
+	return &AbsSendTimeExtension{
+		Timestamp: toNtpTime(sendTime) >> 14,
+	}
+}
+
 func toNtpTime(t time.Time) uint64 {
 	var s uint64
 	var f uint64
