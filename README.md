@@ -44,6 +44,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Tarrence van As](https://github.com/tarrencev) *add audio level extension*
 * [Simone Gotti](https://github.com/sgotti)
 * [Guilherme Souza](https://github.com/gqgs)
+* [Rob Lofthouse](https://github.com/roblofthouse)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
