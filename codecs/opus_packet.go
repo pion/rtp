@@ -18,7 +18,7 @@ func (p *OpusPayloader) Payload(mtu int, payload []byte) [][]byte {
 	return [][]byte{out}
 }
 
-// OpusPacket represents the VP8 header that is stored in the payload of an RTP Packet
+// OpusPacket represents the Opus header that is stored in the payload of an RTP Packet
 type OpusPacket struct {
 	Payload []byte
 }
