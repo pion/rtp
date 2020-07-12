@@ -123,6 +123,49 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 			b:   []byte{0xD0},
 			err: errShortPacket,
 		},
+		"ScalabilityStructureResolutionsNoPayload": {
+			b: []byte{
+				0x0A,
+				(1 << 5) | (1 << 4) | 0, // NS:1 Y:1 G:0
+				640 >> 8, 640 & 0xff,
+				360 >> 8, 360 & 0xff,
+				1280 >> 8, 1280 & 0xff,
+				720 >> 8, 720 & 0xff,
+			},
+			pkt: VP9Packet{
+				B:       true,
+				V:       true,
+				NS:      1,
+				Y:       true,
+				G:       false,
+				NG:      0,
+				Width:   []uint16{640, 1280},
+				Height:  []uint16{360, 720},
+				Payload: []byte{},
+			},
+		},
+		"ScalabilityStructureNoPayload": {
+			b: []byte{
+				0x0A,
+				(1 << 5) | (0 << 4) | (1 << 3), // NS:1 Y:0 G:1
+				2,
+				(0 << 5) | (1 << 4) | (0 << 2) | 0, // T:0 U:1 R:0 -
+				(2 << 5) | (0 << 4) | (1 << 2) | 0, // T:2 U:0 R:1 -
+				33,
+			},
+			pkt: VP9Packet{
+				B:       true,
+				V:       true,
+				NS:      1,
+				Y:       false,
+				G:       true,
+				NG:      2,
+				PGTID:   []uint8{0, 2},
+				PGU:     []bool{true, false},
+				PGPDiff: [][]uint8{{}, {33}},
+				Payload: []byte{},
+			},
+		},
 	}
 	for name, c := range cases {
 		c := c
