@@ -45,6 +45,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Simone Gotti](https://github.com/sgotti)
 * [Guilherme Souza](https://github.com/gqgs)
 * [Rob Lofthouse](https://github.com/roblofthouse)
+* [Kazuyuki Honda](https://github.com/hakobera)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
