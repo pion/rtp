@@ -214,7 +214,11 @@ func TestVP9Payloader_Payload(t *testing.T) {
 		},
 	}
 	for name, c := range cases {
-		pck := VP9Payloader{Rand: rand.New(rand.NewSource(0))}
+		pck := VP9Payloader{
+			InitialPictureIDFn: func() uint16 {
+				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF))
+			},
+		}
 		c := c
 		t.Run(fmt.Sprintf("%s_MTU%d", name, c.mtu), func(t *testing.T) {
 			res := [][]byte{}
@@ -227,7 +231,11 @@ func TestVP9Payloader_Payload(t *testing.T) {
 		})
 	}
 	t.Run("PictureIDOverflow", func(t *testing.T) {
-		pck := VP9Payloader{Rand: rand.New(rand.NewSource(0))}
+		pck := VP9Payloader{
+			InitialPictureIDFn: func() uint16 {
+				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF))
+			},
+		}
 		pPrev := VP9Packet{}
 		for i := 0; i < 0x8000; i++ {
 			res := pck.Payload(4, []byte{0x01})
