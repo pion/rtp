@@ -2,15 +2,20 @@ package codecs
 
 import (
 	"errors"
-	"math/rand"
-	"time"
+
+	"github.com/pion/randutil"
 )
+
+// Use global random generator to properly seed by crypto grade random.
+var globalMathRandomGenerator = randutil.NewMathRandomGenerator() // nolint:gochecknoglobals
 
 // VP9Payloader payloads VP9 packets
 type VP9Payloader struct {
 	pictureID   uint16
 	initialized bool
-	Rand        *rand.Rand
+
+	// InitialPictureIDFn is a function that returns random initial picture ID.
+	InitialPictureIDFn func() uint16
 }
 
 const (
@@ -60,10 +65,12 @@ func (p *VP9Payloader) Payload(mtu int, payload []byte) [][]byte {
 	 */
 
 	if !p.initialized {
-		if p.Rand == nil {
-			p.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+		if p.InitialPictureIDFn == nil {
+			p.InitialPictureIDFn = func() uint16 {
+				return uint16(globalMathRandomGenerator.Intn(0x7FFF))
+			}
 		}
-		p.pictureID = uint16(p.Rand.Int31n(0x7FFF))
+		p.pictureID = p.InitialPictureIDFn() & 0x7FFF
 		p.initialized = true
 	}
 	if payload == nil {
