@@ -126,7 +126,7 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 		"ScalabilityStructureResolutionsNoPayload": {
 			b: []byte{
 				0x0A,
-				(1 << 5) | (1 << 4) | 0, // NS:1 Y:1 G:0
+				(1 << 5) | (1 << 4), // NS:1 Y:1 G:0
 				640 >> 8, 640 & 0xff,
 				360 >> 8, 360 & 0xff,
 				1280 >> 8, 1280 & 0xff,
@@ -149,8 +149,8 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 				0x0A,
 				(1 << 5) | (0 << 4) | (1 << 3), // NS:1 Y:0 G:1
 				2,
-				(0 << 5) | (1 << 4) | (0 << 2) | 0, // T:0 U:1 R:0 -
-				(2 << 5) | (0 << 4) | (1 << 2) | 0, // T:2 U:0 R:1 -
+				(0 << 5) | (1 << 4) | (0 << 2), // T:0 U:1 R:0 -
+				(2 << 5) | (0 << 4) | (1 << 2), // T:2 U:0 R:1 -
 				33,
 			},
 			pkt: VP9Packet{

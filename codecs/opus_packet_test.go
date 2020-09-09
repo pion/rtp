@@ -8,7 +8,6 @@ import (
 func TestOpusPacket_Unmarshal(t *testing.T) {
 	pck := OpusPacket{}
 
-	errNilPacket := fmt.Errorf("invalid nil packet")
 	errPayloadTooSmall := fmt.Errorf("Payload is not large enough")
 
 	// Nil packet
