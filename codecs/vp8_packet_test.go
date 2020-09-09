@@ -8,7 +8,6 @@ import (
 func TestVP8Packet_Unmarshal(t *testing.T) {
 	pck := VP8Packet{}
 
-	errNilPacket := fmt.Errorf("invalid nil packet")
 	errSmallerThanHeaderLen := fmt.Errorf("Payload is not large enough to container header")
 	errPayloadTooSmall := fmt.Errorf("Payload is not large enough")
 
