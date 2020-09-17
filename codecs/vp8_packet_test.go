@@ -1,22 +1,19 @@
 package codecs
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 )
 
 func TestVP8Packet_Unmarshal(t *testing.T) {
 	pck := VP8Packet{}
 
-	errSmallerThanHeaderLen := fmt.Errorf("Payload is not large enough to container header")
-	errPayloadTooSmall := fmt.Errorf("Payload is not large enough")
-
 	// Nil packet
 	raw, err := pck.Unmarshal(nil)
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
-	if err == nil || err.Error() != errNilPacket.Error() {
+	if !errors.Is(err, errNilPacket) {
 		t.Fatal("Error should be:", errNilPacket)
 	}
 
@@ -25,8 +22,8 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
-	if err == nil || err.Error() != errSmallerThanHeaderLen.Error() {
-		t.Fatal("Error should be:", errSmallerThanHeaderLen)
+	if !errors.Is(err, errShortPacket) {
+		t.Fatal("Error should be:", errShortPacket)
 	}
 
 	// Payload smaller than header size
@@ -34,8 +31,8 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
-	if err == nil || err.Error() != errSmallerThanHeaderLen.Error() {
-		t.Fatal("Error should be:", errSmallerThanHeaderLen)
+	if !errors.Is(err, errShortPacket) {
+		t.Fatal("Error should be:", errShortPacket)
 	}
 
 	// Normal payload
@@ -70,8 +67,8 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
-	if err == nil || err.Error() != errPayloadTooSmall.Error() {
-		t.Fatal("Error should be:", errPayloadTooSmall)
+	if !errors.Is(err, errShortPacket) {
+		t.Fatal("Error should be:", errShortPacket)
 	}
 
 	// Header size, X and L
@@ -106,8 +103,8 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
-	if err == nil || err.Error() != errPayloadTooSmall.Error() {
-		t.Fatal("Error should be:", errPayloadTooSmall)
+	if !errors.Is(err, errShortPacket) {
+		t.Fatal("Error should be:", errShortPacket)
 	}
 }
 

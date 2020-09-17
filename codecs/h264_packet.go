@@ -118,10 +118,10 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 			out[0] |= naluRefIdc
 
 			// +---------------+
-			//|0|1|2|3|4|5|6|7|
-			//+-+-+-+-+-+-+-+-+
-			//|S|E|R|  Type   |
-			//+---------------+
+			// |0|1|2|3|4|5|6|7|
+			// +-+-+-+-+-+-+-+-+
+			// |S|E|R|  Type   |
+			// +---------------+
 
 			out[1] = naluType
 			if naluDataRemaining == naluDataLength {
@@ -150,9 +150,9 @@ type H264Packet struct {
 // Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon
 func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("invalid nil packet")
+		return nil, errNilPacket
 	} else if len(payload) <= 2 {
-		return nil, fmt.Errorf("Payload is not large enough to container header and payload")
+		return nil, fmt.Errorf("%w: %d <= 2", errShortPacket, len(payload))
 	}
 
 	// NALU Types
@@ -170,7 +170,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 			currOffset += stapaNALULengthSize
 
 			if len(payload) < currOffset+naluSize {
-				return nil, fmt.Errorf("STAP-A declared size(%d) is larger than buffer(%d)", naluSize, len(payload)-currOffset)
+				return nil, fmt.Errorf("%w STAP-A declared size(%d) is larger than buffer(%d)", errShortPacket, naluSize, len(payload)-currOffset)
 			}
 
 			result = append(result, annexbNALUStartCode()...)
@@ -181,7 +181,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 
 	case naluType == fuaNALUType:
 		if len(payload) < fuaHeaderSize {
-			return nil, fmt.Errorf("Payload is not large enough to be FU-A")
+			return nil, errShortPacket
 		}
 
 		if payload[1]&fuaStartBitmask != 0 {
@@ -197,5 +197,5 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 		return payload[fuaHeaderSize:], nil
 	}
 
-	return nil, fmt.Errorf("nalu type %d is currently not handled", naluType)
+	return nil, fmt.Errorf("%w: %d", errUnhandledNALUType, naluType)
 }

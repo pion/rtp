@@ -1,9 +1,5 @@
 package codecs
 
-import (
-	"fmt"
-)
-
 // VP8Payloader payloads VP8 packets
 type VP8Payloader struct{}
 
@@ -85,13 +81,13 @@ type VP8Packet struct {
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon
 func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("invalid nil packet")
+		return nil, errNilPacket
 	}
 
 	payloadLen := len(payload)
 
 	if payloadLen < 4 {
-		return nil, fmt.Errorf("Payload is not large enough to container header")
+		return nil, errShortPacket
 	}
 
 	payloadIndex := 0
@@ -128,7 +124,7 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) {
 	}
 
 	if payloadIndex >= payloadLen {
-		return nil, fmt.Errorf("Payload is not large enough")
+		return nil, errShortPacket
 	}
 	p.Payload = payload[payloadIndex:]
 	return p.Payload, nil

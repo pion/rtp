@@ -12,8 +12,6 @@ type Extension struct {
 	payload []byte
 }
 
-// TODO(@kixelated) Remove Header.PayloadOffset and Packet.Raw
-
 // Header represents an RTP packet header
 // NOTE: PayloadOffset is populated by Marshal/Unmarshal and should not be modified
 type Header struct {
@@ -80,9 +78,9 @@ func (p Packet) String() string {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the Header this method is called upon
-func (h *Header) Unmarshal(rawPacket []byte) error {
+func (h *Header) Unmarshal(rawPacket []byte) error { //nolint:gocognit
 	if len(rawPacket) < headerLength {
-		return fmt.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), headerLength)
+		return fmt.Errorf("%w: %d < %d", errHeaderSizeInsufficient, len(rawPacket), headerLength)
 	}
 
 	/*
@@ -187,7 +185,7 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 
 		default: // RFC3550 Extension
 			if len(rawPacket) < currOffset+extensionLength {
-				return fmt.Errorf("RTP header size insufficient for extension length; %d < %d", len(rawPacket), currOffset+extensionLength)
+				return fmt.Errorf("%w: %d < %d", errHeaderSizeInsufficientForExtension, len(rawPacket), currOffset+extensionLength)
 			}
 
 			extension := Extension{id: 0, payload: rawPacket[currOffset : currOffset+extensionLength]}
@@ -298,7 +296,7 @@ func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 		default: // RFC3550 Extension
 			extlen := len(h.Extensions[0].payload)
 			if extlen%4 != 0 {
-				//the payload must be in 32-bit words.
+				// the payload must be in 32-bit words.
 				return 0, io.ErrShortBuffer
 			}
 			n += copy(buf[n:], h.Extensions[0].payload)
@@ -353,28 +351,28 @@ func (h *Header) MarshalSize() int {
 }
 
 // SetExtension sets an RTP header extension
-func (h *Header) SetExtension(id uint8, payload []byte) error {
+func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocognit
 	if h.Extension {
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
 		case extensionProfileOneByte:
 			if id < 1 || id > 14 {
-				return fmt.Errorf("header extension id must be between 1 and 14 for RFC 5285 extensions")
+				return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderIDRange, id)
 			}
 			if len(payload) > 16 {
-				return fmt.Errorf("header extension payload must be 16bytes or less for RFC 5285 one byte extensions")
+				return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderSize, len(payload))
 			}
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
 			if id < 1 || id > 255 {
-				return fmt.Errorf("header extension id must be between 1 and 255 for RFC 5285 extensions")
+				return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderIDRange, id)
 			}
 			if len(payload) > 255 {
-				return fmt.Errorf("header extension payload must be 255bytes or less for RFC 5285 two byte extensions")
+				return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderSize, len(payload))
 			}
 		default: // RFC3550 Extension
 			if id != 0 {
-				return fmt.Errorf("header extension id must be 0 for none RFC 5285 extensions")
+				return fmt.Errorf("%w actual(%d)", errRFC3550HeaderIDRange, id)
 			}
 		}
 
@@ -419,7 +417,7 @@ func (h *Header) GetExtension(id uint8) []byte {
 // DelExtension Removes an RTP Header extension
 func (h *Header) DelExtension(id uint8) error {
 	if !h.Extension {
-		return fmt.Errorf("h.Extension not enabled")
+		return errHeaderExtensionsNotEnabled
 	}
 	for i, extension := range h.Extensions {
 		if extension.id == id {
@@ -427,7 +425,7 @@ func (h *Header) DelExtension(id uint8) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("extension not found")
+	return errHeaderExtensionNotFound
 }
 
 // Marshal serializes the packet into bytes.

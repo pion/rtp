@@ -2,6 +2,7 @@ package rtp
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestTransportCCExtensionTooSmall(t *testing.T) {
 
 	rawData := []byte{}
 
-	if err := t1.Unmarshal(rawData); err != errTooSmall {
+	if err := t1.Unmarshal(rawData); !errors.Is(err, errTooSmall) {
 		t.Fatal("err != errTooSmall")
 	}
 }

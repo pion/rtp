@@ -23,8 +23,8 @@ type packetizer struct {
 	Sequencer        Sequencer
 	Timestamp        uint32
 	ClockRate        uint32
-	extensionNumbers struct { //put extension numbers in here. If they're 0, the extension is disabled (0 is not a legal extension number)
-		AbsSendTime int //http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+	extensionNumbers struct { // put extension numbers in here. If they're 0, the extension is disabled (0 is not a legal extension number)
+		AbsSendTime int // http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	}
 	timegen func() time.Time
 }
@@ -76,7 +76,7 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 
 	if len(packets) != 0 && p.extensionNumbers.AbsSendTime != 0 {
 		sendTime := NewAbsSendTimeExtension(p.timegen())
-		//apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+		// apply http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 		b, err := sendTime.Marshal()
 		if err != nil {
 			return nil // never happens
