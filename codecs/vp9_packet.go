@@ -1,8 +1,6 @@
 package codecs
 
 import (
-	"errors"
-
 	"github.com/pion/randutil"
 )
 
@@ -258,7 +256,7 @@ func (p *VP9Packet) parseLayerInfoCommon(packet []byte, pos int) (int, error) {
 	p.D = packet[pos]&0x01 != 0
 
 	if p.SID >= maxSpatialLayers {
-		return pos, errors.New("too many spatial layers")
+		return pos, errTooManySpatialLayers
 	}
 
 	pos++

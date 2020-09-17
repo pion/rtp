@@ -1,4 +1,4 @@
-package codecs
+package codecs //nolint:dupl
 
 import (
 	"bytes"
@@ -15,19 +15,18 @@ func TestG722Payloader(t *testing.T) {
 		testmtu = 1500
 	)
 
-	//generate random 8-bit g722 samples
+	// generate random 8-bit g722 samples
 	samples := make([]byte, testlen)
 	_, err := rand.Read(samples)
-
 	if err != nil {
 		t.Fatal("RNG Error: ", err)
 	}
 
-	//make a copy, for payloader input
+	// make a copy, for payloader input
 	samplesIn := make([]byte, testlen)
 	copy(samplesIn, samples)
 
-	//split our samples into payloads
+	// split our samples into payloads
 	payloads := p.Payload(testmtu, samplesIn)
 
 	outcnt := int(math.Ceil(float64(testlen) / testmtu))

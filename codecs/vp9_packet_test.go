@@ -1,6 +1,7 @@
 package codecs
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -186,7 +187,7 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 				if raw != nil {
 					t.Error("Result should be nil in case of error")
 				}
-				if err != c.err {
+				if !errors.Is(err, c.err) {
 					t.Errorf("Error should be '%v', got '%v'", c.err, err)
 				}
 			}
@@ -195,7 +196,7 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 }
 
 func TestVP9Payloader_Payload(t *testing.T) {
-	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF))
+	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 	var rands [][2]byte
 	for i := 0; i < 10; i++ {
 		rands = append(rands, [2]byte{byte(r0>>8) | 0x80, byte(r0 & 0xFF)})
@@ -259,7 +260,7 @@ func TestVP9Payloader_Payload(t *testing.T) {
 	for name, c := range cases {
 		pck := VP9Payloader{
 			InitialPictureIDFn: func() uint16 {
-				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF))
+				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 			},
 		}
 		c := c
@@ -276,7 +277,7 @@ func TestVP9Payloader_Payload(t *testing.T) {
 	t.Run("PictureIDOverflow", func(t *testing.T) {
 		pck := VP9Payloader{
 			InitialPictureIDFn: func() uint16 {
-				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF))
+				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 			},
 		}
 		pPrev := VP9Packet{}

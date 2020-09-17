@@ -88,15 +88,16 @@ func TestExtension(t *testing.T) {
 		t.Fatal("Unmarshal did not error on packet with invalid extension length")
 	}
 
-	p = &Packet{Header: Header{
-		Extension:        true,
-		ExtensionProfile: 3,
-		Extensions: []Extension{
-			{0, []byte{
-				0,
-			}},
+	p = &Packet{
+		Header: Header{
+			Extension:        true,
+			ExtensionProfile: 3,
+			Extensions: []Extension{
+				{0, []byte{
+					0,
+				}},
+			},
 		},
-	},
 		Payload: []byte{},
 	}
 	if _, err := p.Marshal(); err == nil {
@@ -116,23 +117,24 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	p = &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{5, []byte{
-				0xAA,
-			}},
+	p = &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{5, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  18,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  18,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: rawPkt[20:],
 		Raw:     rawPkt,
 	}
@@ -176,26 +178,27 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 	}
 
 	// Test Marshal
-	p = &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
-			{2, []byte{
-				0xBB,
-			}},
+	p = &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+				{2, []byte{
+					0xBB,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: rawPkt[20:],
 		Raw:     rawPkt,
 	}
@@ -297,29 +300,30 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
 
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
-			{2, []byte{
-				0xBB, 0xBB,
-			}},
-			{3, []byte{
-				0xCC, 0xCC, 0xCC, 0xCC,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+				{2, []byte{
+					0xBB, 0xBB,
+				}},
+				{3, []byte{
+					0xCC, 0xCC, 0xCC, 0xCC,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: rawPkt[28:],
 		Raw:     rawPkt,
 	}
@@ -344,25 +348,26 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	p = &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0x1000,
-		Extensions: []Extension{
-			{5, []byte{
-				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-			}},
+	p = &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0x1000,
+			Extensions: []Extension{
+				{5, []byte{
+					0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+					0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+					0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  42,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  42,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: rawPkt[44:],
 		Raw:     rawPkt,
 	}
@@ -443,28 +448,29 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
 
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0x1000,
-		Extensions: []Extension{
-			{1, []byte{}},
-			{2, []byte{
-				0xBB,
-			}},
-			{3, []byte{
-				0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-				0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0x1000,
+			Extensions: []Extension{
+				{1, []byte{}},
+				{2, []byte{
+					0xBB,
+				}},
+				{3, []byte{
+					0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+					0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  40,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  40,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: rawPkt[40:],
 		Raw:     rawPkt,
 	}
@@ -480,17 +486,18 @@ func TestRFC8285GetExtensionReturnsNilWhenExtensionsDisabled(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:         true,
-		Extension:      false,
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
+	p := &Packet{
+		Header: Header{
+			Marker:         true,
+			Extension:      false,
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
 		Payload: payload,
 	}
 
@@ -505,23 +512,24 @@ func TestRFC8285DelExtension(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: payload,
 	}
 
@@ -551,17 +559,18 @@ func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:         true,
-		Extension:      false,
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
+	p := &Packet{
+		Header: Header{
+			Marker:         true,
+			Extension:      false,
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
 		Payload: payload,
 	}
 
@@ -576,17 +585,18 @@ func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:         true,
-		Extension:      false,
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
+	p := &Packet{
+		Header: Header{
+			Marker:         true,
+			Extension:      false,
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
 		Payload: payload,
 	}
 
@@ -618,17 +628,18 @@ func TestRFC8285OneByteSetExtensionShouldSetCorrectExtensionProfileFor16ByteExte
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:         true,
-		Extension:      false,
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
+	p := &Packet{
+		Header: Header{
+			Marker:         true,
+			Extension:      false,
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
 		Payload: payload,
 	}
 
@@ -653,23 +664,24 @@ func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: payload,
 	}
 
@@ -693,23 +705,24 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: payload,
 	}
 
@@ -750,23 +763,24 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: payload,
 	}
 
@@ -783,17 +797,18 @@ func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:         true,
-		Extension:      false,
-		Version:        2,
-		PayloadOffset:  31,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
+	p := &Packet{
+		Header: Header{
+			Marker:         true,
+			Extension:      false,
+			Version:        2,
+			PayloadOffset:  31,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
 		Payload: payload,
 	}
 
@@ -828,23 +843,24 @@ func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0x1000,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0x1000,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: payload,
 	}
 
@@ -871,23 +887,24 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0xBEDE,
-		Extensions: []Extension{
-			{1, []byte{
-				0xAA,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: payload,
 	}
 
@@ -928,23 +945,24 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0x1111,
-		Extensions: []Extension{
-			{0, []byte{
-				0xAA,
-			}},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0x1111,
+			Extensions: []Extension{
+				{0, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
 		},
-		Version:        2,
-		PayloadOffset:  26,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	},
 		Payload: payload,
 	}
 
@@ -964,18 +982,19 @@ func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	p := &Packet{Header: Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 0x1111,
-		Version:          2,
-		PayloadOffset:    26,
-		PayloadType:      96,
-		SequenceNumber:   27023,
-		Timestamp:        3653407706,
-		SSRC:             476325762,
-		CSRC:             []uint32{},
-	},
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0x1111,
+			Version:          2,
+			PayloadOffset:    26,
+			PayloadType:      96,
+			SequenceNumber:   27023,
+			Timestamp:        3653407706,
+			SSRC:             476325762,
+			CSRC:             []uint32{},
+		},
 		Payload: payload,
 	}
 

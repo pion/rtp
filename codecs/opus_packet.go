@@ -1,9 +1,5 @@
 package codecs
 
-import (
-	"fmt"
-)
-
 // OpusPayloader payloads Opus packets
 type OpusPayloader struct{}
 
@@ -26,11 +22,11 @@ type OpusPacket struct {
 // Unmarshal parses the passed byte slice and stores the result in the OpusPacket this method is called upon
 func (p *OpusPacket) Unmarshal(packet []byte) ([]byte, error) {
 	if packet == nil {
-		return nil, fmt.Errorf("invalid nil packet")
+		return nil, errNilPacket
+	} else if len(packet) == 0 {
+		return nil, errShortPacket
 	}
-	if len(packet) == 0 {
-		return nil, fmt.Errorf("Payload is not large enough")
-	}
+
 	p.Payload = packet
 	return packet, nil
 }

@@ -2,16 +2,11 @@ package rtp
 
 import (
 	"encoding/binary"
-	"errors"
 )
 
 const (
 	// transport-wide sequence
 	transportCCExtensionSize = 2
-)
-
-var (
-	errTooSmall = errors.New("buffer too small")
 )
 
 // TransportCCExtension is a extension payload format in

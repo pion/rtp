@@ -2,6 +2,7 @@ package rtp
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestAudioLevelExtensionTooSmall(t *testing.T) {
 
 	rawData := []byte{}
 
-	if err := a.Unmarshal(rawData); err != errTooSmall {
+	if err := a.Unmarshal(rawData); !errors.Is(err, errTooSmall) {
 		t.Fatal("err != errTooSmall")
 	}
 }
@@ -73,7 +74,7 @@ func TestAudioLevelExtensionLevelOverflow(t *testing.T) {
 		Voice: false,
 	}
 
-	if _, err := a.Marshal(); err != errAudioLevelOverflow {
+	if _, err := a.Marshal(); !errors.Is(err, errAudioLevelOverflow) {
 		t.Fatal("err != errAudioLevelOverflow")
 	}
 }

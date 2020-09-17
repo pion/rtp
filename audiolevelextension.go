@@ -9,9 +9,7 @@ const (
 	audioLevelExtensionSize = 1
 )
 
-var (
-	errAudioLevelOverflow = errors.New("audio level overflow")
-)
+var errAudioLevelOverflow = errors.New("audio level overflow")
 
 // AudioLevelExtension is a extension payload format described in
 // https://tools.ietf.org/html/rfc6464

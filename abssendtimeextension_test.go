@@ -66,7 +66,7 @@ func TestAbsSendTimeExtension_Estimate(t *testing.T) {
 	tests := []struct {
 		sendNTP    uint64
 		receiveNTP uint64
-	}{ //FFFFFFC000000000 mask of second
+	}{ // FFFFFFC000000000 mask of second
 		{0xa0c65b1000100000, 0xa0c65b1001000000}, // not carried
 		{0xa0c65b3f00000000, 0xa0c65b4001000000}, // carried during transmission
 	}

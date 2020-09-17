@@ -57,7 +57,7 @@ func toNtpTime(t time.Time) uint64 {
 	var f uint64
 	u := uint64(t.UnixNano())
 	s = u / 1e9
-	s += 0x83AA7E80 //offset in seconds between unix epoch and ntp epoch
+	s += 0x83AA7E80 // offset in seconds between unix epoch and ntp epoch
 	f = u % 1e9
 	f <<= 32
 	f /= 1e9
