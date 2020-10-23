@@ -407,7 +407,7 @@ func (h *Header) GetExtensionIDs() []uint8 {
 		return nil
 	}
 
-	if len(h.Extensions) <= 0 {
+	if len(h.Extensions) == 0 {
 		return nil
 	}
 
