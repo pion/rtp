@@ -599,6 +599,32 @@ func TestRFC8285GetExtensionIDs(t *testing.T) {
 	}
 }
 
+func TestRFC8285GetExtensionIDsReturnsErrorWhenExtensionsDisabled(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{
+		Header: Header{
+			Marker:         true,
+			Extension:      false,
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
+		Payload: payload,
+	}
+
+	ids := p.GetExtensionIDs()
+	if ids != nil {
+		t.Error("Should return nil on GetExtensionIDs when h.Extensions is nil")
+	}
+}
+
 func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
 	payload := []byte{
 		// Payload
