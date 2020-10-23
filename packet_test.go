@@ -554,6 +554,51 @@ func TestRFC8285DelExtension(t *testing.T) {
 	}
 }
 
+func TestRFC8285GetExtensionIDs(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	p := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+				{2, []byte{
+					0xBB,
+				}},
+			},
+			Version:        2,
+			PayloadOffset:  26,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
+		Payload: payload,
+	}
+
+	ids := p.GetExtensionIDs()
+	if ids == nil {
+		t.Error("Extension should exist")
+	}
+	if len(ids) != len(p.Extensions) {
+		t.Errorf("The number of IDs should be equal to the number of extensions,want=%d,have=%d", len(p.Extensions), len(ids))
+	}
+
+	for _, id := range ids {
+		ext := p.GetExtension(id)
+		if ext == nil {
+			t.Error("Extension should exist")
+		}
+	}
+}
+
 func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
 	payload := []byte{
 		// Payload

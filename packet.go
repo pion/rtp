@@ -401,6 +401,23 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 	return nil
 }
 
+// GetExtensionIDs returns an extension id array
+func (h *Header) GetExtensionIDs() []uint8 {
+	if !h.Extension {
+		return nil
+	}
+
+	if len(h.Extensions) <= 0 {
+		return nil
+	}
+
+	ids := make([]uint8, 0, len(h.Extensions))
+	for _, extension := range h.Extensions {
+		ids = append(ids, extension.id)
+	}
+	return ids
+}
+
 // GetExtension returns an RTP header extension
 func (h *Header) GetExtension(id uint8) []byte {
 	if !h.Extension {
