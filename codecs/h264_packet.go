@@ -40,6 +40,9 @@ func emitNalus(nals []byte, emit func([]byte)) {
 		}
 		return -1, -1
 	}
+	if len(nals) == 0 {
+		return
+	}
 
 	nextIndStart, nextIndLen := nextInd(nals, 0)
 	if nextIndStart == -1 {
@@ -66,6 +69,9 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 	}
 
 	emitNalus(payload, func(nalu []byte) {
+		if len(nalu) == 0 {
+			return
+		}
 		naluType := nalu[0] & naluTypeBitmask
 		naluRefIdc := nalu[0] & naluRefIdcBitmask
 
