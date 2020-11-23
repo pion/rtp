@@ -61,11 +61,15 @@ func emitNalus(nals []byte, emit func([]byte)) {
 // Payload fragments a H264 packet across one or more byte arrays
 func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 	var payloads [][]byte
-	if payload == nil {
+	if len(payload) == 0 {
 		return payloads
 	}
 
 	emitNalus(payload, func(nalu []byte) {
+		if len(nalu) == 0 {
+			return
+		}
+
 		naluType := nalu[0] & naluTypeBitmask
 		naluRefIdc := nalu[0] & naluRefIdcBitmask
 

@@ -47,6 +47,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Rob Lofthouse](https://github.com/roblofthouse)
 * [Kazuyuki Honda](https://github.com/hakobera)
 * [Haiyang Wang](https://github.com/ocean2811)
+* [lxb](https://github.com/lxb531)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

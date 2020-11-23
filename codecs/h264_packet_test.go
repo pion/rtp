@@ -25,6 +25,18 @@ func TestH264Payloader_Payload(t *testing.T) {
 		t.Fatal("Generated payload should be empty")
 	}
 
+	// Positive MTU, empty payload
+	res = pck.Payload(1, []byte{})
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, empty NAL
+	res = pck.Payload(1, []byte{0x00, 0x00, 0x01})
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
 	// Negative MTU, small payload
 	res = pck.Payload(0, smallpayload)
 	if len(res) != 0 {
