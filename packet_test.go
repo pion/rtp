@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -41,31 +42,36 @@ func TestBasic(t *testing.T) {
 		Raw:     rawPkt,
 	}
 
-	if err := p.Unmarshal(rawPkt); err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(p, parsedPacket) {
-		t.Errorf("TestBasic unmarshal: got %#v, want %#v", p, parsedPacket)
-	}
+	// Unmarshal to the used Packet should work as well.
+	for i := 0; i < 2; i++ {
+		t.Run(fmt.Sprintf("Run%d", i+1), func(t *testing.T) {
+			if err := p.Unmarshal(rawPkt); err != nil {
+				t.Error(err)
+			} else if !reflect.DeepEqual(p, parsedPacket) {
+				t.Errorf("TestBasic unmarshal: got %#v, want %#v", p, parsedPacket)
+			}
 
-	if parsedPacket.Header.MarshalSize() != 20 {
-		t.Errorf("wrong computed header marshal size")
-	} else if parsedPacket.MarshalSize() != len(rawPkt) {
-		t.Errorf("wrong computed marshal size")
-	}
+			if parsedPacket.Header.MarshalSize() != 20 {
+				t.Errorf("wrong computed header marshal size")
+			} else if parsedPacket.MarshalSize() != len(rawPkt) {
+				t.Errorf("wrong computed marshal size")
+			}
 
-	if p.PayloadOffset != 20 {
-		t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
-	}
+			if p.PayloadOffset != 20 {
+				t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
+			}
 
-	raw, err := p.Marshal()
-	if err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(raw, rawPkt) {
-		t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
-	}
+			raw, err := p.Marshal()
+			if err != nil {
+				t.Error(err)
+			} else if !reflect.DeepEqual(raw, rawPkt) {
+				t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
+			}
 
-	if p.PayloadOffset != 20 {
-		t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
+			if p.PayloadOffset != 20 {
+				t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
+			}
+		})
 	}
 }
 
@@ -1218,4 +1224,47 @@ func BenchmarkMarshalTo(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func BenchmarkUnmarshal(b *testing.B) {
+	pkt := Packet{
+		Header: Header{
+			Extension:        true,
+			CSRC:             []uint32{1, 2},
+			ExtensionProfile: extensionProfileTwoByte,
+			Extensions: []Extension{
+				{id: 1, payload: []byte{3, 4}},
+				{id: 2, payload: []byte{5, 6}},
+			},
+		},
+		Payload: []byte{
+			0x07, 0x08, 0x09, 0x0a,
+		},
+	}
+	rawPkt, errMarshal := pkt.Marshal()
+	if errMarshal != nil {
+		b.Fatal(errMarshal)
+	}
+
+	b.Run("SharedStruct", func(b *testing.B) {
+		p := &Packet{}
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if err := p.Unmarshal(rawPkt); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("NewStruct", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			p := &Packet{}
+			if err := p.Unmarshal(rawPkt); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
