@@ -101,9 +101,14 @@ func (h *Header) Unmarshal(rawPacket []byte) error { //nolint:gocognit
 	h.Version = rawPacket[0] >> versionShift & versionMask
 	h.Padding = (rawPacket[0] >> paddingShift & paddingMask) > 0
 	h.Extension = (rawPacket[0] >> extensionShift & extensionMask) > 0
-	h.CSRC = make([]uint32, rawPacket[0]&ccMask)
+	nCSRC := int(rawPacket[0] & ccMask)
+	if cap(h.CSRC) < nCSRC || h.CSRC == nil {
+		h.CSRC = make([]uint32, nCSRC)
+	} else {
+		h.CSRC = h.CSRC[:nCSRC]
+	}
 
-	currOffset := csrcOffset + (len(h.CSRC) * csrcLength)
+	currOffset := csrcOffset + (nCSRC * csrcLength)
 	if len(rawPacket) < currOffset {
 		return fmt.Errorf("size %d < %d: %w", len(rawPacket), currOffset, errHeaderSizeInsufficient)
 	}
@@ -118,6 +123,10 @@ func (h *Header) Unmarshal(rawPacket []byte) error { //nolint:gocognit
 	for i := range h.CSRC {
 		offset := csrcOffset + (i * csrcLength)
 		h.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:])
+	}
+
+	if h.Extensions != nil {
+		h.Extensions = h.Extensions[:0]
 	}
 
 	if h.Extension {
