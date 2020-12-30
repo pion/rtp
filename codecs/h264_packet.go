@@ -18,7 +18,7 @@ const (
 
 	naluTypeBitmask   = 0x1F
 	naluRefIdcBitmask = 0x60
-	fuaStartBitmask   = 0x80
+	fuaEndBitmask     = 0x40
 )
 
 func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
@@ -149,6 +149,18 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 
 // H264Packet represents the H264 header that is stored in the payload of an RTP Packet
 type H264Packet struct {
+	IsAVC     bool
+	fuaBuffer []byte
+}
+
+func (p *H264Packet) doPackaging(nalu []byte) []byte {
+	if p.IsAVC {
+		naluLength := make([]byte, 4)
+		binary.BigEndian.PutUint32(naluLength, uint32(len(nalu)))
+		return append(naluLength, nalu...)
+	}
+
+	return append(annexbNALUStartCode(), nalu...)
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon
@@ -164,7 +176,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	naluType := payload[0] & naluTypeBitmask
 	switch {
 	case naluType > 0 && naluType < 24:
-		return append(annexbNALUStartCode(), payload...), nil
+		return p.doPackaging(payload), nil
 
 	case naluType == stapaNALUType:
 		currOffset := int(stapaHeaderSize)
@@ -177,8 +189,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 				return nil, fmt.Errorf("%w STAP-A declared size(%d) is larger than buffer(%d)", errShortPacket, naluSize, len(payload)-currOffset)
 			}
 
-			result = append(result, annexbNALUStartCode()...)
-			result = append(result, payload[currOffset:currOffset+naluSize]...)
+			result = append(result, p.doPackaging(payload[currOffset:currOffset+naluSize])...)
 			currOffset += naluSize
 		}
 		return result, nil
@@ -188,17 +199,23 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 			return nil, errShortPacket
 		}
 
-		if payload[1]&fuaStartBitmask != 0 {
+		if p.fuaBuffer == nil {
+			p.fuaBuffer = []byte{}
+		}
+
+		p.fuaBuffer = append(p.fuaBuffer, payload[fuaHeaderSize:]...)
+
+		if payload[1]&fuaEndBitmask != 0 {
 			naluRefIdc := payload[0] & naluRefIdcBitmask
 			fragmentedNaluType := payload[1] & naluTypeBitmask
 
-			// Take a copy of payload since we are mutating it.
-			payloadCopy := append([]byte{}, payload...)
-			payloadCopy[fuaHeaderSize-1] = naluRefIdc | fragmentedNaluType
-			return append(annexbNALUStartCode(), payloadCopy[fuaHeaderSize-1:]...), nil
+			nalu := append([]byte{}, naluRefIdc|fragmentedNaluType)
+			nalu = append(nalu, p.fuaBuffer...)
+			p.fuaBuffer = nil
+			return p.doPackaging(nalu), nil
 		}
 
-		return payload[fuaHeaderSize:], nil
+		return []byte{}, nil
 	}
 
 	return nil, fmt.Errorf("%w: %d", errUnhandledNALUType, naluType)
