@@ -222,3 +222,26 @@ func TestH264PartitionHeadChecker_IsPartitionHead(t *testing.T) {
 		t.Fatal("fub end nalu must not be a partition head")
 	}
 }
+
+func TestH264Payloader_Payload_SPS_and_PPS_handling(t *testing.T) {
+	pck := H264Payloader{}
+	expected := [][]byte{
+		{0x78, 0x00, 0x03, 0x07, 0x00, 0x01, 0x00, 0x03, 0x08, 0x02, 0x03},
+		{0x05, 0x04, 0x05},
+	}
+
+	// When packetizing SPS and PPS are emitted with following NALU
+	res := pck.Payload(1500, []byte{0x07, 0x00, 0x01})
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	res = pck.Payload(1500, []byte{0x08, 0x02, 0x03})
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	if !reflect.DeepEqual(pck.Payload(1500, []byte{0x05, 0x04, 0x05}), expected) {
+		t.Fatal("SPS and PPS aren't packed together")
+	}
+}
