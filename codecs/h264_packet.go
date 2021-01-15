@@ -3,6 +3,8 @@ package codecs
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/pion/rtp"
 )
 
 // H264Payloader payloads H264 packets
@@ -149,6 +151,14 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 
 // H264Packet represents the H264 header that is stored in the payload of an RTP Packet
 type H264Packet struct {
+}
+
+// IsDetectedFinalPacketInSequence returns true of the packet passed in has the marker bit set indicated the end of a packet sequence
+func (p *H264Packet) IsDetectedFinalPacketInSequence(packet *rtp.Packet) bool {
+	if packet == nil {
+		return false
+	}
+	return packet.Marker
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon

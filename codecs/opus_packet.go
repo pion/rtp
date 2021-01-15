@@ -1,5 +1,7 @@
 package codecs
 
+import "github.com/pion/rtp"
+
 // OpusPayloader payloads Opus packets
 type OpusPayloader struct{}
 
@@ -17,6 +19,11 @@ func (p *OpusPayloader) Payload(mtu int, payload []byte) [][]byte {
 // OpusPacket represents the Opus header that is stored in the payload of an RTP Packet
 type OpusPacket struct {
 	Payload []byte
+}
+
+// IsDetectedFinalPacketInSequence returns true as all opus packets are always final in a sequence
+func (p *OpusPacket) IsDetectedFinalPacketInSequence(packet *rtp.Packet) bool {
+	return true
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the OpusPacket this method is called upon
