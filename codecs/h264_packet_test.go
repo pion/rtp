@@ -179,3 +179,36 @@ func TestH264Packet_Unmarshal(t *testing.T) {
 		t.Fatal("Failed to unmarshal a single packet with multiple NALUs into avc stream")
 	}
 }
+
+func TestH264PartitionHeadChecker_IsPartitionHead(t *testing.T) {
+	h264PartitionHeadChecker := H264PartitionHeadChecker{}
+
+	if h264PartitionHeadChecker.IsPartitionHead(nil) {
+		t.Fatal("nil must not be a partition head")
+	}
+
+	emptyNalu := []byte{}
+	if h264PartitionHeadChecker.IsPartitionHead(emptyNalu) {
+		t.Fatal("empty nalu must not be a partition head")
+	}
+
+	singleNalu := []byte{1, 0}
+	if h264PartitionHeadChecker.IsPartitionHead(singleNalu) == false {
+		t.Fatal("single nalu must be a partition head")
+	}
+
+	stapaNalu := []byte{stapaNALUType, 0}
+	if h264PartitionHeadChecker.IsPartitionHead(stapaNalu) == false {
+		t.Fatal("stapa nalu must be a partition head")
+	}
+
+	fuaStartNalu := []byte{fuaNALUType, fuaStartBitmask}
+	if h264PartitionHeadChecker.IsPartitionHead(fuaStartNalu) == false {
+		t.Fatal("fua start nalu must be a partition head")
+	}
+
+	fuaEndNalu := []byte{fuaNALUType, fuaEndBitmask}
+	if h264PartitionHeadChecker.IsPartitionHead(fuaEndNalu) {
+		t.Fatal("fua end nalu must not be a partition head")
+	}
+}

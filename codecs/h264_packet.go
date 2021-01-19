@@ -18,6 +18,7 @@ const (
 
 	naluTypeBitmask   = 0x1F
 	naluRefIdcBitmask = 0x60
+	fuaStartBitmask   = 0x80
 	fuaEndBitmask     = 0x40
 )
 
@@ -219,4 +220,21 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("%w: %d", errUnhandledNALUType, naluType)
+}
+
+// H264PartitionHeadChecker checks H264 partition head
+type H264PartitionHeadChecker struct{}
+
+// IsPartitionHead checks if this is the head of a packetized nalu stream.
+func (*H264PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
+	if packet == nil || len(packet) < 2 {
+		return false
+	}
+
+	if packet[0]&naluTypeBitmask == fuaNALUType &&
+		packet[1]&fuaStartBitmask == 0 {
+		return false
+	}
+
+	return true
 }
