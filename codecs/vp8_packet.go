@@ -1,9 +1,13 @@
 package codecs
 
-import "github.com/pion/rtp"
+import (
+	"github.com/pion/rtp"
+)
 
 // VP8Payloader payloads VP8 packets
-type VP8Payloader struct{}
+type VP8Payloader struct {
+	pictureID uint16
+}
 
 const (
 	vp8HeaderSize = 1
@@ -32,7 +36,21 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 	 *     first packet of each encoded frame.
 	 */
 
-	maxFragmentSize := mtu - vp8HeaderSize
+	usingHeaderSize := vp8HeaderSize
+	switch {
+	case p.pictureID == 0:
+		break
+	case p.pictureID < 128:
+		{
+			usingHeaderSize = vp8HeaderSize + 2
+		}
+	default:
+		{
+			usingHeaderSize = vp8HeaderSize + 3
+		}
+	}
+
+	maxFragmentSize := mtu - usingHeaderSize
 
 	payloadData := payload
 	payloadDataRemaining := len(payload)
@@ -44,19 +62,40 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 	if min(maxFragmentSize, payloadDataRemaining) <= 0 {
 		return payloads
 	}
+	first := true
 	for payloadDataRemaining > 0 {
 		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
-		out := make([]byte, vp8HeaderSize+currentFragmentSize)
-		if payloadDataRemaining == len(payload) {
+		out := make([]byte, usingHeaderSize+currentFragmentSize)
+
+		if first {
 			out[0] = 0x10
+			first = false
+		}
+		switch usingHeaderSize {
+		case vp8HeaderSize:
+			break
+		case vp8HeaderSize + 2:
+			{
+				out[0] |= 0x80
+				out[1] |= 0x80
+				out[2] |= uint8(p.pictureID & 0x7F)
+			}
+		case vp8HeaderSize + 3:
+			out[0] |= 0x80
+			out[1] |= 0x80
+			out[2] |= 0x80 | uint8((p.pictureID>>8)&0x7F)
+			out[3] |= uint8(p.pictureID & 0xFF)
 		}
 
-		copy(out[vp8HeaderSize:], payloadData[payloadDataIndex:payloadDataIndex+currentFragmentSize])
+		copy(out[usingHeaderSize:], payloadData[payloadDataIndex:payloadDataIndex+currentFragmentSize])
 		payloads = append(payloads, out)
 
 		payloadDataRemaining -= currentFragmentSize
 		payloadDataIndex += currentFragmentSize
 	}
+
+	p.pictureID++
+	p.pictureID &= 0x7FFF
 
 	return payloads
 }
@@ -119,8 +158,10 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) {
 
 	if p.I == 1 { // PID present?
 		if payload[payloadIndex]&0x80 > 0 { // M == 1, PID is 16bit
+			p.PictureID = (uint16(payload[payloadIndex]&0x7F) << 8) | uint16(payload[payloadIndex+1])
 			payloadIndex += 2
 		} else {
+			p.PictureID = uint16(payload[payloadIndex])
 			payloadIndex++
 		}
 	}
