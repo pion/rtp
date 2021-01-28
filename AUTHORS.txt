@@ -6,6 +6,7 @@
 adwpc <adwpc@hotmail.com>
 aler9 <46489434+aler9@users.noreply.github.com>
 Antoine Baché <antoine.bache@epitech.eu>
+Antoine Baché <antoine@tenten.app>
 Atsushi Watanabe <atsushi.w@ieee.org>
 Bao Nguyen <bao@n4n.dev>
 debiandebiandebian <debiandebiandebiandebian@gmail.com>
@@ -20,6 +21,7 @@ Luke Curley <kixelated@gmail.com>
 lxb <xiangbing.li@uama.com.cn>
 Michael MacDonald <github@macdonald.cx>
 Michael MacDonald <mike.macdonald@savantsystems.com>
+Michael Uti <utimichael9@gmail.com>
 Raphael Derosso Pereira <raphaelpereira@gmail.com>
 Rob Lofthouse <ri.lofthouse@gmail.com>
 Robin Raymond <robin@goheadroom.com>
