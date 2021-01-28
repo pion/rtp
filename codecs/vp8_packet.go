@@ -11,7 +11,7 @@ const (
 )
 
 // Payload fragments a VP8 packet across one or more byte arrays
-func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
+func (p *VP8Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	/*
 	 * https://tools.ietf.org/html/rfc7741#section-4.2
 	 *
@@ -44,7 +44,7 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 		}
 	}
 
-	maxFragmentSize := mtu - usingHeaderSize
+	maxFragmentSize := int(mtu) - usingHeaderSize
 
 	payloadData := payload
 	payloadDataRemaining := len(payload)

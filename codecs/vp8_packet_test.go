@@ -112,7 +112,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 func TestVP8Payloader_Payload(t *testing.T) {
 	testCases := map[string]struct {
 		payloader VP8Payloader
-		mtu       int
+		mtu       uint16
 		payload   [][]byte
 		expected  [][][]byte
 	}{
@@ -196,12 +196,6 @@ func TestVP8Payloader_Payload(t *testing.T) {
 		// Positive MTU, small payload
 		// MTU of 1 results in fragment size of 0
 		res = pck.Payload(1, payload)
-		if len(res) != 0 {
-			t.Fatal("Generated payload should be empty")
-		}
-
-		// Negative MTU, small payload
-		res = pck.Payload(-1, payload)
 		if len(res) != 0 {
 			t.Fatal("Generated payload should be empty")
 		}
