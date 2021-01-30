@@ -11,6 +11,7 @@ type H264Payloader struct{}
 const (
 	stapaNALUType = 24
 	fuaNALUType   = 28
+	fubNALUType   = 29
 
 	fuaHeaderSize       = 2
 	stapaHeaderSize     = 1
@@ -18,8 +19,8 @@ const (
 
 	naluTypeBitmask   = 0x1F
 	naluRefIdcBitmask = 0x60
-	fuaStartBitmask   = 0x80
-	fuaEndBitmask     = 0x40
+	fuStartBitmask    = 0x80
+	fuEndBitmask      = 0x40
 )
 
 func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
@@ -206,7 +207,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 
 		p.fuaBuffer = append(p.fuaBuffer, payload[fuaHeaderSize:]...)
 
-		if payload[1]&fuaEndBitmask != 0 {
+		if payload[1]&fuEndBitmask != 0 {
 			naluRefIdc := payload[0] & naluRefIdcBitmask
 			fragmentedNaluType := payload[1] & naluTypeBitmask
 
@@ -231,9 +232,9 @@ func (*H264PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
 		return false
 	}
 
-	if packet[0]&naluTypeBitmask == fuaNALUType &&
-		packet[1]&fuaStartBitmask == 0 {
-		return false
+	if packet[0]&naluTypeBitmask == fuaNALUType ||
+		packet[0]&naluTypeBitmask == fubNALUType {
+		return packet[1]&fuStartBitmask != 0
 	}
 
 	return true

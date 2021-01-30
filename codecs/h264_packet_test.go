@@ -202,13 +202,23 @@ func TestH264PartitionHeadChecker_IsPartitionHead(t *testing.T) {
 		t.Fatal("stapa nalu must be a partition head")
 	}
 
-	fuaStartNalu := []byte{fuaNALUType, fuaStartBitmask}
+	fuaStartNalu := []byte{fuaNALUType, fuStartBitmask}
 	if h264PartitionHeadChecker.IsPartitionHead(fuaStartNalu) == false {
 		t.Fatal("fua start nalu must be a partition head")
 	}
 
-	fuaEndNalu := []byte{fuaNALUType, fuaEndBitmask}
+	fuaEndNalu := []byte{fuaNALUType, fuEndBitmask}
 	if h264PartitionHeadChecker.IsPartitionHead(fuaEndNalu) {
 		t.Fatal("fua end nalu must not be a partition head")
+	}
+
+	fubStartNalu := []byte{fubNALUType, fuStartBitmask}
+	if h264PartitionHeadChecker.IsPartitionHead(fubStartNalu) == false {
+		t.Fatal("fub start nalu must be a partition head")
+	}
+
+	fubEndNalu := []byte{fubNALUType, fuEndBitmask}
+	if h264PartitionHeadChecker.IsPartitionHead(fubEndNalu) {
+		t.Fatal("fub end nalu must not be a partition head")
 	}
 }
