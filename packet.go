@@ -480,3 +480,35 @@ func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
 func (p *Packet) MarshalSize() int {
 	return p.Header.MarshalSize() + len(p.Payload)
 }
+
+// Clone returns a deep copy of p.
+func (p *Packet) Clone() *Packet {
+	clone := &Packet{}
+	clone.Header = p.Header.Clone()
+	if p.Payload != nil {
+		clone.Payload = make([]byte, len(p.Payload))
+		copy(clone.Payload, p.Payload)
+	}
+	return clone
+}
+
+// Clone returns a deep copy h.
+func (h Header) Clone() Header {
+	clone := h
+	if h.CSRC != nil {
+		clone.CSRC = make([]uint32, len(h.CSRC))
+		copy(clone.CSRC, h.CSRC)
+	}
+	if h.Extensions != nil {
+		ext := make([]Extension, len(h.Extensions))
+		for i, e := range h.Extensions {
+			ext[i] = e
+			if e.payload != nil {
+				ext[i].payload = make([]byte, len(e.payload))
+				copy(ext[i].payload, e.payload)
+			}
+		}
+		clone.Extensions = ext
+	}
+	return clone
+}
