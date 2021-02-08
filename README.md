@@ -51,6 +51,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Robin Raymond](https://github.com/robin-raymond)
 * [debiandebiandebian](https://github.com/debiandebiandebian)
 * [Juliusz Chroboczek](https://github.com/jech)
+* [ffmiyo](https://github.com/ffmiyo)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

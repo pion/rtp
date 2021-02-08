@@ -43,7 +43,6 @@ func TestPacketizer_AbsSendTime(t *testing.T) {
 			Padding:          false,
 			Extension:        true,
 			Marker:           true,
-			PayloadOffset:    0, // not set by Packetize() at now
 			PayloadType:      98,
 			SequenceNumber:   1234,
 			Timestamp:        45678,
