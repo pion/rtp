@@ -34,7 +34,8 @@ jobs:
 
       - name: Setup go-acc
         run: |
-          go get -u github.com/ory/go-acc
+          go get github.com/ory/go-acc
+          git checkout go.mod go.sum
 
       - name: Run test
         run: |
