@@ -2,7 +2,6 @@ package codecs
 
 import (
 	"github.com/pion/randutil"
-	"github.com/pion/rtp"
 )
 
 // Use global random generator to properly seed by crypto grade random.
@@ -150,12 +149,10 @@ type VP9Packet struct {
 	Payload []byte
 }
 
-// IsDetectedFinalPacketInSequence returns true of the packet passed in has the marker bit set indicated the end of a packet sequence
-func (p *VP9Packet) IsDetectedFinalPacketInSequence(packet *rtp.Packet) bool {
-	if packet == nil {
-		return false
-	}
-	return packet.Marker
+// IsDetectedFinalPacketInSequence returns true of the packet passed in has the
+// marker bit set indicated the end of a packet sequence
+func (p *VP9Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
+	return rtpPacketMarketBit
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the VP9Packet this method is called upon

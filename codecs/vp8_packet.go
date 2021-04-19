@@ -1,9 +1,5 @@
 package codecs
 
-import (
-	"github.com/pion/rtp"
-)
-
 // VP8Payloader payloads VP8 packets
 type VP8Payloader struct {
 	pictureID uint16
@@ -119,12 +115,10 @@ type VP8Packet struct {
 	Payload []byte
 }
 
-// IsDetectedFinalPacketInSequence returns true of the packet passed in has the marker bit set indicated the end of a packet sequence
-func (p *VP8Packet) IsDetectedFinalPacketInSequence(packet *rtp.Packet) bool {
-	if packet == nil {
-		return false
-	}
-	return packet.Marker
+// IsDetectedFinalPacketInSequence returns true of the packet passed in has the
+// marker bit set indicated the end of a packet sequence
+func (p *VP8Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
+	return rtpPacketMarketBit
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon

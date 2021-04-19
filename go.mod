@@ -1,4 +1,4 @@
-module github.com/pion/rtp
+module github.com/pion/rtp/v2
 
 go 1.13
 

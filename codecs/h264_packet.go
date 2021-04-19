@@ -3,8 +3,6 @@ package codecs
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/pion/rtp"
 )
 
 // H264Payloader payloads H264 packets
@@ -13,6 +11,7 @@ type H264Payloader struct{}
 const (
 	stapaNALUType = 24
 	fuaNALUType   = 28
+	fubNALUType   = 29
 
 	fuaHeaderSize       = 2
 	stapaHeaderSize     = 1
@@ -20,7 +19,8 @@ const (
 
 	naluTypeBitmask   = 0x1F
 	naluRefIdcBitmask = 0x60
-	fuaStartBitmask   = 0x80
+	fuStartBitmask    = 0x80
+	fuEndBitmask      = 0x40
 )
 
 func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
@@ -151,14 +151,24 @@ func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 
 // H264Packet represents the H264 header that is stored in the payload of an RTP Packet
 type H264Packet struct {
+	IsAVC     bool
+	fuaBuffer []byte
 }
 
-// IsDetectedFinalPacketInSequence returns true of the packet passed in has the marker bit set indicated the end of a packet sequence
-func (p *H264Packet) IsDetectedFinalPacketInSequence(packet *rtp.Packet) bool {
-	if packet == nil {
-		return false
+func (p *H264Packet) doPackaging(nalu []byte) []byte {
+	if p.IsAVC {
+		naluLength := make([]byte, 4)
+		binary.BigEndian.PutUint32(naluLength, uint32(len(nalu)))
+		return append(naluLength, nalu...)
 	}
-	return packet.Marker
+
+	return append(annexbNALUStartCode(), nalu...)
+}
+
+// IsDetectedFinalPacketInSequence returns true of the packet passed in has the
+// marker bit set indicated the end of a packet sequence
+func (p *H264Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
+	return rtpPacketMarketBit
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon
@@ -174,7 +184,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	naluType := payload[0] & naluTypeBitmask
 	switch {
 	case naluType > 0 && naluType < 24:
-		return append(annexbNALUStartCode(), payload...), nil
+		return p.doPackaging(payload), nil
 
 	case naluType == stapaNALUType:
 		currOffset := int(stapaHeaderSize)
@@ -187,8 +197,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 				return nil, fmt.Errorf("%w STAP-A declared size(%d) is larger than buffer(%d)", errShortPacket, naluSize, len(payload)-currOffset)
 			}
 
-			result = append(result, annexbNALUStartCode()...)
-			result = append(result, payload[currOffset:currOffset+naluSize]...)
+			result = append(result, p.doPackaging(payload[currOffset:currOffset+naluSize])...)
 			currOffset += naluSize
 		}
 		return result, nil
@@ -198,18 +207,41 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 			return nil, errShortPacket
 		}
 
-		if payload[1]&fuaStartBitmask != 0 {
+		if p.fuaBuffer == nil {
+			p.fuaBuffer = []byte{}
+		}
+
+		p.fuaBuffer = append(p.fuaBuffer, payload[fuaHeaderSize:]...)
+
+		if payload[1]&fuEndBitmask != 0 {
 			naluRefIdc := payload[0] & naluRefIdcBitmask
 			fragmentedNaluType := payload[1] & naluTypeBitmask
 
-			// Take a copy of payload since we are mutating it.
-			payloadCopy := append([]byte{}, payload...)
-			payloadCopy[fuaHeaderSize-1] = naluRefIdc | fragmentedNaluType
-			return append(annexbNALUStartCode(), payloadCopy[fuaHeaderSize-1:]...), nil
+			nalu := append([]byte{}, naluRefIdc|fragmentedNaluType)
+			nalu = append(nalu, p.fuaBuffer...)
+			p.fuaBuffer = nil
+			return p.doPackaging(nalu), nil
 		}
 
-		return payload[fuaHeaderSize:], nil
+		return []byte{}, nil
 	}
 
 	return nil, fmt.Errorf("%w: %d", errUnhandledNALUType, naluType)
+}
+
+// H264PartitionHeadChecker checks H264 partition head
+type H264PartitionHeadChecker struct{}
+
+// IsPartitionHead checks if this is the head of a packetized nalu stream.
+func (*H264PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
+	if packet == nil || len(packet) < 2 {
+		return false
+	}
+
+	if packet[0]&naluTypeBitmask == fuaNALUType ||
+		packet[0]&naluTypeBitmask == fubNALUType {
+		return packet[1]&fuStartBitmask != 0
+	}
+
+	return true
 }

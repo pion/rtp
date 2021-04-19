@@ -1,7 +1,5 @@
 package codecs
 
-import "github.com/pion/rtp"
-
 // OpusPayloader payloads Opus packets
 type OpusPayloader struct{}
 
@@ -21,8 +19,9 @@ type OpusPacket struct {
 	Payload []byte
 }
 
-// IsDetectedFinalPacketInSequence returns true as all opus packets are always final in a sequence
-func (p *OpusPacket) IsDetectedFinalPacketInSequence(packet *rtp.Packet) bool {
+// IsDetectedFinalPacketInSequence returns true as all opus packets are always
+// final in a sequence
+func (p *OpusPacket) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
 	return true
 }
 
