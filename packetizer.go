@@ -11,8 +11,9 @@ type Payloader interface {
 
 // Packetizer packetizes a payload
 type Packetizer interface {
-	Packetize(payload []byte, samples uint32, skippedSamples uint32) []*Packet
+	Packetize(payload []byte, samples uint32) []*Packet
 	EnableAbsSendTime(value int)
+	SkipSamples(skippedSamples uint32)
 }
 
 type packetizer struct {
@@ -48,7 +49,7 @@ func (p *packetizer) EnableAbsSendTime(value int) {
 }
 
 // Packetize packetizes the payload of an RTP packet and returns one or more RTP packets
-func (p *packetizer) Packetize(payload []byte, samples uint32, skippedSamples uint32) []*Packet {
+func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	// Guard against an empty payload
 	if len(payload) == 0 {
 		return nil
@@ -56,7 +57,6 @@ func (p *packetizer) Packetize(payload []byte, samples uint32, skippedSamples ui
 
 	payloads := p.Payloader.Payload(p.MTU-12, payload)
 	packets := make([]*Packet, len(payloads))
-	p.Timestamp += skippedSamples
 
 	for i, pp := range payloads {
 		packets[i] = &Packet{
@@ -89,4 +89,10 @@ func (p *packetizer) Packetize(payload []byte, samples uint32, skippedSamples ui
 	}
 
 	return packets
+}
+
+// SkipSamples causes a gap in sample count between Packetize requests so the
+// RTP payloads produced have a gap in timestamps
+func (p *packetizer) SkipSamples(skippedSamples uint32) {
+	p.Timestamp += skippedSamples
 }
