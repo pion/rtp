@@ -2,7 +2,8 @@ package codecs
 
 // VP8Payloader payloads VP8 packets
 type VP8Payloader struct {
-	pictureID uint16
+	EnablePictureID bool
+	pictureID       uint16
 }
 
 const (
@@ -33,12 +34,14 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 	 */
 
 	usingHeaderSize := vp8HeaderSize
-	switch {
-	case p.pictureID == 0:
-	case p.pictureID < 128:
-		usingHeaderSize = vp8HeaderSize + 2
-	default:
-		usingHeaderSize = vp8HeaderSize + 3
+	if p.EnablePictureID {
+		switch {
+		case p.pictureID == 0:
+		case p.pictureID < 128:
+			usingHeaderSize = vp8HeaderSize + 2
+		default:
+			usingHeaderSize = vp8HeaderSize + 3
+		}
 	}
 
 	maxFragmentSize := mtu - usingHeaderSize
@@ -62,17 +65,19 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 			out[0] = 0x10
 			first = false
 		}
-		switch usingHeaderSize {
-		case vp8HeaderSize:
-		case vp8HeaderSize + 2:
-			out[0] |= 0x80
-			out[1] |= 0x80
-			out[2] |= uint8(p.pictureID & 0x7F)
-		case vp8HeaderSize + 3:
-			out[0] |= 0x80
-			out[1] |= 0x80
-			out[2] |= 0x80 | uint8((p.pictureID>>8)&0x7F)
-			out[3] |= uint8(p.pictureID & 0xFF)
+		if p.EnablePictureID {
+			switch usingHeaderSize {
+			case vp8HeaderSize:
+			case vp8HeaderSize + 2:
+				out[0] |= 0x80
+				out[1] |= 0x80
+				out[2] |= uint8(p.pictureID & 0x7F)
+			case vp8HeaderSize + 3:
+				out[0] |= 0x80
+				out[1] |= 0x80
+				out[2] |= 0x80 | uint8((p.pictureID>>8)&0x7F)
+				out[3] |= uint8(p.pictureID & 0xFF)
+			}
 		}
 
 		copy(out[usingHeaderSize:], payloadData[payloadDataIndex:payloadDataIndex+currentFragmentSize])
