@@ -2,6 +2,7 @@ package codecs
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -109,33 +110,102 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 }
 
 func TestVP8Payloader_Payload(t *testing.T) {
-	pck := VP8Payloader{}
-	payload := []byte{0x90, 0x90, 0x90}
+	testCases := map[string]struct {
+		payloader VP8Payloader
+		mtu       int
+		payload   [][]byte
+		expected  [][][]byte
+	}{
+		"WithoutPictureID": {
+			payloader: VP8Payloader{},
+			mtu:       2,
+			payload: [][]byte{
+				{0x90, 0x90, 0x90},
+				{0x91, 0x91},
+			},
+			expected: [][][]byte{
+				{{0x10, 0x90}, {0x00, 0x90}, {0x00, 0x90}},
+				{{0x10, 0x91}, {0x00, 0x91}},
+			},
+		},
+		"WithPictureID_1byte": {
+			payloader: VP8Payloader{
+				EnablePictureID: true,
+				pictureID:       0x20,
+			},
+			mtu: 5,
+			payload: [][]byte{
+				{0x90, 0x90, 0x90},
+				{0x91, 0x91},
+			},
+			expected: [][][]byte{
+				{
+					{0x90, 0x80, 0x20, 0x90, 0x90},
+					{0x80, 0x80, 0x20, 0x90},
+				},
+				{
+					{0x90, 0x80, 0x21, 0x91, 0x91},
+				},
+			},
+		},
+		"WithPictureID_2bytes": {
+			payloader: VP8Payloader{
+				EnablePictureID: true,
+				pictureID:       0x120,
+			},
+			mtu: 6,
+			payload: [][]byte{
+				{0x90, 0x90, 0x90},
+				{0x91, 0x91},
+			},
+			expected: [][][]byte{
+				{
+					{0x90, 0x80, 0x81, 0x20, 0x90, 0x90},
+					{0x80, 0x80, 0x81, 0x20, 0x90},
+				},
+				{
+					{0x90, 0x80, 0x81, 0x21, 0x91, 0x91},
+				},
+			},
+		},
+	}
+	for name, testCase := range testCases {
+		testCase := testCase
+		t.Run(name, func(t *testing.T) {
+			pck := testCase.payloader
 
-	// Positive MTU, nil payload
-	res := pck.Payload(1, nil)
-	if len(res) != 0 {
-		t.Fatal("Generated payload should be empty")
+			for i := range testCase.payload {
+				res := pck.Payload(testCase.mtu, testCase.payload[i])
+				if !reflect.DeepEqual(testCase.expected[i], res) {
+					t.Fatalf("Generated packet[%d] differs, expected: %v, got: %v", i, testCase.expected[i], res)
+				}
+			}
+		})
 	}
 
-	// Positive MTU, small payload
-	// MTU of 1 results in fragment size of 0
-	res = pck.Payload(1, payload)
-	if len(res) != 0 {
-		t.Fatal("Generated payload should be empty")
-	}
+	t.Run("Error", func(t *testing.T) {
+		pck := VP8Payloader{}
+		payload := []byte{0x90, 0x90, 0x90}
 
-	// Negative MTU, small payload
-	res = pck.Payload(-1, payload)
-	if len(res) != 0 {
-		t.Fatal("Generated payload should be empty")
-	}
+		// Positive MTU, nil payload
+		res := pck.Payload(1, nil)
+		if len(res) != 0 {
+			t.Fatal("Generated payload should be empty")
+		}
 
-	// Positive MTU, small payload
-	res = pck.Payload(2, payload)
-	if len(res) != len(payload) {
-		t.Fatal("Generated payload should be the same size as original payload size")
-	}
+		// Positive MTU, small payload
+		// MTU of 1 results in fragment size of 0
+		res = pck.Payload(1, payload)
+		if len(res) != 0 {
+			t.Fatal("Generated payload should be empty")
+		}
+
+		// Negative MTU, small payload
+		res = pck.Payload(-1, payload)
+		if len(res) != 0 {
+			t.Fatal("Generated payload should be empty")
+		}
+	})
 }
 
 func TestVP8PartitionHeadChecker_IsPartitionHead(t *testing.T) {
