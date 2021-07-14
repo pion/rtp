@@ -117,8 +117,10 @@ func TestVP8Payloader_Payload(t *testing.T) {
 		expected  [][][]byte
 	}{
 		"WithoutPictureID": {
-			payloader: VP8Payloader{},
-			mtu:       2,
+			payloader: VP8Payloader{
+				OmitPictureID: true,
+			},
+			mtu: 2,
 			payload: [][]byte{
 				{0x90, 0x90, 0x90},
 				{0x91, 0x91},
@@ -130,8 +132,7 @@ func TestVP8Payloader_Payload(t *testing.T) {
 		},
 		"WithPictureID_1byte": {
 			payloader: VP8Payloader{
-				EnablePictureID: true,
-				pictureID:       0x20,
+				pictureID: 0x20,
 			},
 			mtu: 5,
 			payload: [][]byte{
@@ -150,8 +151,7 @@ func TestVP8Payloader_Payload(t *testing.T) {
 		},
 		"WithPictureID_2bytes": {
 			payloader: VP8Payloader{
-				EnablePictureID: true,
-				pictureID:       0x120,
+				pictureID: 0x120,
 			},
 			mtu: 6,
 			payload: [][]byte{

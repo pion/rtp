@@ -2,8 +2,8 @@ package codecs
 
 // VP8Payloader payloads VP8 packets
 type VP8Payloader struct {
-	EnablePictureID bool
-	pictureID       uint16
+	OmitPictureID bool
+	pictureID     uint16
 }
 
 const (
@@ -34,7 +34,7 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 	 */
 
 	usingHeaderSize := vp8HeaderSize
-	if p.EnablePictureID {
+	if !p.OmitPictureID {
 		switch {
 		case p.pictureID == 0:
 		case p.pictureID < 128:
@@ -65,7 +65,7 @@ func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 			out[0] = 0x10
 			first = false
 		}
-		if p.EnablePictureID {
+		if !p.OmitPictureID {
 			switch usingHeaderSize {
 			case vp8HeaderSize:
 			case vp8HeaderSize + 2:
