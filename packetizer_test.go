@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/rtp/v2/codecs"
+	"github.com/pion/rtp/codecs"
 )
 
 func TestPacketizer(t *testing.T) {
