@@ -148,12 +148,8 @@ type VP9Packet struct {
 	PGPDiff [][]uint8 // Reference indecies of pictures in a Picture Group
 
 	Payload []byte
-}
 
-// IsDetectedFinalPacketInSequence returns true of the packet passed in has the
-// marker bit set indicated the end of a packet sequence
-func (p *VP9Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
-	return rtpPacketMarketBit
+	videoDepacketizer
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the VP9Packet this method is called upon
@@ -380,14 +376,13 @@ func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) {
 	return pos, nil
 }
 
-// VP9PartitionHeadChecker checks VP9 partition head
+// VP9PartitionHeadChecker is obsolete
 type VP9PartitionHeadChecker struct{}
 
 // IsPartitionHead checks whether if this is a head of the VP9 partition
-func (*VP9PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
-	p := &VP9Packet{}
-	if _, err := p.Unmarshal(packet); err != nil {
+func (*VP9Packet) IsPartitionHead(payload []byte) bool {
+	if len(payload) < 1 {
 		return false
 	}
-	return p.B
+	return (payload[0] & 0x08) != 0
 }

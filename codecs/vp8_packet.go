@@ -115,12 +115,8 @@ type VP8Packet struct {
 	KEYIDX    uint8  /* 5 bits temporal key frame index */
 
 	Payload []byte
-}
 
-// IsDetectedFinalPacketInSequence returns true of the packet passed in has the
-// marker bit set indicated the end of a packet sequence
-func (p *VP8Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
-	return rtpPacketMarketBit
+	videoDepacketizer
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon
@@ -193,14 +189,13 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) {
 	return p.Payload, nil
 }
 
-// VP8PartitionHeadChecker checks VP8 partition head
+// VP8PartitionHeadChecker is obsolete
 type VP8PartitionHeadChecker struct{}
 
 // IsPartitionHead checks whether if this is a head of the VP8 partition
-func (*VP8PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
-	p := &VP8Packet{}
-	if _, err := p.Unmarshal(packet); err != nil {
+func (*VP8Packet) IsPartitionHead(payload []byte) bool {
+	if len(payload) < 1 {
 		return false
 	}
-	return p.S == 1
+	return (payload[0] & 0x10) != 0
 }
