@@ -59,15 +59,10 @@ func TestOpusPayloader_Payload(t *testing.T) {
 	}
 }
 
-func TestOpusPartitionHeadChecker_IsPartitionHead(t *testing.T) {
-	checker := &OpusPartitionHeadChecker{}
-	t.Run("SmallPacket", func(t *testing.T) {
-		if checker.IsPartitionHead([]byte{}) {
-			t.Fatal("Small packet should not be the head of a new partition")
-		}
-	})
+func TestOpusIsPartitionHead(t *testing.T) {
+	opus := &OpusPacket{}
 	t.Run("NormalPacket", func(t *testing.T) {
-		if !checker.IsPartitionHead([]byte{0x00, 0x00}) {
+		if !opus.IsPartitionHead([]byte{0x00, 0x00}) {
 			t.Fatal("All OPUS RTP packet should be the head of a new partition")
 		}
 	})
