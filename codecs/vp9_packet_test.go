@@ -299,18 +299,18 @@ func TestVP9Payloader_Payload(t *testing.T) {
 	})
 }
 
-func TestVP9PartitionHeadChecker_IsPartitionHead(t *testing.T) {
-	checker := &VP9PartitionHeadChecker{}
+func TestVP9IsPartitionHead(t *testing.T) {
+	vp9 := &VP9Packet{}
 	t.Run("SmallPacket", func(t *testing.T) {
-		if checker.IsPartitionHead([]byte{}) {
+		if vp9.IsPartitionHead([]byte{}) {
 			t.Fatal("Small packet should not be the head of a new partition")
 		}
 	})
 	t.Run("NormalPacket", func(t *testing.T) {
-		if !checker.IsPartitionHead([]byte{0x18, 0x00, 0x00}) {
+		if !vp9.IsPartitionHead([]byte{0x18, 0x00, 0x00}) {
 			t.Error("VP9 RTP packet with B flag should be head of a new partition")
 		}
-		if checker.IsPartitionHead([]byte{0x10, 0x00, 0x00}) {
+		if vp9.IsPartitionHead([]byte{0x10, 0x00, 0x00}) {
 			t.Error("VP9 RTP packet without B flag should not be head of a new partition")
 		}
 	})

@@ -189,6 +189,8 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 type H264Packet struct {
 	IsAVC     bool
 	fuaBuffer []byte
+
+	videoDepacketizer
 }
 
 func (p *H264Packet) doPackaging(nalu []byte) []byte {
@@ -265,18 +267,27 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	return nil, fmt.Errorf("%w: %d", errUnhandledNALUType, naluType)
 }
 
-// H264PartitionHeadChecker checks H264 partition head
+// H264PartitionHeadChecker checks H264 partition head.
+//
+// Deprecated: replaced by H264Packet.IsPartitionHead()
 type H264PartitionHeadChecker struct{}
 
 // IsPartitionHead checks if this is the head of a packetized nalu stream.
+//
+// Deprecated: replaced by H264Packet.IsPartitionHead()
 func (*H264PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
-	if packet == nil || len(packet) < 2 {
+	return (&H264Packet{}).IsPartitionHead(packet)
+}
+
+// IsPartitionHead checks if this is the head of a packetized nalu stream.
+func (*H264Packet) IsPartitionHead(payload []byte) bool {
+	if len(payload) < 2 {
 		return false
 	}
 
-	if packet[0]&naluTypeBitmask == fuaNALUType ||
-		packet[0]&naluTypeBitmask == fubNALUType {
-		return packet[1]&fuStartBitmask != 0
+	if payload[0]&naluTypeBitmask == fuaNALUType ||
+		payload[0]&naluTypeBitmask == fubNALUType {
+		return payload[1]&fuStartBitmask != 0
 	}
 
 	return true
