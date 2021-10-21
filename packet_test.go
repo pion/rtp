@@ -22,6 +22,7 @@ func TestBasic(t *testing.T) {
 	}
 	parsedPacket := &Packet{
 		Header: Header{
+			Padding:          false,
 			Marker:           true,
 			Extension:        true,
 			ExtensionProfile: 1,
@@ -62,6 +63,104 @@ func TestBasic(t *testing.T) {
 				t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
 			}
 		})
+	}
+
+	// packet with padding
+	rawPkt = []byte{
+		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x04,
+	}
+	parsedPacket = &Packet{
+		Header: Header{
+			Padding:          true,
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Extensions: []Extension{
+				{0, []byte{
+					0xFF, 0xFF, 0xFF, 0xFF,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
+		Payload: rawPkt[20:21],
+	}
+	if err := p.Unmarshal(rawPkt); err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(p, parsedPacket) {
+		t.Errorf("TestBasic padding unmarshal: got %#v, want %#v", p, parsedPacket)
+	}
+
+	// packet with only padding
+	rawPkt = []byte{
+		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x05,
+	}
+	parsedPacket = &Packet{
+		Header: Header{
+			Padding:          true,
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Extensions: []Extension{
+				{0, []byte{
+					0xFF, 0xFF, 0xFF, 0xFF,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
+		Payload: []byte{},
+	}
+	if err := p.Unmarshal(rawPkt); err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(p, parsedPacket) {
+		t.Errorf("TestBasic padding only unmarshal: got %#v, want %#v", p, parsedPacket)
+	}
+	if len(p.Payload) != 0 {
+		t.Errorf("Unmarshal of padding only packet has payload of non-zero length: %d", len(p.Payload))
+	}
+
+	// packet with excessive padding
+	rawPkt = []byte{
+		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x06,
+	}
+	parsedPacket = &Packet{
+		Header: Header{
+			Padding:          true,
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Extensions: []Extension{
+				{0, []byte{
+					0xFF, 0xFF, 0xFF, 0xFF,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
+		Payload: []byte{},
+	}
+	err := p.Unmarshal(rawPkt)
+	if err == nil {
+		t.Fatal("Unmarshal did not error on packet with excessive padding")
+	}
+	if !errors.Is(err, errTooSmall) {
+		t.Errorf("Expected error: %v, got: %v", errTooSmall, err)
 	}
 }
 

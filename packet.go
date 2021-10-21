@@ -210,7 +210,14 @@ func (p *Packet) Unmarshal(buf []byte) error {
 	if err != nil {
 		return err
 	}
-	p.Payload = buf[n:]
+	end := len(buf)
+	if p.Header.Padding {
+		end -= int(buf[end-1])
+	}
+	if end < n {
+		return errTooSmall
+	}
+	p.Payload = buf[n:end]
 	return nil
 }
 
