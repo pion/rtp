@@ -214,8 +214,17 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	p.Payload = rawPacket[p.PayloadOffset:]
+	end := len(rawPacket)
+	if p.Header.Padding {
+		end -= int(rawPacket[end-1])
+	}
+	if end < p.PayloadOffset {
+		return errTooSmall
+	}
+
+	p.Payload = rawPacket[p.PayloadOffset:end]
 	p.Raw = rawPacket
+
 	return nil
 }
 
