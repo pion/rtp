@@ -34,7 +34,8 @@ type Header struct {
 type Packet struct {
 	Header
 	Raw     []byte
-	Payload []byte
+	Payload     []byte
+	PaddingSize byte
 }
 
 const (
@@ -216,7 +217,8 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 
 	end := len(rawPacket)
 	if p.Header.Padding {
-		end -= int(rawPacket[end-1])
+		p.PaddingSize = rawPacket[end-1]
+		end -= int(p.PaddingSize)
 	}
 	if end < p.PayloadOffset {
 		return errTooSmall
@@ -477,23 +479,27 @@ func (p *Packet) Marshal() (buf []byte, err error) {
 
 // MarshalTo serializes the packet and writes to the buffer.
 func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
+	p.Header.Padding = p.PaddingSize != 0
 	n, err = p.Header.MarshalTo(buf)
 	if err != nil {
 		return 0, err
 	}
 
 	// Make sure the buffer is large enough to hold the packet.
-	if n+len(p.Payload) > len(buf) {
+	if n+len(p.Payload)+int(p.PaddingSize) > len(buf) {
 		return 0, io.ErrShortBuffer
 	}
 
 	m := copy(buf[n:], p.Payload)
 	p.Raw = buf[:n+m]
+	if p.Header.Padding {
+		buf[n+m+int(p.PaddingSize-1)] = p.PaddingSize
+	}
 
-	return n + m, nil
+	return n + m + int(p.PaddingSize), nil
 }
 
 // MarshalSize returns the size of the packet once marshaled.
 func (p *Packet) MarshalSize() int {
-	return p.Header.MarshalSize() + len(p.Payload)
+	return p.Header.MarshalSize() + len(p.Payload) + int(p.PaddingSize)
 }
