@@ -30,7 +30,8 @@ type Header struct {
 // Packet represents an RTP Packet
 type Packet struct {
 	Header
-	Payload []byte
+	Payload     []byte
+	PaddingSize byte
 }
 
 const (
@@ -212,7 +213,8 @@ func (p *Packet) Unmarshal(buf []byte) error {
 	}
 	end := len(buf)
 	if p.Header.Padding {
-		end -= int(buf[end-1])
+		p.PaddingSize = buf[end-1]
+		end -= int(p.PaddingSize)
 	}
 	if end < n {
 		return errTooSmall
@@ -468,24 +470,28 @@ func (p *Packet) Marshal() (buf []byte, err error) {
 
 // MarshalTo serializes the packet and writes to the buffer.
 func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
+	p.Header.Padding = p.PaddingSize != 0
 	n, err = p.Header.MarshalTo(buf)
 	if err != nil {
 		return 0, err
 	}
 
 	// Make sure the buffer is large enough to hold the packet.
-	if n+len(p.Payload) > len(buf) {
+	if n+len(p.Payload)+int(p.PaddingSize) > len(buf) {
 		return 0, io.ErrShortBuffer
 	}
 
 	m := copy(buf[n:], p.Payload)
+	if p.Header.Padding {
+		buf[n+m+int(p.PaddingSize-1)] = p.PaddingSize
+	}
 
-	return n + m, nil
+	return n + m + int(p.PaddingSize), nil
 }
 
 // MarshalSize returns the size of the packet once marshaled.
 func (p *Packet) MarshalSize() int {
-	return p.Header.MarshalSize() + len(p.Payload)
+	return p.Header.MarshalSize() + len(p.Payload) + int(p.PaddingSize)
 }
 
 // Clone returns a deep copy of p.
@@ -496,6 +502,7 @@ func (p *Packet) Clone() *Packet {
 		clone.Payload = make([]byte, len(p.Payload))
 		copy(clone.Payload, p.Payload)
 	}
+	clone.PaddingSize = p.PaddingSize
 	return clone
 }
 
