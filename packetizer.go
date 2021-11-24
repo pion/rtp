@@ -13,7 +13,13 @@ type Payloader interface {
 type Packetizer interface {
 	Packetize(payload []byte, samples uint32) []*Packet
 	EnableAbsSendTime(value int)
+	PacketizeInterleaved(payload []byte, samples uint32) []*Packet
+	SetTimestamps(timestamp uint32, interleavedTimestamp uint32)
+	GetTimestamps() (uint32, uint32)
+	GetStats() (uint64, uint64)
+	GetCurrentSequenceNumber() (uint16)
 	SkipSamples(skippedSamples uint32)
+	SkipInterleavedSamples(skippedSamples uint32)
 }
 
 type packetizer struct {
@@ -95,4 +101,30 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 // RTP payloads produced have a gap in timestamps
 func (p *packetizer) SkipSamples(skippedSamples uint32) {
 	p.Timestamp += skippedSamples
+}
+
+
+func (p *packetizer) SkipInterleavedSamples(skippedSamples uint32) {
+	panic("not implemented")
+}
+
+// PacketizeInterleaved packetizes the payload of an RTP packet and returns one or more RTP packets
+func (p *packetizer) PacketizeInterleaved(payload []byte, samples uint32) []*Packet {
+	panic("not implemented")
+}
+
+func (p *packetizer) SetTimestamps(timestamp uint32, interleavedTimestamp uint32) {
+	panic("not implemented")
+}
+
+func (p *packetizer) GetTimestamps() (uint32, uint32) {
+	panic("not implemented")
+}
+
+func (p *packetizer) GetStats() (uint64, uint64) {
+	panic("not implemented")
+}
+
+func (p *packetizer) GetCurrentSequenceNumber() (uint16){
+	panic("not implemented")
 }

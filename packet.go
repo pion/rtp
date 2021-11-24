@@ -12,6 +12,10 @@ type Extension struct {
 	payload []byte
 }
 
+func (e *Extension) String() string {
+	return fmt.Sprintf("%d:%s", e.id, string(e.payload[:]))
+}
+
 // Header represents an RTP packet header
 type Header struct {
 	Version          uint8
@@ -30,6 +34,7 @@ type Header struct {
 // Packet represents an RTP Packet
 type Packet struct {
 	Header
+	Length  int
 	Payload []byte
 }
 
@@ -218,6 +223,7 @@ func (p *Packet) Unmarshal(buf []byte) error {
 		return errTooSmall
 	}
 	p.Payload = buf[n:end]
+	p.Length = len(buf)
 	return nil
 }
 
@@ -410,6 +416,16 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 	return nil
 }
 
+func (h *Header) SetExtensions(extensions []Extension) error {
+	for _, extension := range extensions {
+		err := h.SetExtension(extension.id, extension.payload)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetExtensionIDs returns an extension id array
 func (h *Header) GetExtensionIDs() []uint8 {
 	if !h.Extension {
@@ -479,6 +495,7 @@ func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
 	}
 
 	m := copy(buf[n:], p.Payload)
+	p.Length = len(buf[:n+m])
 
 	return n + m, nil
 }
