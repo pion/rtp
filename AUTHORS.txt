@@ -19,6 +19,7 @@ Hugo Arregui <hugo@decentraland.org>
 John Bradley <jrb@turrettech.com>
 Juliusz Chroboczek <jch@irif.fr>
 Kazuyuki Honda <hakobera@gmail.com>
+Kevin Wang <kevmo314@gmail.com>
 Luke Curley <kixelated@gmail.com>
 lxb <xiangbing.li@uama.com.cn>
 Michael MacDonald <github@macdonald.cx>
