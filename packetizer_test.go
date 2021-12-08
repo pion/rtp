@@ -12,7 +12,7 @@ import (
 func TestPacketizer(t *testing.T) {
 	multiplepayload := make([]byte, 128)
 	// use the G722 payloader here, because it's very simple and all 0s is valid G722 data.
-	packetizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewRandomSequencer(), 90000)
+	packetizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewRandomSequencer())
 	packets := packetizer.Packetize(multiplepayload, 2000)
 
 	if len(packets) != 2 {
@@ -26,7 +26,7 @@ func TestPacketizer(t *testing.T) {
 
 func TestPacketizer_AbsSendTime(t *testing.T) {
 	// use the G722 payloader here, because it's very simple and all 0s is valid G722 data.
-	pktizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewFixedSequencer(1234), 90000)
+	pktizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewFixedSequencer(1234))
 	pktizer.(*packetizer).Timestamp = 45678
 	pktizer.(*packetizer).timegen = func() time.Time {
 		return time.Date(1985, time.June, 23, 4, 0, 0, 0, time.FixedZone("UTC-5", -5*60*60))
