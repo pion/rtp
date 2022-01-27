@@ -38,6 +38,10 @@ func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
 func h264SubtitleSeiAttemptParse(nals []byte, startNalPos int) (result bool, endPosition int) {
 	var seiSubtitleUuid []byte = []byte{0x8f, 0x4a, 0xf5, 0x58, 0xe4, 0x21, 0x45, 0xc9, 0xb0, 0xa5, 0x47, 0x0d, 0x7a, 0x3a, 0x74, 0xf9}
 
+	// Ignore empty nal
+	if startNalPos >= len(nals) {
+		return false, -1
+	}
 	// check if SEI nal unit
 	if (nals[startNalPos] & naluTypeBitmask) != seiNALUType {
 		return false, -1
@@ -101,9 +105,8 @@ func emitNalus(nals []byte, emit func([]byte)) {
 			if firstNalStart {
 				isSubtitle, endSubtitlePos := h264SubtitleSeiAttemptParse(nals, nextIndStart+nextIndLen)
 				if isSubtitle {
-					/* subtitles are being encoded as SEI nalus.
-					    each nalu has a start code which must be escaped.
-					    since we don't escape our subtitle SEI start code as part of our encoding, we skip it until the next nalu. */
+					/* Subtitle NAL may contain nal unit start code (Does not escaped with emulation prevention byte),
+					so we ensure the next NAL start code index will be searched for after the end of SEI subtitle nal unit */
 					nextIndStart, nextIndLen = nextInd(nals, endSubtitlePos)
 				} else {
 					nextIndStart, nextIndLen = nextInd(nals, prevStart)
