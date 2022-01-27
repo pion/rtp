@@ -39,6 +39,7 @@ func TestBasic(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
+		Length:  25,
 	}
 
 	// Unmarshal to the used Packet should work as well.
@@ -89,6 +90,7 @@ func TestBasic(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:21],
+		Length:  25,
 	}
 	if err := p.Unmarshal(rawPkt); err != nil {
 		t.Error(err)
@@ -120,6 +122,7 @@ func TestBasic(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: []byte{},
+		Length:  25,
 	}
 	if err := p.Unmarshal(rawPkt); err != nil {
 		t.Error(err)
