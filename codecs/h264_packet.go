@@ -101,8 +101,9 @@ func emitNalus(nals []byte, emit func([]byte)) {
 			if firstNalStart {
 				isSubtitle, endSubtitlePos := h264SubtitleSeiAttemptParse(nals, nextIndStart+nextIndLen)
 				if isSubtitle {
-					/* Subtitle NAL may contain nal unit start code (Does not escaped with emulation prevention byte),
-					so we ensure the next NAL start code index will be searched for after the end of SEI subtitle nal unit */
+					/* subtitles are being encoded as SEI nalus.
+					    each nalu has a start code which must be escaped.
+					    since we don't escape our subtitle SEI start code as part of our encoding, we skip it until the next nalu. */
 					nextIndStart, nextIndLen = nextInd(nals, endSubtitlePos)
 				} else {
 					nextIndStart, nextIndLen = nextInd(nals, prevStart)
