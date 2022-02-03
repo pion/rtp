@@ -812,6 +812,39 @@ func TestH265_Packet(t *testing.T) {
 	}
 }
 
+func TestH265IsPartitionHead(t *testing.T) {
+	h265 := H265Packet{}
+
+	if h265.IsPartitionHead(nil) {
+		t.Fatal("nil must not be a partition head")
+	}
+
+	emptyNalu := []byte{}
+	if h265.IsPartitionHead(emptyNalu) {
+		t.Fatal("empty nalu must not be a partition head")
+	}
+
+	singleNalu := []byte{0x01, 0x01, 0xab, 0xcd, 0xef}
+	if h265.IsPartitionHead(singleNalu) == false {
+		t.Fatal("single nalu must be a partition head")
+	}
+
+	fbitNalu := []byte{0x80, 0x00, 0x00}
+	if h265.IsPartitionHead(fbitNalu) == false {
+		t.Fatal("fbit nalu must be a partition head")
+	}
+
+	fuStartNalu := []byte{0x62, 0x01, 0x93}
+	if h265.IsPartitionHead(fuStartNalu) == false {
+		t.Fatal("fu start nalu must be a partition head")
+	}
+
+	fuEndNalu := []byte{0x62, 0x01, 0x53}
+	if h265.IsPartitionHead(fuEndNalu) {
+		t.Fatal("fu end nalu must not be a partition head")
+	}
+}
+
 func TestH265_Packet_Real(t *testing.T) {
 	// Tests decoding of real H265 payloads extracted from a Wireshark dump.
 
