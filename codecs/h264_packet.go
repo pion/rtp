@@ -14,6 +14,7 @@ const (
 	stapaNALUType  = 24
 	fuaNALUType    = 28
 	fubNALUType    = 29
+	seiNALUType    = 6
 	spsNALUType    = 7
 	ppsNALUType    = 8
 	audNALUType    = 9
@@ -32,6 +33,48 @@ const (
 )
 
 func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
+
+// returns true if nals byte stream starts with subtitle sei and the it's position end index
+func h264SubtitleSeiAttemptParse(nals []byte, startNalPos int) (result bool, endPosition int) {
+	var seiSubtitleUuid []byte = []byte{0x8f, 0x4a, 0xf5, 0x58, 0xe4, 0x21, 0x45, 0xc9, 0xb0, 0xa5, 0x47, 0x0d, 0x7a, 0x3a, 0x74, 0xf9}
+
+	// Ignore empty nal
+	if startNalPos >= len(nals) {
+		return false, -1
+	}
+	// check if SEI nal unit
+	if (nals[startNalPos] & naluTypeBitmask) != seiNALUType {
+		return false, -1
+	}
+	// Check for SEI User Data Unregistered(5) payloadType
+	startNalPos++
+	if nals[startNalPos] != 5 {
+		return false, -1
+	}
+	// Ensure payloadSize is at least 16 bytes, since we expect 16 bytes uuid in start of payload + subtitle payload
+	startNalPos++
+	naluPayloadSizeIdx := startNalPos
+	if nals[naluPayloadSizeIdx] < 16 { // checking only first payloadSize byte is enough to check if its less than 16
+		return false, -1
+	}
+	// read payloadSize bytes
+	naluPayloadSize := 0
+	naluPayloadSize += int(nals[naluPayloadSizeIdx])
+	// continue accumalating payloadSize until we reach a byte which is not 255
+	for nals[naluPayloadSizeIdx] == 255 {
+		naluPayloadSizeIdx++
+		naluPayloadSize += int(nals[naluPayloadSizeIdx])
+	}
+	// check if 16 bytes uuid_iso_iec_11578 field (Part of SEI payload)  is matching subtitle uuid
+	naluPayloadStartIdx := naluPayloadSizeIdx + 1
+	for i := 0; i < 16; i++ {
+		if seiSubtitleUuid[i] != nals[naluPayloadStartIdx+i] {
+			return false, -1
+		}
+	}
+
+	return true, naluPayloadStartIdx + naluPayloadSize
+}
 
 func emitNalus(nals []byte, emit func([]byte)) {
 	nextInd := func(nalu []byte, start int) (indStart int, indLen int) {
@@ -55,15 +98,31 @@ func emitNalus(nals []byte, emit func([]byte)) {
 	if nextIndStart == -1 {
 		emit(nals)
 	} else {
+		firstNalStart := true
 		for nextIndStart != -1 {
 			prevStart := nextIndStart + nextIndLen
-			nextIndStart, nextIndLen = nextInd(nals, prevStart)
+			// Check for SEI subtitle NAL unit (We should expect it in first NAL)
+			if firstNalStart {
+				isSubtitle, endSubtitlePos := h264SubtitleSeiAttemptParse(nals, nextIndStart+nextIndLen)
+				if isSubtitle {
+					/* subtitles are being encoded as SEI nalus.
+					    each nalu has a start code which must be escaped.
+					    since we don't escape our subtitle SEI start code as part of our encoding, we skip it until the next nalu. */
+					nextIndStart, nextIndLen = nextInd(nals, endSubtitlePos)
+				} else {
+					nextIndStart, nextIndLen = nextInd(nals, prevStart)
+				}
+			} else {
+				nextIndStart, nextIndLen = nextInd(nals, prevStart)
+			}
+
 			if nextIndStart != -1 {
 				emit(nals[prevStart:nextIndStart])
 			} else {
 				// Emit until end of stream, no end indicator found
 				emit(nals[prevStart:])
 			}
+			firstNalStart = false
 		}
 	}
 }
