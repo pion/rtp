@@ -343,7 +343,3 @@ func (*H264Packet) IsPartitionHead(payload []byte) bool {
 
 	return true
 }
-
-func (*H264Packet) IsPartitionTail(marker bool, payload []byte) bool {
-	return false
-}
