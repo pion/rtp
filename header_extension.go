@@ -135,12 +135,12 @@ func (e *OneByteHeaderExtension) Unmarshal(buf []byte) (int, error) {
 }
 
 // Marshal returns the extension payload.
-func (e *OneByteHeaderExtension) Marshal() ([]byte, error) {
+func (e OneByteHeaderExtension) Marshal() ([]byte, error) {
 	return e.payload, nil
 }
 
 // MarshalTo writes the extension payload to the given buffer.
-func (e *OneByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
+func (e OneByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 	size := e.MarshalSize()
 	if size > len(buf) {
 		return 0, io.ErrShortBuffer
@@ -149,7 +149,7 @@ func (e *OneByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 }
 
 // MarshalSize returns the size of the extension payload.
-func (e *OneByteHeaderExtension) MarshalSize() int {
+func (e OneByteHeaderExtension) MarshalSize() int {
 	return len(e.payload)
 }
 
@@ -266,12 +266,12 @@ func (e *TwoByteHeaderExtension) Unmarshal(buf []byte) (int, error) {
 }
 
 // Marshal returns the extension payload.
-func (e *TwoByteHeaderExtension) Marshal() ([]byte, error) {
+func (e TwoByteHeaderExtension) Marshal() ([]byte, error) {
 	return e.payload, nil
 }
 
 // MarshalTo marshals the extension to the given buffer.
-func (e *TwoByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
+func (e TwoByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 	size := e.MarshalSize()
 	if size > len(buf) {
 		return 0, io.ErrShortBuffer
@@ -280,7 +280,7 @@ func (e *TwoByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 }
 
 // MarshalSize returns the size of the extension payload.
-func (e *TwoByteHeaderExtension) MarshalSize() int {
+func (e TwoByteHeaderExtension) MarshalSize() int {
 	return len(e.payload)
 }
 
@@ -331,12 +331,12 @@ func (e *RawExtension) Unmarshal(buf []byte) (int, error) {
 }
 
 // Marshal returns the raw extension payload.
-func (e *RawExtension) Marshal() ([]byte, error) {
+func (e RawExtension) Marshal() ([]byte, error) {
 	return e.payload, nil
 }
 
 // MarshalTo marshals the extension to the given buffer.
-func (e *RawExtension) MarshalTo(buf []byte) (int, error) {
+func (e RawExtension) MarshalTo(buf []byte) (int, error) {
 	size := e.MarshalSize()
 	if size > len(buf) {
 		return 0, io.ErrShortBuffer
@@ -345,6 +345,6 @@ func (e *RawExtension) MarshalTo(buf []byte) (int, error) {
 }
 
 // MarshalSize returns the size of the extension when marshaled.
-func (e *RawExtension) MarshalSize() int {
+func (e RawExtension) MarshalSize() int {
 	return len(e.payload)
 }
