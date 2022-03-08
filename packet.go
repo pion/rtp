@@ -224,7 +224,7 @@ func (p *Packet) Unmarshal(buf []byte) error {
 }
 
 // Marshal serializes the header into bytes.
-func (h *Header) Marshal() (buf []byte, err error) {
+func (h Header) Marshal() (buf []byte, err error) {
 	buf = make([]byte, h.MarshalSize())
 
 	n, err := h.MarshalTo(buf)
@@ -235,7 +235,7 @@ func (h *Header) Marshal() (buf []byte, err error) {
 }
 
 // MarshalTo serializes the header and writes to the buffer.
-func (h *Header) MarshalTo(buf []byte) (n int, err error) {
+func (h Header) MarshalTo(buf []byte) (n int, err error) {
 	/*
 	 *  0                   1                   2                   3
 	 *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -332,7 +332,7 @@ func (h *Header) MarshalTo(buf []byte) (n int, err error) {
 }
 
 // MarshalSize returns the size of the header once marshaled.
-func (h *Header) MarshalSize() int {
+func (h Header) MarshalSize() int {
 	// NOTE: Be careful to match the MarshalTo() method.
 	size := 12 + (len(h.CSRC) * csrcLength)
 
@@ -457,7 +457,7 @@ func (h *Header) DelExtension(id uint8) error {
 }
 
 // Marshal serializes the packet into bytes.
-func (p *Packet) Marshal() (buf []byte, err error) {
+func (p Packet) Marshal() (buf []byte, err error) {
 	buf = make([]byte, p.MarshalSize())
 
 	n, err := p.MarshalTo(buf)
@@ -469,7 +469,7 @@ func (p *Packet) Marshal() (buf []byte, err error) {
 }
 
 // MarshalTo serializes the packet and writes to the buffer.
-func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
+func (p Packet) MarshalTo(buf []byte) (n int, err error) {
 	p.Header.Padding = p.PaddingSize != 0
 	n, err = p.Header.MarshalTo(buf)
 	if err != nil {
@@ -490,12 +490,12 @@ func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
 }
 
 // MarshalSize returns the size of the packet once marshaled.
-func (p *Packet) MarshalSize() int {
+func (p Packet) MarshalSize() int {
 	return p.Header.MarshalSize() + len(p.Payload) + int(p.PaddingSize)
 }
 
 // Clone returns a deep copy of p.
-func (p *Packet) Clone() *Packet {
+func (p Packet) Clone() *Packet {
 	clone := &Packet{}
 	clone.Header = p.Header.Clone()
 	if p.Payload != nil {
