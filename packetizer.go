@@ -23,6 +23,7 @@ type packetizer struct {
 	Payloader        Payloader
 	Sequencer        Sequencer
 	Timestamp        uint32
+	ClockRate        uint32
 	extensionNumbers struct { // put extension numbers in here. If they're 0, the extension is disabled (0 is not a legal extension number)
 		AbsSendTime int // http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	}
@@ -30,7 +31,7 @@ type packetizer struct {
 }
 
 // NewPacketizer returns a new instance of a Packetizer for a specific payloader
-func NewPacketizer(mtu uint16, pt uint8, ssrc uint32, payloader Payloader, sequencer Sequencer) Packetizer {
+func NewPacketizer(mtu uint16, pt uint8, ssrc uint32, payloader Payloader, sequencer Sequencer, clockRate uint32) Packetizer {
 	return &packetizer{
 		MTU:         mtu,
 		PayloadType: pt,
@@ -38,6 +39,7 @@ func NewPacketizer(mtu uint16, pt uint8, ssrc uint32, payloader Payloader, seque
 		Payloader:   payloader,
 		Sequencer:   sequencer,
 		Timestamp:   globalMathRandomGenerator.Uint32(),
+		ClockRate:   clockRate,
 		timegen:     time.Now,
 	}
 }
