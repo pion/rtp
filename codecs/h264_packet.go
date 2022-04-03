@@ -127,6 +127,144 @@ func emitNalus(nals []byte, emit func([]byte)) {
 	}
 }
 
+func (p *H264Payloader) PayloadAndDetectData(mtu uint16, payload []byte) ([][]byte, int) {
+	var payloads [][]byte
+	dataPayloadIdx := -1
+	dataPayloadFound := false
+	payloadIdx := 0
+
+	if len(payload) == 0 {
+		return payloads, dataPayloadIdx
+	}
+
+	emitNalus(payload, func(nalu []byte) {
+		if len(nalu) == 0 {
+			return
+		}
+
+		naluType := nalu[0] & naluTypeBitmask
+		naluRefIdc := nalu[0] & naluRefIdcBitmask
+
+		switch {
+		case naluType == audNALUType || naluType == fillerNALUType:
+			return
+		case naluType == spsNALUType:
+			p.spsNalu = nalu
+			return
+		case naluType == ppsNALUType:
+			p.ppsNalu = nalu
+			return
+		case p.spsNalu != nil && p.ppsNalu != nil:
+			// Pack current NALU with SPS and PPS as STAP-A
+			spsLen := make([]byte, 2)
+			binary.BigEndian.PutUint16(spsLen, uint16(len(p.spsNalu)))
+
+			ppsLen := make([]byte, 2)
+			binary.BigEndian.PutUint16(ppsLen, uint16(len(p.ppsNalu)))
+
+			stapANalu := []byte{outputStapAHeader}
+			stapANalu = append(stapANalu, spsLen...)
+			stapANalu = append(stapANalu, p.spsNalu...)
+			stapANalu = append(stapANalu, ppsLen...)
+			stapANalu = append(stapANalu, p.ppsNalu...)
+			if len(stapANalu) <= int(mtu) {
+				out := make([]byte, len(stapANalu))
+				copy(out, stapANalu)
+				payloads = append(payloads, out)
+				payloadIdx++
+			}
+
+			p.spsNalu = nil
+			p.ppsNalu = nil
+		}
+
+		// Single NALU
+		if len(nalu) <= int(mtu) {
+			out := make([]byte, len(nalu))
+			copy(out, nalu)
+			payloads = append(payloads, out)
+			// still looking for first packet of data
+			if !dataPayloadFound {
+				if naluType == 1 || naluType == 2 || naluType == 5 { // this is a data nalu
+					dataPayloadFound = true
+					dataPayloadIdx = payloadIdx
+				} else {
+					payloadIdx++
+				}
+			}
+			return
+		}
+
+		// FU-A
+		maxFragmentSize := int(mtu) - fuaHeaderSize
+
+		// The FU payload consists of fragments of the payload of the fragmented
+		// NAL unit so that if the fragmentation unit payloads of consecutive
+		// FUs are sequentially concatenated, the payload of the fragmented NAL
+		// unit can be reconstructed.  The NAL unit type octet of the fragmented
+		// NAL unit is not included as such in the fragmentation unit payload,
+		// 	but rather the information of the NAL unit type octet of the
+		// fragmented NAL unit is conveyed in the F and NRI fields of the FU
+		// indicator octet of the fragmentation unit and in the type field of
+		// the FU header.  An FU payload MAY have any number of octets and MAY
+		// be empty.
+
+		naluData := nalu
+		// According to the RFC, the first octet is skipped due to redundant information
+		naluDataIndex := 1
+		naluDataLength := len(nalu) - naluDataIndex
+		naluDataRemaining := naluDataLength
+
+		if min(maxFragmentSize, naluDataRemaining) <= 0 {
+			return
+		}
+
+		for naluDataRemaining > 0 {
+			if !dataPayloadFound {
+				if naluType == 1 || naluType == 2 || naluType == 5 { // this is a data nalu
+					dataPayloadFound = true
+					dataPayloadIdx = payloadIdx
+				} else {
+					payloadIdx++
+				}
+			}
+			currentFragmentSize := min(maxFragmentSize, naluDataRemaining)
+			out := make([]byte, fuaHeaderSize+currentFragmentSize)
+
+			// +---------------+
+			// |0|1|2|3|4|5|6|7|
+			// +-+-+-+-+-+-+-+-+
+			// |F|NRI|  Type   |
+			// +---------------+
+			out[0] = fuaNALUType
+			out[0] |= naluRefIdc
+
+			// +---------------+
+			// |0|1|2|3|4|5|6|7|
+			// +-+-+-+-+-+-+-+-+
+			// |S|E|R|  Type   |
+			// +---------------+
+
+			out[1] = naluType
+			if naluDataRemaining == naluDataLength {
+				// Set start bit
+				out[1] |= 1 << 7
+			} else if naluDataRemaining-currentFragmentSize == 0 {
+				// Set end bit
+				out[1] |= 1 << 6
+			}
+
+			copy(out[fuaHeaderSize:], naluData[naluDataIndex:naluDataIndex+currentFragmentSize])
+			payloads = append(payloads, out)
+
+			naluDataRemaining -= currentFragmentSize
+			naluDataIndex += currentFragmentSize
+		}
+	})
+
+	return payloads, dataPayloadIdx
+}
+
 // Payload fragments a H264 packet across one or more byte arrays
 func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	var payloads [][]byte
