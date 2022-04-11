@@ -1,16 +1,19 @@
-package codecs
+// Package frame provides code to construct complete media frames from packetized media
+package frame
 
-// AV1Frame represents a collection of OBUs given a stream of AV1 Packets.
+import "github.com/pion/rtp/v2/codecs"
+
+// AV1 represents a collection of OBUs given a stream of AV1 Packets.
 // Each AV1 RTP Packet is a collection of OBU Elements. Each OBU Element may be a full OBU, or just a fragment of one.
-// AV1Frame provides the tools to construct a collection of OBUs from a collection of OBU Elements. This structure
+// AV1 provides the tools to construct a collection of OBUs from a collection of OBU Elements. This structure
 // contains an internal cache and should be used for the entire RTP Stream.
-type AV1Frame struct {
+type AV1 struct {
 	// Buffer for fragmented OBU. If ReadFrames is called on a RTP Packet
 	// that doesn't contain a fully formed OBU
 	obuBuffer []byte
 }
 
-func (f *AV1Frame) pushOBUElement(isFirstOBUFragment *bool, obuElement []byte, obuList [][]byte) [][]byte {
+func (f *AV1) pushOBUElement(isFirstOBUFragment *bool, obuElement []byte, obuList [][]byte) [][]byte {
 	if *isFirstOBUFragment {
 		*isFirstOBUFragment = false
 		// Discard pushed because we don't have a fragment to combine it with
@@ -23,8 +26,8 @@ func (f *AV1Frame) pushOBUElement(isFirstOBUFragment *bool, obuElement []byte, o
 	return append(obuList, obuElement)
 }
 
-// ReadFrames processes the AV1Packet and returns fully constructed frames
-func (f *AV1Frame) ReadFrames(pkt *AV1Packet) ([][]byte, error) {
+// ReadFrames processes the codecs.AV1Packet and returns fully constructed frames
+func (f *AV1) ReadFrames(pkt *codecs.AV1Packet) ([][]byte, error) {
 	OBUs := [][]byte{}
 	isFirstOBUFragment := pkt.Z
 
