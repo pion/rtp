@@ -35,7 +35,7 @@ func (f *AV1) ReadFrames(pkt *codecs.AV1Packet) ([][]byte, error) {
 		OBUs = f.pushOBUElement(&isFirstOBUFragment, pkt.OBUElements[i], OBUs)
 	}
 
-	if pkt.Y {
+	if pkt.Y && len(OBUs) > 0 {
 		// Take copy of OBUElement that is being cached
 		f.obuBuffer = append(f.obuBuffer, append([]byte{}, OBUs[len(OBUs)-1]...)...)
 		OBUs = OBUs[:len(OBUs)-1]
