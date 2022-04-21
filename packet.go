@@ -33,7 +33,7 @@ type Header struct {
 // NOTE: Raw is populated by Marshal/Unmarshal and should not be modified
 type Packet struct {
 	Header
-	Raw     []byte
+	Raw         []byte
 	Payload     []byte
 	PaddingSize byte
 }
