@@ -159,16 +159,16 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 				}
 
 				extid := buf[n] >> 4
-				len := int(buf[n]&^0xF0 + 1)
+				payloadLen := int(buf[n]&^0xF0 + 1)
 				n++
 
 				if extid == extensionIDReserved {
 					break
 				}
 
-				extension := Extension{id: extid, payload: buf[n : n+len]}
+				extension := Extension{id: extid, payload: buf[n : n+payloadLen]}
 				h.Extensions = append(h.Extensions, extension)
-				n += len
+				n += payloadLen
 			}
 
 		// RFC 8285 RTP Two Byte Header Extension
@@ -183,12 +183,12 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 				extid := buf[n]
 				n++
 
-				len := int(buf[n])
+				payloadLen := int(buf[n])
 				n++
 
-				extension := Extension{id: extid, payload: buf[n : n+len]}
+				extension := Extension{id: extid, payload: buf[n : n+payloadLen]}
 				h.Extensions = append(h.Extensions, extension)
-				n += len
+				n += payloadLen
 			}
 
 		default: // RFC3550 Extension
@@ -401,10 +401,10 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 	// No existing header extensions
 	h.Extension = true
 
-	switch len := len(payload); {
-	case len <= 16:
+	switch payloadLen := len(payload); {
+	case payloadLen <= 16:
 		h.ExtensionProfile = extensionProfileOneByte
-	case len > 16 && len < 256:
+	case payloadLen > 16 && payloadLen < 256:
 		h.ExtensionProfile = extensionProfileTwoByte
 	}
 

@@ -27,8 +27,13 @@ func TestPacketizer(t *testing.T) {
 func TestPacketizer_AbsSendTime(t *testing.T) {
 	// use the G722 payloader here, because it's very simple and all 0s is valid G722 data.
 	pktizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewFixedSequencer(1234), 90000)
-	pktizer.(*packetizer).Timestamp = 45678
-	pktizer.(*packetizer).timegen = func() time.Time {
+	p, ok := pktizer.(*packetizer)
+	if !ok {
+		t.Fatal("Failed to access packetizer")
+	}
+
+	p.Timestamp = 45678
+	p.timegen = func() time.Time {
 		return time.Date(1985, time.June, 23, 4, 0, 0, 0, time.FixedZone("UTC-5", -5*60*60))
 		// (0xa0c65b1000000000>>14) & 0xFFFFFF  = 0x400000
 	}
