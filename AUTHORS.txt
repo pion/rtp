@@ -3,6 +3,7 @@
 #
 # This file is auto generated, using git to list all individuals contributors.
 # see `.github/generate-authors.sh` for the scripting
+Aaron Boushley <boushley@pretzelaux.com>
 adwpc <adwpc@hotmail.com>
 aler9 <46489434+aler9@users.noreply.github.com>
 Antoine Baché <antoine.bache@epitech.eu>
