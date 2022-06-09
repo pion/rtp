@@ -36,7 +36,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    0,
 		},
 		Payload: rawPkt[20:],
@@ -78,7 +77,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    4,
 		},
 		Payload:     rawPkt[20:21],
@@ -108,7 +106,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    0,
 		},
 		Payload: rawPkt[20:],
@@ -137,7 +134,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    5,
 		},
 		Payload:     []byte{},
@@ -168,7 +164,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    0,
 		},
 		Payload: []byte{},
@@ -198,7 +193,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    4,
 		},
 		Payload: rawPkt[20:21],
@@ -228,7 +222,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    5,
 		},
 		Payload: []byte{},
@@ -258,7 +251,6 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    5,
 		},
 		Payload: []byte{},
@@ -330,7 +322,6 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
 	}
@@ -384,7 +375,6 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
 	}
@@ -493,7 +483,6 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[28:],
 	}
@@ -531,7 +520,6 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[44:],
 	}
@@ -645,7 +633,6 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[40:],
 	}
@@ -667,7 +654,6 @@ func TestRFC8285GetExtensionReturnsNilWhenExtensionsDisabled(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -694,7 +680,6 @@ func TestRFC8285DelExtension(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -727,7 +712,6 @@ func TestRFC8285GetExtensionIDs(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -755,7 +739,6 @@ func TestRFC8285GetExtensionIDsReturnsErrorWhenExtensionsDisabled(t *testing.T) 
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -776,7 +759,6 @@ func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -799,7 +781,6 @@ func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -825,7 +806,6 @@ func TestRFC8285OneByteSetExtensionShouldSetCorrectExtensionProfileFor16ByteExte
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -861,7 +841,6 @@ func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -893,7 +872,6 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -961,7 +939,6 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -989,7 +966,6 @@ func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -1025,7 +1001,6 @@ func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -1060,7 +1035,6 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -1142,7 +1116,6 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload: payload,
 	}
@@ -1169,7 +1142,6 @@ func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
 			SSRC:             476325762,
-			CSRC:             []uint32{},
 		},
 		Payload: payload,
 	}
@@ -1335,7 +1307,6 @@ func TestCloneHeader(t *testing.T) {
 		SequenceNumber: 27023,
 		Timestamp:      3653407706,
 		SSRC:           476325762,
-		CSRC:           []uint32{},
 	}
 	clone := header.Clone()
 	assert.Equal(t, header, clone)
@@ -1385,7 +1356,6 @@ func TestMarshalRTPPacketFuncs(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 			PaddingSize:    5,
 		},
 		Payload: []byte{},
@@ -1426,7 +1396,6 @@ func TestDeprecatedPaddingSizeField(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
 		},
 		Payload:     []byte{},
 		PaddingSize: 5,
@@ -1554,4 +1523,39 @@ func TestMarshalToPanic(t *testing.T) {
 	n, err := hdr.MarshalTo(buf)
 	assert.NoError(t, err)
 	assert.Equal(t, 16, n)
+}
+
+func BenchmarkUnmarshalHeader(b *testing.B) {
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda,
+		0x1c, 0x64, 0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01,
+		0x50, 0xAA, 0x00, 0x00, 0x98, 0x36, 0xbe, 0x88,
+	}
+	b.Run("NewStructWithoutCSRC", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			h := &Header{}
+			if _, err := h.Unmarshal(rawPkt); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	rawPkt = []byte{
+		0x92, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda,
+		0x1c, 0x64, 0x27, 0x82, 0x00, 0x00, 0x11, 0x11,
+		0x00, 0x00, 0x22, 0x22, 0xBE, 0xDE, 0x00, 0x01,
+		0x50, 0xAA, 0x00, 0x00, 0x98, 0x36, 0xbe, 0x88,
+	}
+	b.Run("NewStructWithCSRC", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			h := &Header{}
+			if _, err := h.Unmarshal(rawPkt); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }

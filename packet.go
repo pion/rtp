@@ -128,7 +128,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 	h.Padding = (buf[0] >> paddingShift & paddingMask) > 0
 	h.Extension = (buf[0] >> extensionShift & extensionMask) > 0
 	nCSRC := int(buf[0] & ccMask)
-	if cap(h.CSRC) < nCSRC || h.CSRC == nil {
+	if cap(h.CSRC) < nCSRC {
 		h.CSRC = make([]uint32, nCSRC)
 	} else {
 		h.CSRC = h.CSRC[:nCSRC]
@@ -153,9 +153,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 		h.CSRC[i] = binary.BigEndian.Uint32(buf[offset:])
 	}
 
-	if h.Extensions != nil {
-		h.Extensions = h.Extensions[:0]
-	}
+	h.Extensions = h.Extensions[:0]
 
 	if h.Extension { // nolint: nestif
 		if expected := n + 4; len(buf) < expected {

@@ -132,7 +132,6 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 				SequenceNumber: p.Sequencer.NextSequenceNumber(),
 				Timestamp:      p.Timestamp, // Figure out how to do timestamps
 				SSRC:           p.SSRC,
-				CSRC:           []uint32{},
 			},
 			Payload: pp,
 		}
@@ -175,7 +174,6 @@ func (p *packetizer) GeneratePadding(samples uint32) []*Packet {
 				SequenceNumber: p.Sequencer.NextSequenceNumber(),
 				Timestamp:      p.Timestamp, // Use latest timestamp
 				SSRC:           p.SSRC,
-				CSRC:           []uint32{},
 				PaddingSize:    255,
 			},
 		}
