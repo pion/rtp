@@ -23,9 +23,38 @@ const (
 // AV1Payloader payloads AV1 packets
 type AV1Payloader struct{}
 
+func packetObuNoSize(obu obu.OBU) []byte {
+	// https://aomediacodec.github.io/av1-rtp-spec/#45-payload-structure
+	// To minimize overhead, the obu_has_size_field flag SHOULD be set to zero in all OBUs.
+	data := obu.Header.Marshal()
+	data[0] &= 0b1111_1101
+	data = append(data, obu.Data...)
+	return data
+}
+
+func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
+	// Split frame data into obus
+	obus, err := obu.SplitOBU(payload)
+	if err != nil {
+		return
+	}
+	for _, part := range obus {
+		// Packetization Rules (https://aomediacodec.github.io/av1-rtp-spec/#5-packetization-rules)
+		// Each RTP packet MUST NOT contain OBUs that belong to different temporal units.
+		// The temporal delimiter OBU, if present, SHOULD be removed when transmitting, and MUST be ignored by receivers.
+		// Tile list OBUs are not supported. They SHOULD be removed when transmitted, and MUST be ignored by receivers.
+		if part.Header.ObuType == obu.OBU_TEMPORAL_DELIMITER || part.Header.ObuType == obu.OBU_TILE_LIST {
+			continue
+		}
+		chunk := packetObuNoSize(part)
+		payloads = append(payloads, p.payload(mtu, chunk)...)
+	}
+	return
+}
+
 // Payload fragments a AV1 packet across one or more byte arrays
 // See AV1Packet for description of AV1 Payload Header
-func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
+func (p *AV1Payloader) payload(mtu uint16, payload []byte) (payloads [][]byte) {
 	maxFragmentSize := int(mtu) - av1PayloaderHeadersize - 2
 	payloadDataRemaining := len(payload)
 	payloadDataIndex := 0
@@ -37,21 +66,9 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 
 	for payloadDataRemaining > 0 {
 		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
-		leb128Size := 1
-		if currentFragmentSize >= 127 {
-			leb128Size = 2
-		}
-
-		out := make([]byte, av1PayloaderHeadersize+leb128Size+currentFragmentSize)
-		leb128Value := obu.EncodeLEB128(uint(currentFragmentSize))
-		if leb128Size == 1 {
-			out[1] = byte(leb128Value)
-		} else {
-			out[1] = byte(leb128Value >> 8)
-			out[2] = byte(leb128Value)
-		}
-
-		copy(out[av1PayloaderHeadersize+leb128Size:], payload[payloadDataIndex:payloadDataIndex+currentFragmentSize])
+		// Current implement always handle one obu a time, so we can just set W=1 and omit leb128Size
+		out := make([]byte, av1PayloaderHeadersize+currentFragmentSize)
+		copy(out[av1PayloaderHeadersize:], payload[payloadDataIndex:payloadDataIndex+currentFragmentSize])
 		payloads = append(payloads, out)
 
 		payloadDataRemaining -= currentFragmentSize
@@ -63,6 +80,8 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 		if payloadDataRemaining != 0 {
 			out[0] ^= yMask
 		}
+		// set W = 1
+		out[0] |= 1 << wBitshift
 	}
 
 	return payloads

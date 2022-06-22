@@ -1,6 +1,7 @@
 package obu
 
 import (
+	"encoding/hex"
 	"errors"
 	"testing"
 )
@@ -8,20 +9,21 @@ import (
 func TestLEB128(t *testing.T) {
 	for _, test := range []struct {
 		Value   uint
-		Encoded uint
+		Encoded string
 	}{
-		{0, 0},
-		{5, 5},
-		{999999, 0xBF843D},
+		{0, "00"},
+		{5, "05"},
+		{999999, "bf843d"},
 	} {
 		test := test
 
 		encoded := EncodeLEB128(test.Value)
-		if encoded != test.Encoded {
-			t.Fatalf("Actual(%d) did not equal expected(%d)", encoded, test.Encoded)
+		encodedHex := hex.EncodeToString(encoded)
+		if encodedHex != test.Encoded {
+			t.Fatalf("Actual(%s) did not equal expected(%s)", encodedHex, test.Encoded)
 		}
 
-		decoded := decodeLEB128(encoded)
+		decoded, _, _ := ReadLeb128(encoded)
 		if decoded != test.Value {
 			t.Fatalf("Actual(%d) did not equal expected(%d)", decoded, test.Value)
 		}

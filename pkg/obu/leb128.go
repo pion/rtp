@@ -11,23 +11,33 @@ const (
 // ErrFailedToReadLEB128 indicates that a buffer ended before a LEB128 value could be successfully read
 var ErrFailedToReadLEB128 = errors.New("payload ended before LEB128 was finished")
 
-// EncodeLEB128 encodes a uint as LEB128
-func EncodeLEB128(in uint) (out uint) {
-	for {
-		// Copy seven bits from in and discard
-		// what we have copied from in
-		out |= (in & sevenLsbBitmask)
-		in >>= 7
+// AppendUleb128 appends v to b using unsigned LEB128 encoding.
+func AppendUleb128(b []byte, v uint) []byte {
+	// If it's less than or equal to 7-bit
+	if v < 0x80 {
+		return append(b, byte(v))
+	}
 
-		// If we have more bits to encode set MSB
-		// otherwise we are done
-		if in != 0 {
-			out |= msbBitmask
-			out <<= 8
-		} else {
-			return out
+	for {
+		c := uint8(v & 0x7f)
+		v >>= 7
+
+		if v != 0 {
+			c |= 0x80
+		}
+
+		b = append(b, c)
+
+		if c&0x80 == 0 {
+			break
 		}
 	}
+
+	return b
+}
+
+func EncodeLEB128(in uint) []byte {
+	return AppendUleb128(make([]byte, 0), in)
 }
 
 func decodeLEB128(in uint) (out uint) {
