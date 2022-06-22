@@ -2,7 +2,6 @@ package codecs
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -49,7 +48,7 @@ func TestAV1_Unmarshal_Error(t *testing.T) {
 		av1Pkt := &AV1Packet{}
 
 		if _, err := av1Pkt.Unmarshal(test.input); !errors.Is(err, test.expectedError) {
-			t.Fatal(fmt.Sprintf("Expected error(%s) but got (%s)", test.expectedError, err))
+			t.Fatalf("Expected error(%s) but got (%s)", test.expectedError, err)
 		}
 	}
 }
