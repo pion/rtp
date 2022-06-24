@@ -183,6 +183,33 @@ func TestNewPacketizerWithOptions_PartialOptions(t *testing.T) {
 	assert.Equal(t, uint32(90000), p.ClockRate)
 }
 
+func TestPacketizer_Empty_Payload(t *testing.T) {
+	pktizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewFixedSequencer(1234), 90000)
+	const expectedSamples = uint32(4000)
+
+	prevTimestamp := uint32(0)
+	for i := 0; i < 10; i++ {
+		payload := []byte{0x11, 0x12, 0x13, 0x14}
+		isEmptyPayload := i%2 == 0
+		if isEmptyPayload {
+			payload = nil
+		}
+
+		packets := pktizer.Packetize(payload, 2000)
+
+		if isEmptyPayload {
+			assert.Len(t, packets, 0)
+		} else {
+			assert.Len(t, packets, 1)
+
+			if prevTimestamp != 0 {
+				assert.Equal(t, packets[0].Timestamp-prevTimestamp, expectedSamples)
+			}
+			prevTimestamp = packets[0].Timestamp
+		}
+	}
+}
+
 func FuzzPacketizer_Packetize_G722(f *testing.F) {
 	// mixed seeds.
 	f.Add(uint16(100), uint8(98), uint32(0x1234ABCD), uint32(960), false, []byte{0})
