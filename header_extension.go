@@ -46,14 +46,14 @@ func (e *OneByteHeaderExtension) Set(id uint8, buf []byte) error {
 		}
 
 		extid := e.payload[n] >> 4
-		len := int(e.payload[n]&^0xF0 + 1)
+		payloadLen := int(e.payload[n]&^0xF0 + 1)
 		n++
 
 		if extid == id {
-			e.payload = append(e.payload[:n+1], append(buf, e.payload[n+1+len:]...)...)
+			e.payload = append(e.payload[:n+1], append(buf, e.payload[n+1+payloadLen:]...)...)
 			return nil
 		}
-		n += len
+		n += payloadLen
 	}
 	e.payload = append(e.payload, (id<<4 | uint8(len(buf)-1)))
 	e.payload = append(e.payload, buf...)
@@ -71,7 +71,7 @@ func (e *OneByteHeaderExtension) GetIDs() []uint8 {
 		}
 
 		extid := e.payload[n] >> 4
-		len := int(e.payload[n]&^0xF0 + 1)
+		payloadLen := int(e.payload[n]&^0xF0 + 1)
 		n++
 
 		if extid == headerExtensionIDReserved {
@@ -79,7 +79,7 @@ func (e *OneByteHeaderExtension) GetIDs() []uint8 {
 		}
 
 		ids = append(ids, extid)
-		n += len
+		n += payloadLen
 	}
 	return ids
 }
@@ -93,13 +93,13 @@ func (e *OneByteHeaderExtension) Get(id uint8) []byte {
 		}
 
 		extid := e.payload[n] >> 4
-		len := int(e.payload[n]&^0xF0 + 1)
+		payloadLen := int(e.payload[n]&^0xF0 + 1)
 		n++
 
 		if extid == id {
-			return e.payload[n : n+len]
+			return e.payload[n : n+payloadLen]
 		}
-		n += len
+		n += payloadLen
 	}
 	return nil
 }
@@ -113,13 +113,13 @@ func (e *OneByteHeaderExtension) Del(id uint8) error {
 		}
 
 		extid := e.payload[n] >> 4
-		len := int(e.payload[n]&^0xF0 + 1)
+		payloadLen := int(e.payload[n]&^0xF0 + 1)
 
 		if extid == id {
-			e.payload = append(e.payload[:n], e.payload[n+1+len:]...)
+			e.payload = append(e.payload[:n], e.payload[n+1+payloadLen:]...)
 			return nil
 		}
-		n += len + 1
+		n += payloadLen + 1
 	}
 	return errHeaderExtensionNotFound
 }
@@ -135,12 +135,12 @@ func (e *OneByteHeaderExtension) Unmarshal(buf []byte) (int, error) {
 }
 
 // Marshal returns the extension payload.
-func (e *OneByteHeaderExtension) Marshal() ([]byte, error) {
+func (e OneByteHeaderExtension) Marshal() ([]byte, error) {
 	return e.payload, nil
 }
 
 // MarshalTo writes the extension payload to the given buffer.
-func (e *OneByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
+func (e OneByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 	size := e.MarshalSize()
 	if size > len(buf) {
 		return 0, io.ErrShortBuffer
@@ -149,7 +149,7 @@ func (e *OneByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 }
 
 // MarshalSize returns the size of the extension payload.
-func (e *OneByteHeaderExtension) MarshalSize() int {
+func (e OneByteHeaderExtension) MarshalSize() int {
 	return len(e.payload)
 }
 
@@ -176,14 +176,14 @@ func (e *TwoByteHeaderExtension) Set(id uint8, buf []byte) error {
 		extid := e.payload[n]
 		n++
 
-		len := int(e.payload[n])
+		payloadLen := int(e.payload[n])
 		n++
 
 		if extid == id {
-			e.payload = append(e.payload[:n+2], append(buf, e.payload[n+2+len:]...)...)
+			e.payload = append(e.payload[:n+2], append(buf, e.payload[n+2+payloadLen:]...)...)
 			return nil
 		}
-		n += len
+		n += payloadLen
 	}
 	e.payload = append(e.payload, id, uint8(len(buf)))
 	e.payload = append(e.payload, buf...)
@@ -203,11 +203,11 @@ func (e *TwoByteHeaderExtension) GetIDs() []uint8 {
 		extid := e.payload[n]
 		n++
 
-		len := int(e.payload[n])
+		payloadLen := int(e.payload[n])
 		n++
 
 		ids = append(ids, extid)
-		n += len
+		n += payloadLen
 	}
 	return ids
 }
@@ -223,13 +223,13 @@ func (e *TwoByteHeaderExtension) Get(id uint8) []byte {
 		extid := e.payload[n]
 		n++
 
-		len := int(e.payload[n])
+		payloadLen := int(e.payload[n])
 		n++
 
 		if extid == id {
-			return e.payload[n : n+len]
+			return e.payload[n : n+payloadLen]
 		}
-		n += len
+		n += payloadLen
 	}
 	return nil
 }
@@ -244,13 +244,13 @@ func (e *TwoByteHeaderExtension) Del(id uint8) error {
 
 		extid := e.payload[n]
 
-		len := int(e.payload[n+1])
+		payloadLen := int(e.payload[n+1])
 
 		if extid == id {
-			e.payload = append(e.payload[:n], e.payload[n+2+len:]...)
+			e.payload = append(e.payload[:n], e.payload[n+2+payloadLen:]...)
 			return nil
 		}
-		n += len + 2
+		n += payloadLen + 2
 	}
 	return errHeaderExtensionNotFound
 }
@@ -266,12 +266,12 @@ func (e *TwoByteHeaderExtension) Unmarshal(buf []byte) (int, error) {
 }
 
 // Marshal returns the extension payload.
-func (e *TwoByteHeaderExtension) Marshal() ([]byte, error) {
+func (e TwoByteHeaderExtension) Marshal() ([]byte, error) {
 	return e.payload, nil
 }
 
 // MarshalTo marshals the extension to the given buffer.
-func (e *TwoByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
+func (e TwoByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 	size := e.MarshalSize()
 	if size > len(buf) {
 		return 0, io.ErrShortBuffer
@@ -280,7 +280,7 @@ func (e *TwoByteHeaderExtension) MarshalTo(buf []byte) (int, error) {
 }
 
 // MarshalSize returns the size of the extension payload.
-func (e *TwoByteHeaderExtension) MarshalSize() int {
+func (e TwoByteHeaderExtension) MarshalSize() int {
 	return len(e.payload)
 }
 
@@ -331,12 +331,12 @@ func (e *RawExtension) Unmarshal(buf []byte) (int, error) {
 }
 
 // Marshal returns the raw extension payload.
-func (e *RawExtension) Marshal() ([]byte, error) {
+func (e RawExtension) Marshal() ([]byte, error) {
 	return e.payload, nil
 }
 
 // MarshalTo marshals the extension to the given buffer.
-func (e *RawExtension) MarshalTo(buf []byte) (int, error) {
+func (e RawExtension) MarshalTo(buf []byte) (int, error) {
 	size := e.MarshalSize()
 	if size > len(buf) {
 		return 0, io.ErrShortBuffer
@@ -345,6 +345,6 @@ func (e *RawExtension) MarshalTo(buf []byte) (int, error) {
 }
 
 // MarshalSize returns the size of the extension when marshaled.
-func (e *RawExtension) MarshalSize() int {
+func (e RawExtension) MarshalSize() int {
 	return len(e.payload)
 }

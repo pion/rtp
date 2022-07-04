@@ -17,18 +17,22 @@ on:
   pull_request:
     branches:
     - master
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.16", "1.17"]
+        go: ["1.17", "1.18"]
       fail-fast: false
     name: Go ${{ matrix.go }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: |
             ~/go/pkg/mod
@@ -39,23 +43,36 @@ jobs:
             ${{ runner.os }}-amd64-go-
 
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
 
       - name: Setup go-acc
-        run: |
-          go get github.com/ory/go-acc
-          git checkout go.mod go.sum
+        run: go install github.com/ory/go-acc@latest
+
+      - name: Set up gotestfmt
+        uses: haveyoudebuggedit/gotestfmt-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Avoid getting rate limited
 
       - name: Run test
         run: |
           TEST_BENCH_OPTION="-bench=."
           if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
 
+          set -euo pipefail
           go-acc -o cover.out ./... -- \
             ${TEST_BENCH_OPTION} \
-            -v -race
+            -json \
+            -v -race 2>&1 | grep -v '^go: downloading' | tee /tmp/gotest.log | gotestfmt
+
+      - name: Upload test log
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: test-log-${{ matrix.go }}
+          path: /tmp/gotest.log
+          if-no-files-found: error
 
       - name: Run TEST_HOOK
         run: |
@@ -64,7 +81,6 @@ jobs:
 
       - uses: codecov/codecov-action@v2
         with:
-          file: ./cover.out
           name: codecov-umbrella
           fail_ci_if_error: true
           flags: go
@@ -73,13 +89,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.16", "1.17"]
+        go: ["1.17", "1.18"]
       fail-fast: false
     name: Go i386 ${{ matrix.go }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: |
             ~/go/pkg/mod
@@ -110,14 +126,14 @@ jobs:
       fail-fast: false
     name: WASM
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Use Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '16.x'
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: |
             ~/go/pkg/mod
@@ -153,7 +169,6 @@ jobs:
 
       - uses: codecov/codecov-action@v2
         with:
-          file: ./cover.out
           name: codecov-umbrella
           fail_ci_if_error: true
           flags: wasm
