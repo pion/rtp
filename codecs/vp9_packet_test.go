@@ -169,6 +169,25 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 				Payload: []byte{},
 			},
 		},
+		"ScalabilityStructureReserved": {
+			b: []byte{
+				0x0A,
+				(1 << 5) | (0 << 4) | (0 << 3) | (1 << 2) | (1 << 1) | 1, // NS:1 Y:0 G:0, reserved fields set to 1
+			},
+			pkt: VP9Packet{
+				B:       true,
+				V:       true,
+				NS:      1,
+				Y:       false,
+				G:       false,
+				NG:      0,
+				Payload: []byte{},
+			},
+		},
+		"ScalabilityStructure_ShortPacket0": {
+			b:   []byte{0x0A, 0x10},
+			err: errShortPacket,
+		},
 		"ScalabilityMissingWidth": {
 			b:   []byte("200"),
 			err: errShortPacket,
