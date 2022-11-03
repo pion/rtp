@@ -35,10 +35,11 @@ const (
 // H265NALUHeader is a H265 NAL Unit Header
 // https://datatracker.ietf.org/doc/html/rfc7798#section-1.1.4
 // +---------------+---------------+
-//  |0|1|2|3|4|5|6|7|0|1|2|3|4|5|6|7|
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  |F|   Type    |  LayerID  | TID |
-//  +-------------+-----------------+
+//
+//	|0|1|2|3|4|5|6|7|0|1|2|3|4|5|6|7|
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|F|   Type    |  LayerID  | TID |
+//	+-------------+-----------------+
 type H265NALUHeader uint16
 
 func newH265NALUHeader(highByte, lowByte uint8) H265NALUHeader {
@@ -97,17 +98,18 @@ func (h H265NALUHeader) IsPACIPacket() bool {
 //
 
 // H265SingleNALUnitPacket represents a NALU packet, containing exactly one NAL unit.
-//     0                   1                   2                   3
-//    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |           PayloadHdr          |      DONL (conditional)       |
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |                                                               |
-//   |                  NAL unit payload data                        |
-//   |                                                               |
-//   |                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |                               :...OPTIONAL RTP padding        |
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//
+//	  0                   1                   2                   3
+//	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|           PayloadHdr          |      DONL (conditional)       |
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|                                                               |
+//	|                  NAL unit payload data                        |
+//	|                                                               |
+//	|                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|                               :...OPTIONAL RTP padding        |
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 // Reference: https://datatracker.ietf.org/doc/html/rfc7798#section-4.4.1
 type H265SingleNALUnitPacket struct {
@@ -187,17 +189,17 @@ func (p *H265SingleNALUnitPacket) isH265Packet() {}
 
 // H265AggregationUnitFirst represent the First Aggregation Unit in an AP.
 //
-//    0                   1                   2                   3
-//    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//                   :       DONL (conditional)      |   NALU size   |
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |   NALU size   |                                               |
-//   +-+-+-+-+-+-+-+-+         NAL unit                              |
-//   |                                                               |
-//   |                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |                               :
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	 0                   1                   2                   3
+//	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	                :       DONL (conditional)      |   NALU size   |
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|   NALU size   |                                               |
+//	+-+-+-+-+-+-+-+-+         NAL unit                              |
+//	|                                                               |
+//	|                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|                               :
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 // Reference: https://datatracker.ietf.org/doc/html/rfc7798#section-4.4.2
 type H265AggregationUnitFirst struct {
@@ -225,16 +227,16 @@ func (u H265AggregationUnitFirst) NalUnit() []byte {
 
 // H265AggregationUnit represent the an Aggregation Unit in an AP, which is not the first one.
 //
-//    0                   1                   2                   3
-//    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//                   : DOND (cond)   |          NALU size            |
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |                                                               |
-//   |                       NAL unit                                |
-//   |                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |                               :
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	 0                   1                   2                   3
+//	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	                : DOND (cond)   |          NALU size            |
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|                                                               |
+//	|                       NAL unit                                |
+//	|                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|                               :
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 // Reference: https://datatracker.ietf.org/doc/html/rfc7798#section-4.4.2
 type H265AggregationUnit struct {
@@ -261,17 +263,18 @@ func (u H265AggregationUnit) NalUnit() []byte {
 }
 
 // H265AggregationPacket represents an Aggregation packet.
-//   0                   1                   2                   3
-//    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |    PayloadHdr (Type=48)       |                               |
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
-//   |                                                               |
-//   |             two or more aggregation units                     |
-//   |                                                               |
-//   |                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |                               :...OPTIONAL RTP padding        |
-//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//
+//	0                   1                   2                   3
+//	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|    PayloadHdr (Type=48)       |                               |
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
+//	|                                                               |
+//	|             two or more aggregation units                     |
+//	|                                                               |
+//	|                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//	|                               :...OPTIONAL RTP padding        |
+//	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 // Reference: https://datatracker.ietf.org/doc/html/rfc7798#section-4.4.2
 type H265AggregationPacket struct {
@@ -424,7 +427,8 @@ func (h H265FragmentationUnitHeader) FuType() uint8 {
 
 // H265FragmentationUnitPacket represents a single Fragmentation Unit packet.
 //
-//  0                   1                   2                   3
+//	0                   1                   2                   3
+//
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // |    PayloadHdr (Type=49)       |   FU header   | DONL (cond)   |
@@ -524,7 +528,8 @@ func (p *H265FragmentationUnitPacket) isH265Packet() {}
 
 // H265PACIPacket represents a single H265 PACI packet.
 //
-//  0                   1                   2                   3
+//	0                   1                   2                   3
+//
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // |    PayloadHdr (Type=50)       |A|   cType   | PHSsize |F0..2|Y|
@@ -1120,5 +1125,65 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 
 	flushBufferedNals()
 
+	return payloads
+}
+
+// H265SafariPayloader payloads H265 packets
+type H265SafariPayloader struct {
+}
+
+// Payload fragments a H265 packet across one or more byte arrays in a Safari format
+func (p *H265SafariPayloader) Payload(mtu uint16, payload []byte) [][]byte {
+	var payloads [][]byte
+	if len(payload) == 0 {
+		return payloads
+	}
+
+	bufferedPayload := make([]byte, 0)
+	buffer := make([]byte, 0)
+	var start byte
+
+	emitNalus(payload, func(nalu []byte) {
+		if len(nalu) == 0 {
+			return
+		}
+
+		naluHeader := newH265NALUHeader(nalu[0], nalu[1])
+		naluType := naluHeader.Type()
+
+		// add 0x0001 before each nal
+		nalu = append(annexbNALUStartCode(), nalu...)
+
+		switch {
+		case (naluType >= 32 && naluType <= 35) || naluType == 39:
+			// save AUD,VPS,SPS,PPS,SEI before Frame
+			buffer = append(buffer, nalu...)
+			return
+		case naluType >= 16 && naluType <= 21:
+			// append saved buffer before iframe with prefix 0x03
+			buffer = append([]byte{3}, buffer...)
+			nalu = append(buffer, nalu...)
+			start = 1
+		default:
+			// append saved buffer before iframe with prefix 0x03
+			buffer = append([]byte{2}, buffer...)
+			nalu = append(buffer, nalu...)
+			start = 0
+		}
+
+		bufferedPayload = append(bufferedPayload, nalu...)
+	})
+
+	// fragment packets per mtu
+	maxSize := int(mtu)
+
+	for len(bufferedPayload) > int(mtu) {
+		payloads = append(payloads, bufferedPayload[:maxSize])
+
+		// removed processed bytes
+		bufferedPayload = append([]byte{start}, bufferedPayload[maxSize:]...)
+	}
+
+	payloads = append(payloads, bufferedPayload)
 	return payloads
 }
