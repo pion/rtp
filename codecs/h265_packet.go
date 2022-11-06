@@ -1129,6 +1129,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 }
 
 // H265SafariPayloader payloads H265 packets
+// based on: https://github.com/AlexxIT/Blog/issues/5
 type H265SafariPayloader struct {
 }
 
@@ -1178,12 +1179,18 @@ func (p *H265SafariPayloader) Payload(mtu uint16, payload []byte) [][]byte {
 	maxSize := int(mtu)
 
 	for len(bufferedPayload) > int(mtu) {
-		payloads = append(payloads, bufferedPayload[:maxSize])
+		out := make([]byte, maxSize)
+		copy(out, bufferedPayload[:maxSize])
+
+		payloads = append(payloads, out)
 
 		// removed processed bytes
 		bufferedPayload = append([]byte{start}, bufferedPayload[maxSize:]...)
 	}
 
-	payloads = append(payloads, bufferedPayload)
+	out := make([]byte, len(bufferedPayload))
+	copy(out, bufferedPayload)
+
+	payloads = append(payloads, out)
 	return payloads
 }
