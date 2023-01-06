@@ -27,15 +27,6 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 		t.Fatal("Error should be:", errShortPacket)
 	}
 
-	// Payload smaller than header size
-	raw, err = pck.Unmarshal([]byte{0x00, 0x11, 0x22})
-	if raw != nil {
-		t.Fatal("Result should be nil in case of error")
-	}
-	if !errors.Is(err, errShortPacket) {
-		t.Fatal("Error should be:", errShortPacket)
-	}
-
 	// Normal payload
 	raw, err = pck.Unmarshal([]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x90})
 	if raw == nil {
@@ -65,11 +56,11 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 
 	// Header size, X and I, PID 16bits
 	raw, err = pck.Unmarshal([]byte{0x80, 0x80, 0x81, 0x00})
-	if raw != nil {
-		t.Fatal("Result should be nil in case of error")
+	if raw == nil {
+		t.Fatal("Result shouldn't be nil in case of success")
 	}
-	if !errors.Is(err, errShortPacket) {
-		t.Fatal("Error should be:", errShortPacket)
+	if err != nil {
+		t.Fatal("Error should be nil in case of success")
 	}
 
 	// Header size, X and L
@@ -106,6 +97,30 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	}
 	if !errors.Is(err, errShortPacket) {
 		t.Fatal("Error should be:", errShortPacket)
+	}
+
+	// According to RFC 7741 Section 4.4, the packetizer need not pay
+	// attention to partition boundaries.  In that case, it may
+	// produce packets with minimal headers.
+
+	// The next two have been witnessed in nature.
+	_, err = pck.Unmarshal([]byte{0x00})
+	if err != nil {
+		t.Errorf("Empty packet with trivial header: %v", err)
+	}
+	_, err = pck.Unmarshal([]byte{0x00, 0x2a, 0x94})
+	if err != nil {
+		t.Errorf("Non-empty packet with trivial header: %v", err)
+	}
+
+	// The following two were invented.
+	_, err = pck.Unmarshal([]byte{0x80, 0x00})
+	if err != nil {
+		t.Errorf("Empty packet with trivial extension: %v", err)
+	}
+	_, err = pck.Unmarshal([]byte{0x80, 0x80, 42})
+	if err != nil {
+		t.Errorf("Header with PictureID: %v", err)
 	}
 }
 
