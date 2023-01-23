@@ -36,3 +36,6 @@ Simone Gotti <simone.gotti@gmail.com>
 Tarrence van As <tarrence13@gmail.com>
 wangzixiang <wangzixiang@onething.net>
 Woodrow Douglass <wdouglass@carnegierobotics.com>
+
+# List of contributors not appearing in Git history
+
