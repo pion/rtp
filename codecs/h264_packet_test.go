@@ -115,8 +115,16 @@ func TestH264Packet_Unmarshal(t *testing.T) {
 		t.Fatal("Unmarshal did not fail on nil payload")
 	}
 
-	if _, err := pkt.Unmarshal([]byte{0x00, 0x00}); err == nil {
-		t.Fatal("Unmarshal accepted a packet that is too small for a payload and header")
+	if _, err := pkt.Unmarshal([]byte{}); err == nil {
+		t.Fatal("Unmarshal did not fail on []byte{}")
+	}
+
+	if _, err := pkt.Unmarshal([]byte{0xFC}); err == nil {
+		t.Fatal("Unmarshal accepted a FU-A packet that is too small for a payload and header")
+	}
+
+	if _, err := pkt.Unmarshal([]byte{0x0A}); err != nil {
+		t.Fatal("Unmarshaling end of sequence(NALU Type : 10) should succeed")
 	}
 
 	if _, err := pkt.Unmarshal([]byte{0xFF, 0x00, 0x00}); err == nil {
