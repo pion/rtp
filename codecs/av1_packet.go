@@ -69,12 +69,12 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 }
 
 // AV1Packet represents a depacketized AV1 RTP Packet
-//
-//  0 1 2 3 4 5 6 7
-// +-+-+-+-+-+-+-+-+
-// |Z|Y| W |N|-|-|-|
-// +-+-+-+-+-+-+-+-+
-//
+/*
+*  0 1 2 3 4 5 6 7
+* +-+-+-+-+-+-+-+-+
+* |Z|Y| W |N|-|-|-|
+* +-+-+-+-+-+-+-+-+
+**/
 // https://aomediacodec.github.io/av1-rtp-spec/#44-av1-aggregation-header
 type AV1Packet struct {
 	// Z: MUST be set to 1 if the first OBU element is an
