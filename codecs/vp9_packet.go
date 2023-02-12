@@ -206,16 +206,13 @@ func (p *VP9Packet) Unmarshal(packet []byte) ([]byte, error) {
 }
 
 // Picture ID:
-//
-//	+-+-+-+-+-+-+-+-+
-//
-// I:   |M| PICTURE ID  |   M:0 => picture id is 7 bits.
-//
-//	+-+-+-+-+-+-+-+-+   M:1 => picture id is 15 bits.
-//
-// M:   | EXTENDED PID  |
-//
-//	+-+-+-+-+-+-+-+-+
+/*
+*      +-+-+-+-+-+-+-+-+
+* I:   |M| PICTURE ID  |   M:0 => picture id is 7 bits.
+*      +-+-+-+-+-+-+-+-+   M:1 => picture id is 15 bits.
+* M:   | EXTENDED PID  |
+*      +-+-+-+-+-+-+-+-+
+**/
 func (p *VP9Packet) parsePictureID(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
@@ -247,12 +244,11 @@ func (p *VP9Packet) parseLayerInfo(packet []byte, pos int) (int, error) {
 }
 
 // Layer indices (flexible mode):
-//
-//	+-+-+-+-+-+-+-+-+
-//
-// L:   |  T  |U|  S  |D|
-//
-//	+-+-+-+-+-+-+-+-+
+/*
+*      +-+-+-+-+-+-+-+-+
+* L:   |  T  |U|  S  |D|
+*      +-+-+-+-+-+-+-+-+
+**/
 func (p *VP9Packet) parseLayerInfoCommon(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
@@ -272,14 +268,13 @@ func (p *VP9Packet) parseLayerInfoCommon(packet []byte, pos int) (int, error) {
 }
 
 // Layer indices (non-flexible mode):
-//
-//	+-+-+-+-+-+-+-+-+
-//
-// L:   |  T  |U|  S  |D|
-//
-//	+-+-+-+-+-+-+-+-+
-//	|   TL0PICIDX   |
-//	+-+-+-+-+-+-+-+-+
+/*
+*      +-+-+-+-+-+-+-+-+
+* L:   |  T  |U|  S  |D|
+*      +-+-+-+-+-+-+-+-+
+*      |   TL0PICIDX   |
+*      +-+-+-+-+-+-+-+-+
+**/
 func (p *VP9Packet) parseLayerInfoNonFlexibleMode(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
@@ -291,13 +286,12 @@ func (p *VP9Packet) parseLayerInfoNonFlexibleMode(packet []byte, pos int) (int, 
 }
 
 // Reference indices:
-//
-//	+-+-+-+-+-+-+-+-+                P=1,F=1: At least one reference index
-//
-// P,F: | P_DIFF      |N|  up to 3 times          has to be specified.
-//
-//	+-+-+-+-+-+-+-+-+                    N=1: An additional P_DIFF follows
-//	                                          current P_DIFF.
+/*
+*      +-+-+-+-+-+-+-+-+                P=1,F=1: At least one reference index
+* P,F: | P_DIFF      |N|  up to 3 times          has to be specified.
+*      +-+-+-+-+-+-+-+-+                    N=1: An additional P_DIFF follows
+*                                              current P_DIFF.
+**/
 func (p *VP9Packet) parseRefIndices(packet []byte, pos int) (int, error) {
 	for {
 		if len(packet) <= pos {
@@ -318,31 +312,25 @@ func (p *VP9Packet) parseRefIndices(packet []byte, pos int) (int, error) {
 }
 
 // Scalability structure (SS):
-//
-//	+-+-+-+-+-+-+-+-+
-//
-// V:   | N_S |Y|G|-|-|-|
-//
-//	+-+-+-+-+-+-+-+-+              -|
-//
-// Y:   |     WIDTH     | (OPTIONAL)    .
-//   - +               .
-//     |               | (OPTIONAL)    .
-//     +-+-+-+-+-+-+-+-+               . N_S + 1 times
-//     |     HEIGHT    | (OPTIONAL)    .
-//   - +               .
-//     |               | (OPTIONAL)    .
-//     +-+-+-+-+-+-+-+-+              -|
-//
-// G:   |      N_G      | (OPTIONAL)
-//
-//	+-+-+-+-+-+-+-+-+                           -|
-//
-// N_G: |  T  |U| R |-|-| (OPTIONAL)                 .
-//
-//	+-+-+-+-+-+-+-+-+              -|            . N_G times
-//	|    P_DIFF     | (OPTIONAL)    . R times    .
-//	+-+-+-+-+-+-+-+-+              -|           -|
+/*
+*      +-+-+-+-+-+-+-+-+
+* V:   | N_S |Y|G|-|-|-|
+*      +-+-+-+-+-+-+-+-+              -|
+* Y:   |     WIDTH     | (OPTIONAL)    .
+*      +               .
+*      |               | (OPTIONAL)    .
+*      +-+-+-+-+-+-+-+-+               . N_S + 1 times
+*      |     HEIGHT    | (OPTIONAL)    .
+*      +               .
+*      |               | (OPTIONAL)    .
+*      +-+-+-+-+-+-+-+-+              -|
+* G:   |      N_G      | (OPTIONAL)
+*      +-+-+-+-+-+-+-+-+                           -|
+* N_G: |  T  |U| R |-|-| (OPTIONAL)                 .
+*      +-+-+-+-+-+-+-+-+              -|            . N_G times
+*      |    P_DIFF     | (OPTIONAL)    . R times    .
+*      +-+-+-+-+-+-+-+-+              -|           -|
+**/
 func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
