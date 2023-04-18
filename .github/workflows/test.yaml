@@ -8,6 +8,8 @@
 # If you want to update the shared CI config, send a PR to
 # https://github.com/pion/.goassets instead of this repository.
 #
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
 
 name: Test
 on:
@@ -22,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.16", "1.17"]
+        go: ['1.20', '1.19'] # auto-update/supported-go-version-list
       fail-fast: false
     name: Go ${{ matrix.go }}
     steps:
@@ -87,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.16", "1.17"]
+        go: ['1.20', '1.19'] # auto-update/supported-go-version-list
       fail-fast: false
     name: Go i386 ${{ matrix.go }}
     steps:
@@ -119,54 +121,6 @@ jobs:
               -v ./...
 
   test-wasm:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    name: WASM
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16.x'
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache
-          key: ${{ runner.os }}-wasm-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-wasm-go-
-
-      - name: Download Go
-        run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
-        env:
-          GO_VERSION: 1.17
-
-      - name: Set Go Root
-        run: echo "GOROOT=${HOME}/go" >> $GITHUB_ENV
-
-      - name: Set Go Path
-        run: echo "GOPATH=${HOME}/go" >> $GITHUB_ENV
-
-      - name: Set Go Path
-        run: echo "GO_JS_WASM_EXEC=${GOROOT}/misc/wasm/go_js_wasm_exec" >> $GITHUB_ENV
-
-      - name: Insall NPM modules
-        run: yarn install
-
-      - name: Run Tests
-        run: |
-          if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
-          GOOS=js GOARCH=wasm $GOPATH/bin/go test \
-            -coverprofile=cover.out -covermode=atomic \
-            -exec="${GO_JS_WASM_EXEC}" \
-            -v ./...
-
-      - uses: codecov/codecov-action@v2
-        with:
-          name: codecov-umbrella
-          fail_ci_if_error: true
-          flags: wasm
+    uses: pion/.goassets/.github/workflows/test-wasm.reusable.yml@master
+    with:
+      go-version: '1.20' # auto-update/latest-go-version
