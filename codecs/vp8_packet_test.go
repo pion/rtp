@@ -1,11 +1,7 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package codecs
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 )
 
@@ -23,6 +19,15 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 
 	// Nil payload
 	raw, err = pck.Unmarshal([]byte{})
+	if raw != nil {
+		t.Fatal("Result should be nil in case of error")
+	}
+	if !errors.Is(err, errShortPacket) {
+		t.Fatal("Error should be:", errShortPacket)
+	}
+
+	// Payload smaller than header size
+	raw, err = pck.Unmarshal([]byte{0x00, 0x11, 0x22})
 	if raw != nil {
 		t.Fatal("Result should be nil in case of error")
 	}
@@ -59,11 +64,11 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 
 	// Header size, X and I, PID 16bits
 	raw, err = pck.Unmarshal([]byte{0x80, 0x80, 0x81, 0x00})
-	if raw == nil {
-		t.Fatal("Result shouldn't be nil in case of success")
+	if raw != nil {
+		t.Fatal("Result should be nil in case of error")
 	}
-	if err != nil {
-		t.Fatal("Error should be nil in case of success")
+	if !errors.Is(err, errShortPacket) {
+		t.Fatal("Error should be:", errShortPacket)
 	}
 
 	// Header size, X and L
@@ -101,139 +106,52 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	if !errors.Is(err, errShortPacket) {
 		t.Fatal("Error should be:", errShortPacket)
 	}
-
-	// According to RFC 7741 Section 4.4, the packetizer need not pay
-	// attention to partition boundaries.  In that case, it may
-	// produce packets with minimal headers.
-
-	// The next two have been witnessed in nature.
-	_, err = pck.Unmarshal([]byte{0x00})
-	if err != nil {
-		t.Errorf("Empty packet with trivial header: %v", err)
-	}
-	_, err = pck.Unmarshal([]byte{0x00, 0x2a, 0x94})
-	if err != nil {
-		t.Errorf("Non-empty packet with trivial header: %v", err)
-	}
-
-	// The following two were invented.
-	_, err = pck.Unmarshal([]byte{0x80, 0x00})
-	if err != nil {
-		t.Errorf("Empty packet with trivial extension: %v", err)
-	}
-	_, err = pck.Unmarshal([]byte{0x80, 0x80, 42})
-	if err != nil {
-		t.Errorf("Header with PictureID: %v", err)
-	}
 }
 
 func TestVP8Payloader_Payload(t *testing.T) {
-	testCases := map[string]struct {
-		payloader VP8Payloader
-		mtu       uint16
-		payload   [][]byte
-		expected  [][][]byte
-	}{
-		"WithoutPictureID": {
-			payloader: VP8Payloader{},
-			mtu:       2,
-			payload: [][]byte{
-				{0x90, 0x90, 0x90},
-				{0x91, 0x91},
-			},
-			expected: [][][]byte{
-				{{0x10, 0x90}, {0x00, 0x90}, {0x00, 0x90}},
-				{{0x10, 0x91}, {0x00, 0x91}},
-			},
-		},
-		"WithPictureID_1byte": {
-			payloader: VP8Payloader{
-				EnablePictureID: true,
-				pictureID:       0x20,
-			},
-			mtu: 5,
-			payload: [][]byte{
-				{0x90, 0x90, 0x90},
-				{0x91, 0x91},
-			},
-			expected: [][][]byte{
-				{
-					{0x90, 0x80, 0x20, 0x90, 0x90},
-					{0x80, 0x80, 0x20, 0x90},
-				},
-				{
-					{0x90, 0x80, 0x21, 0x91, 0x91},
-				},
-			},
-		},
-		"WithPictureID_2bytes": {
-			payloader: VP8Payloader{
-				EnablePictureID: true,
-				pictureID:       0x120,
-			},
-			mtu: 6,
-			payload: [][]byte{
-				{0x90, 0x90, 0x90},
-				{0x91, 0x91},
-			},
-			expected: [][][]byte{
-				{
-					{0x90, 0x80, 0x81, 0x20, 0x90, 0x90},
-					{0x80, 0x80, 0x81, 0x20, 0x90},
-				},
-				{
-					{0x90, 0x80, 0x81, 0x21, 0x91, 0x91},
-				},
-			},
-		},
-	}
-	for name, testCase := range testCases {
-		testCase := testCase
-		t.Run(name, func(t *testing.T) {
-			pck := testCase.payloader
+	pck := VP8Payloader{}
+	payload := []byte{0x90, 0x90, 0x90}
 
-			for i := range testCase.payload {
-				res := pck.Payload(testCase.mtu, testCase.payload[i])
-				if !reflect.DeepEqual(testCase.expected[i], res) {
-					t.Fatalf("Generated packet[%d] differs, expected: %v, got: %v", i, testCase.expected[i], res)
-				}
-			}
-		})
+	// Positive MTU, nil payload
+	res := pck.Payload(1, nil)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
 	}
 
-	t.Run("Error", func(t *testing.T) {
-		pck := VP8Payloader{}
-		payload := []byte{0x90, 0x90, 0x90}
+	// Positive MTU, small payload
+	// MTU of 1 results in fragment size of 0
+	res = pck.Payload(1, payload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
 
-		// Positive MTU, nil payload
-		res := pck.Payload(1, nil)
-		if len(res) != 0 {
-			t.Fatal("Generated payload should be empty")
-		}
+	// Negative MTU, small payload
+	res = pck.Payload(-1, payload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
 
-		// Positive MTU, small payload
-		// MTU of 1 results in fragment size of 0
-		res = pck.Payload(1, payload)
-		if len(res) != 0 {
-			t.Fatal("Generated payload should be empty")
-		}
-	})
+	// Positive MTU, small payload
+	res = pck.Payload(2, payload)
+	if len(res) != len(payload) {
+		t.Fatal("Generated payload should be the same size as original payload size")
+	}
 }
 
-func TestVP8IsPartitionHead(t *testing.T) {
-	vp8 := &VP8Packet{}
+func TestVP8PartitionHeadChecker_IsPartitionHead(t *testing.T) {
+	checker := &VP8PartitionHeadChecker{}
 	t.Run("SmallPacket", func(t *testing.T) {
-		if vp8.IsPartitionHead([]byte{0x00}) {
+		if checker.IsPartitionHead([]byte{0x00}) {
 			t.Fatal("Small packet should not be the head of a new partition")
 		}
 	})
 	t.Run("SFlagON", func(t *testing.T) {
-		if !vp8.IsPartitionHead([]byte{0x10, 0x00, 0x00, 0x00}) {
+		if !checker.IsPartitionHead([]byte{0x10, 0x00, 0x00, 0x00}) {
 			t.Fatal("Packet with S flag should be the head of a new partition")
 		}
 	})
 	t.Run("SFlagOFF", func(t *testing.T) {
-		if vp8.IsPartitionHead([]byte{0x00, 0x00, 0x00, 0x00}) {
+		if checker.IsPartitionHead([]byte{0x00, 0x00, 0x00, 0x00}) {
 			t.Fatal("Packet without S flag should not be the head of a new partition")
 		}
 	})

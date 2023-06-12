@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package codecs
 
 import (
@@ -26,14 +23,14 @@ const (
 )
 
 // Payload fragments an VP9 packet across one or more byte arrays
-func (p *VP9Payloader) Payload(mtu uint16, payload []byte) [][]byte {
+func (p *VP9Payloader) Payload(mtu int, payload []byte) [][]byte {
 	/*
-	 * https://www.ietf.org/id/draft-ietf-payload-vp9-13.txt
+	 * https://www.ietf.org/id/draft-ietf-payload-vp9-10.txt
 	 *
 	 * Flexible mode (F=1)
 	 *        0 1 2 3 4 5 6 7
 	 *       +-+-+-+-+-+-+-+-+
-	 *       |I|P|L|F|B|E|V|Z| (REQUIRED)
+	 *       |I|P|L|F|B|E|V|-| (REQUIRED)
 	 *       +-+-+-+-+-+-+-+-+
 	 *  I:   |M| PICTURE ID  | (REQUIRED)
 	 *       +-+-+-+-+-+-+-+-+
@@ -50,7 +47,7 @@ func (p *VP9Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	 * Non-flexible mode (F=0)
 	 *        0 1 2 3 4 5 6 7
 	 *       +-+-+-+-+-+-+-+-+
-	 *       |I|P|L|F|B|E|V|Z| (REQUIRED)
+	 *       |I|P|L|F|B|E|V|-| (REQUIRED)
 	 *       +-+-+-+-+-+-+-+-+
 	 *  I:   |M| PICTURE ID  | (RECOMMENDED)
 	 *       +-+-+-+-+-+-+-+-+
@@ -78,7 +75,7 @@ func (p *VP9Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 		return [][]byte{}
 	}
 
-	maxFragmentSize := int(mtu) - vp9HeaderSize
+	maxFragmentSize := mtu - vp9HeaderSize
 	payloadDataRemaining := len(payload)
 	payloadDataIndex := 0
 
@@ -124,7 +121,6 @@ type VP9Packet struct {
 	B bool // Start of a frame
 	E bool // End of a frame
 	V bool // Scalability structure (SS) data present
-	Z bool // Not a reference frame for upper spatial layers
 
 	// Recommended headers
 	PictureID uint16 // 7 or 16 bits, picture ID
@@ -151,8 +147,12 @@ type VP9Packet struct {
 	PGPDiff [][]uint8 // Reference indecies of pictures in a Picture Group
 
 	Payload []byte
+}
 
-	videoDepacketizer
+// IsDetectedFinalPacketInSequence returns true of the packet passed in has the
+// marker bit set indicated the end of a packet sequence
+func (p *VP9Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
+	return rtpPacketMarketBit
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the VP9Packet this method is called upon
@@ -171,7 +171,6 @@ func (p *VP9Packet) Unmarshal(packet []byte) ([]byte, error) {
 	p.B = packet[0]&0x08 != 0
 	p.E = packet[0]&0x04 != 0
 	p.V = packet[0]&0x02 != 0
-	p.Z = packet[0]&0x01 != 0
 
 	pos := 1
 	var err error
@@ -209,13 +208,13 @@ func (p *VP9Packet) Unmarshal(packet []byte) ([]byte, error) {
 }
 
 // Picture ID:
-/*
-*      +-+-+-+-+-+-+-+-+
-* I:   |M| PICTURE ID  |   M:0 => picture id is 7 bits.
-*      +-+-+-+-+-+-+-+-+   M:1 => picture id is 15 bits.
-* M:   | EXTENDED PID  |
-*      +-+-+-+-+-+-+-+-+
-**/
+//
+//      +-+-+-+-+-+-+-+-+
+// I:   |M| PICTURE ID  |   M:0 => picture id is 7 bits.
+//      +-+-+-+-+-+-+-+-+   M:1 => picture id is 15 bits.
+// M:   | EXTENDED PID  |
+//      +-+-+-+-+-+-+-+-+
+//
 func (p *VP9Packet) parsePictureID(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
@@ -247,11 +246,11 @@ func (p *VP9Packet) parseLayerInfo(packet []byte, pos int) (int, error) {
 }
 
 // Layer indices (flexible mode):
-/*
-*      +-+-+-+-+-+-+-+-+
-* L:   |  T  |U|  S  |D|
-*      +-+-+-+-+-+-+-+-+
-**/
+//
+//      +-+-+-+-+-+-+-+-+
+// L:   |  T  |U|  S  |D|
+//      +-+-+-+-+-+-+-+-+
+//
 func (p *VP9Packet) parseLayerInfoCommon(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
@@ -271,13 +270,13 @@ func (p *VP9Packet) parseLayerInfoCommon(packet []byte, pos int) (int, error) {
 }
 
 // Layer indices (non-flexible mode):
-/*
-*      +-+-+-+-+-+-+-+-+
-* L:   |  T  |U|  S  |D|
-*      +-+-+-+-+-+-+-+-+
-*      |   TL0PICIDX   |
-*      +-+-+-+-+-+-+-+-+
-**/
+//
+//      +-+-+-+-+-+-+-+-+
+// L:   |  T  |U|  S  |D|
+//      +-+-+-+-+-+-+-+-+
+//      |   TL0PICIDX   |
+//      +-+-+-+-+-+-+-+-+
+//
 func (p *VP9Packet) parseLayerInfoNonFlexibleMode(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
@@ -289,12 +288,12 @@ func (p *VP9Packet) parseLayerInfoNonFlexibleMode(packet []byte, pos int) (int, 
 }
 
 // Reference indices:
-/*
-*      +-+-+-+-+-+-+-+-+                P=1,F=1: At least one reference index
-* P,F: | P_DIFF      |N|  up to 3 times          has to be specified.
-*      +-+-+-+-+-+-+-+-+                    N=1: An additional P_DIFF follows
-*                                              current P_DIFF.
-**/
+//
+//      +-+-+-+-+-+-+-+-+                P=1,F=1: At least one reference index
+// P,F: | P_DIFF      |N|  up to 3 times          has to be specified.
+//      +-+-+-+-+-+-+-+-+                    N=1: An additional P_DIFF follows
+//                                                current P_DIFF.
+//
 func (p *VP9Packet) parseRefIndices(packet []byte, pos int) (int, error) {
 	for {
 		if len(packet) <= pos {
@@ -315,25 +314,25 @@ func (p *VP9Packet) parseRefIndices(packet []byte, pos int) (int, error) {
 }
 
 // Scalability structure (SS):
-/*
-*      +-+-+-+-+-+-+-+-+
-* V:   | N_S |Y|G|-|-|-|
-*      +-+-+-+-+-+-+-+-+              -|
-* Y:   |     WIDTH     | (OPTIONAL)    .
-*      +               .
-*      |               | (OPTIONAL)    .
-*      +-+-+-+-+-+-+-+-+               . N_S + 1 times
-*      |     HEIGHT    | (OPTIONAL)    .
-*      +               .
-*      |               | (OPTIONAL)    .
-*      +-+-+-+-+-+-+-+-+              -|
-* G:   |      N_G      | (OPTIONAL)
-*      +-+-+-+-+-+-+-+-+                           -|
-* N_G: |  T  |U| R |-|-| (OPTIONAL)                 .
-*      +-+-+-+-+-+-+-+-+              -|            . N_G times
-*      |    P_DIFF     | (OPTIONAL)    . R times    .
-*      +-+-+-+-+-+-+-+-+              -|           -|
-**/
+//
+//      +-+-+-+-+-+-+-+-+
+// V:   | N_S |Y|G|-|-|-|
+//      +-+-+-+-+-+-+-+-+              -|
+// Y:   |     WIDTH     | (OPTIONAL)    .
+//      +               +               .
+//      |               | (OPTIONAL)    .
+//      +-+-+-+-+-+-+-+-+               . N_S + 1 times
+//      |     HEIGHT    | (OPTIONAL)    .
+//      +               +               .
+//      |               | (OPTIONAL)    .
+//      +-+-+-+-+-+-+-+-+              -|
+// G:   |      N_G      | (OPTIONAL)
+//      +-+-+-+-+-+-+-+-+                           -|
+// N_G: |  T  |U| R |-|-| (OPTIONAL)                 .
+//      +-+-+-+-+-+-+-+-+              -|            . N_G times
+//      |    P_DIFF     | (OPTIONAL)    . R times    .
+//      +-+-+-+-+-+-+-+-+              -|           -|
+//
 func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) {
 	if len(packet) <= pos {
 		return pos, errShortPacket
@@ -351,10 +350,6 @@ func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) {
 		p.Width = make([]uint16, NS)
 		p.Height = make([]uint16, NS)
 		for i := 0; i < int(NS); i++ {
-			if len(packet) <= (pos + 3) {
-				return pos, errShortPacket
-			}
-
 			p.Width[i] = uint16(packet[pos])<<8 | uint16(packet[pos+1])
 			pos += 2
 			p.Height[i] = uint16(packet[pos])<<8 | uint16(packet[pos+1])
@@ -363,30 +358,17 @@ func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) {
 	}
 
 	if p.G {
-		if len(packet) <= pos {
-			return pos, errShortPacket
-		}
-
 		p.NG = packet[pos]
 		pos++
 	}
 
 	for i := 0; i < int(p.NG); i++ {
-		if len(packet) <= pos {
-			return pos, errShortPacket
-		}
-
 		p.PGTID = append(p.PGTID, packet[pos]>>5)
 		p.PGU = append(p.PGU, packet[pos]&0x10 != 0)
 		R := (packet[pos] >> 2) & 0x3
 		pos++
 
 		p.PGPDiff = append(p.PGPDiff, []uint8{})
-
-		if len(packet) <= (pos + int(R) - 1) {
-			return pos, errShortPacket
-		}
-
 		for j := 0; j < int(R); j++ {
 			p.PGPDiff[i] = append(p.PGPDiff[i], packet[pos])
 			pos++
@@ -396,13 +378,14 @@ func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) {
 	return pos, nil
 }
 
-// VP9PartitionHeadChecker is obsolete
+// VP9PartitionHeadChecker checks VP9 partition head
 type VP9PartitionHeadChecker struct{}
 
 // IsPartitionHead checks whether if this is a head of the VP9 partition
-func (*VP9Packet) IsPartitionHead(payload []byte) bool {
-	if len(payload) < 1 {
+func (*VP9PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
+	p := &VP9Packet{}
+	if _, err := p.Unmarshal(packet); err != nil {
 		return false
 	}
-	return (payload[0] & 0x08) != 0
+	return p.B
 }
