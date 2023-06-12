@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package rtp
 
 import (
@@ -39,7 +36,7 @@ type AudioLevelExtension struct {
 }
 
 // Marshal serializes the members to buffer
-func (a AudioLevelExtension) Marshal() ([]byte, error) {
+func (a *AudioLevelExtension) Marshal() ([]byte, error) {
 	if a.Level > 127 {
 		return nil, errAudioLevelOverflow
 	}

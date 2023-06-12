@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package codecs
 
 import (
@@ -9,18 +6,12 @@ import (
 )
 
 // H264Payloader payloads H264 packets
-type H264Payloader struct {
-	spsNalu, ppsNalu []byte
-}
+type H264Payloader struct{}
 
 const (
-	stapaNALUType  = 24
-	fuaNALUType    = 28
-	fubNALUType    = 29
-	spsNALUType    = 7
-	ppsNALUType    = 8
-	audNALUType    = 9
-	fillerNALUType = 12
+	stapaNALUType = 24
+	fuaNALUType   = 28
+	fubNALUType   = 29
 
 	fuaHeaderSize       = 2
 	stapaHeaderSize     = 1
@@ -30,8 +21,6 @@ const (
 	naluRefIdcBitmask = 0x60
 	fuStartBitmask    = 0x80
 	fuEndBitmask      = 0x40
-
-	outputStapAHeader = 0x78
 )
 
 func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
@@ -72,7 +61,7 @@ func emitNalus(nals []byte, emit func([]byte)) {
 }
 
 // Payload fragments a H264 packet across one or more byte arrays
-func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
+func (p *H264Payloader) Payload(mtu int, payload []byte) [][]byte {
 	var payloads [][]byte
 	if len(payload) == 0 {
 		return payloads
@@ -86,40 +75,12 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 		naluType := nalu[0] & naluTypeBitmask
 		naluRefIdc := nalu[0] & naluRefIdcBitmask
 
-		switch {
-		case naluType == audNALUType || naluType == fillerNALUType:
+		if naluType == 9 || naluType == 12 {
 			return
-		case naluType == spsNALUType:
-			p.spsNalu = nalu
-			return
-		case naluType == ppsNALUType:
-			p.ppsNalu = nalu
-			return
-		case p.spsNalu != nil && p.ppsNalu != nil:
-			// Pack current NALU with SPS and PPS as STAP-A
-			spsLen := make([]byte, 2)
-			binary.BigEndian.PutUint16(spsLen, uint16(len(p.spsNalu)))
-
-			ppsLen := make([]byte, 2)
-			binary.BigEndian.PutUint16(ppsLen, uint16(len(p.ppsNalu)))
-
-			stapANalu := []byte{outputStapAHeader}
-			stapANalu = append(stapANalu, spsLen...)
-			stapANalu = append(stapANalu, p.spsNalu...)
-			stapANalu = append(stapANalu, ppsLen...)
-			stapANalu = append(stapANalu, p.ppsNalu...)
-			if len(stapANalu) <= int(mtu) {
-				out := make([]byte, len(stapANalu))
-				copy(out, stapANalu)
-				payloads = append(payloads, out)
-			}
-
-			p.spsNalu = nil
-			p.ppsNalu = nil
 		}
 
 		// Single NALU
-		if len(nalu) <= int(mtu) {
+		if len(nalu) <= mtu {
 			out := make([]byte, len(nalu))
 			copy(out, nalu)
 			payloads = append(payloads, out)
@@ -127,7 +88,7 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 		}
 
 		// FU-A
-		maxFragmentSize := int(mtu) - fuaHeaderSize
+		maxFragmentSize := mtu - fuaHeaderSize
 
 		// The FU payload consists of fragments of the payload of the fragmented
 		// NAL unit so that if the fragmentation unit payloads of consecutive
@@ -192,8 +153,6 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 type H264Packet struct {
 	IsAVC     bool
 	fuaBuffer []byte
-
-	videoDepacketizer
 }
 
 func (p *H264Packet) doPackaging(nalu []byte) []byte {
@@ -214,8 +173,10 @@ func (p *H264Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bo
 
 // Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon
 func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
-	if len(payload) == 0 {
-		return nil, fmt.Errorf("%w: %d <=0", errShortPacket, len(payload))
+	if payload == nil {
+		return nil, errNilPacket
+	} else if len(payload) <= 2 {
+		return nil, fmt.Errorf("%w: %d <= 2", errShortPacket, len(payload))
 	}
 
 	// NALU Types
@@ -268,18 +229,18 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	return nil, fmt.Errorf("%w: %d", errUnhandledNALUType, naluType)
 }
 
-// H264PartitionHeadChecker is obsolete
+// H264PartitionHeadChecker checks H264 partition head
 type H264PartitionHeadChecker struct{}
 
 // IsPartitionHead checks if this is the head of a packetized nalu stream.
-func (*H264Packet) IsPartitionHead(payload []byte) bool {
-	if len(payload) < 2 {
+func (*H264PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
+	if packet == nil || len(packet) < 2 {
 		return false
 	}
 
-	if payload[0]&naluTypeBitmask == fuaNALUType ||
-		payload[0]&naluTypeBitmask == fubNALUType {
-		return payload[1]&fuStartBitmask != 0
+	if packet[0]&naluTypeBitmask == fuaNALUType ||
+		packet[0]&naluTypeBitmask == fubNALUType {
+		return packet[1]&fuStartBitmask != 0
 	}
 
 	return true

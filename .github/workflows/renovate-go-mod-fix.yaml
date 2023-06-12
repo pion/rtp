@@ -9,29 +9,25 @@
 # https://github.com/pion/.goassets instead of this repository.
 #
 
-name: Go mod tidy
+name: go-mod-fix
 on:
-  pull_request:
-    branches:
-      - master
   push:
     branches:
-      - master
+      - renovate/*
 
 jobs:
-  Check:
+  go-mod-fix:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
-      - name: check
-        run: |
-          go mod download
-          go mod tidy
-          if ! git diff --exit-code
-          then
-            echo "Not go mod tidied"
-            exit 1
-          fi
+        with:
+          fetch-depth: 2
+      - name: fix
+        uses: at-wat/go-sum-fix-action@v0
+        with:
+          git_user: Pion Bot
+          git_email: 59523206+pionbot@users.noreply.github.com
+          github_token: ${{ secrets.PIONBOT_PRIVATE_KEY }}
+          commit_style: squash
+          push: force

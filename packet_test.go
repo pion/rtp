@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package rtp
 
 import (
@@ -25,7 +22,6 @@ func TestBasic(t *testing.T) {
 	}
 	parsedPacket := &Packet{
 		Header: Header{
-			Padding:          false,
 			Marker:           true,
 			Extension:        true,
 			ExtensionProfile: 1,
@@ -35,14 +31,15 @@ func TestBasic(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  20,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
 		},
-		Payload:     rawPkt[20:],
-		PaddingSize: 0,
+		Payload: rawPkt[20:],
+		Raw:     rawPkt,
 	}
 
 	// Unmarshal to the used Packet should work as well.
@@ -60,216 +57,21 @@ func TestBasic(t *testing.T) {
 				t.Errorf("wrong computed marshal size")
 			}
 
+			if p.PayloadOffset != 20 {
+				t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
+			}
+
 			raw, err := p.Marshal()
 			if err != nil {
 				t.Error(err)
 			} else if !reflect.DeepEqual(raw, rawPkt) {
 				t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
 			}
+
+			if p.PayloadOffset != 20 {
+				t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
+			}
 		})
-	}
-
-	// packet with padding
-	rawPkt = []byte{
-		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x04,
-	}
-	parsedPacket = &Packet{
-		Header: Header{
-			Padding:          true,
-			Marker:           true,
-			Extension:        true,
-			ExtensionProfile: 1,
-			Extensions: []Extension{
-				{0, []byte{
-					0xFF, 0xFF, 0xFF, 0xFF,
-				}},
-			},
-			Version:        2,
-			PayloadType:    96,
-			SequenceNumber: 27023,
-			Timestamp:      3653407706,
-			SSRC:           476325762,
-			CSRC:           []uint32{},
-		},
-		Payload:     rawPkt[20:21],
-		PaddingSize: 4,
-	}
-	if err := p.Unmarshal(rawPkt); err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(p, parsedPacket) {
-		t.Errorf("TestBasic padding unmarshal: got %#v, want %#v", p, parsedPacket)
-	}
-
-	// packet with only padding
-	rawPkt = []byte{
-		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x05,
-	}
-	parsedPacket = &Packet{
-		Header: Header{
-			Padding:          true,
-			Marker:           true,
-			Extension:        true,
-			ExtensionProfile: 1,
-			Extensions: []Extension{
-				{0, []byte{
-					0xFF, 0xFF, 0xFF, 0xFF,
-				}},
-			},
-			Version:        2,
-			PayloadType:    96,
-			SequenceNumber: 27023,
-			Timestamp:      3653407706,
-			SSRC:           476325762,
-			CSRC:           []uint32{},
-		},
-		Payload:     []byte{},
-		PaddingSize: 5,
-	}
-	if err := p.Unmarshal(rawPkt); err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(p, parsedPacket) {
-		t.Errorf("TestBasic padding only unmarshal: got %#v, want %#v", p, parsedPacket)
-	}
-	if len(p.Payload) != 0 {
-		t.Errorf("Unmarshal of padding only packet has payload of non-zero length: %d", len(p.Payload))
-	}
-
-	// packet with excessive padding
-	rawPkt = []byte{
-		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x06,
-	}
-	parsedPacket = &Packet{
-		Header: Header{
-			Padding:          true,
-			Marker:           true,
-			Extension:        true,
-			ExtensionProfile: 1,
-			Extensions: []Extension{
-				{0, []byte{
-					0xFF, 0xFF, 0xFF, 0xFF,
-				}},
-			},
-			Version:        2,
-			PayloadType:    96,
-			SequenceNumber: 27023,
-			Timestamp:      3653407706,
-			SSRC:           476325762,
-			CSRC:           []uint32{},
-		},
-		Payload:     []byte{},
-		PaddingSize: 0,
-	}
-	err := p.Unmarshal(rawPkt)
-	if err == nil {
-		t.Fatal("Unmarshal did not error on packet with excessive padding")
-	}
-	if !errors.Is(err, errTooSmall) {
-		t.Errorf("Expected error: %v, got: %v", errTooSmall, err)
-	}
-
-	// marshal packet with padding
-	rawPkt = []byte{
-		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x00, 0x00, 0x00, 0x04,
-	}
-	parsedPacket = &Packet{
-		Header: Header{
-			Padding:          true,
-			Marker:           true,
-			Extension:        true,
-			ExtensionProfile: 1,
-			Extensions: []Extension{
-				{0, []byte{
-					0xFF, 0xFF, 0xFF, 0xFF,
-				}},
-			},
-			Version:        2,
-			PayloadType:    96,
-			SequenceNumber: 27023,
-			Timestamp:      3653407706,
-			SSRC:           476325762,
-			CSRC:           []uint32{},
-		},
-		Payload:     rawPkt[20:21],
-		PaddingSize: 4,
-	}
-	buf, err := parsedPacket.Marshal()
-	if err != nil {
-		t.Error(err)
-	}
-	if !reflect.DeepEqual(buf, rawPkt) {
-		t.Errorf("TestBasic padding marshal: got %#v, want %#v", buf, rawPkt)
-	}
-
-	// marshal packet with padding only
-	rawPkt = []byte{
-		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x05,
-	}
-	parsedPacket = &Packet{
-		Header: Header{
-			Padding:          true,
-			Marker:           true,
-			Extension:        true,
-			ExtensionProfile: 1,
-			Extensions: []Extension{
-				{0, []byte{
-					0xFF, 0xFF, 0xFF, 0xFF,
-				}},
-			},
-			Version:        2,
-			PayloadType:    96,
-			SequenceNumber: 27023,
-			Timestamp:      3653407706,
-			SSRC:           476325762,
-			CSRC:           []uint32{},
-		},
-		Payload:     []byte{},
-		PaddingSize: 5,
-	}
-	buf, err = parsedPacket.Marshal()
-	if err != nil {
-		t.Error(err)
-	}
-	if !reflect.DeepEqual(buf, rawPkt) {
-		t.Errorf("TestBasic padding marshal: got %#v, want %#v", buf, rawPkt)
-	}
-
-	// marshal packet with padding only without setting Padding explicitly in Header
-	rawPkt = []byte{
-		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x05,
-	}
-	parsedPacket = &Packet{
-		Header: Header{
-			Marker:           true,
-			Extension:        true,
-			ExtensionProfile: 1,
-			Extensions: []Extension{
-				{0, []byte{
-					0xFF, 0xFF, 0xFF, 0xFF,
-				}},
-			},
-			Version:        2,
-			Padding:        true,
-			PayloadType:    96,
-			SequenceNumber: 27023,
-			Timestamp:      3653407706,
-			SSRC:           476325762,
-			CSRC:           []uint32{},
-		},
-		Payload:     []byte{},
-		PaddingSize: 5,
-	}
-	buf, err = parsedPacket.Marshal()
-	if err != nil {
-		t.Error(err)
-	}
-	if !reflect.DeepEqual(buf, rawPkt) {
-		t.Errorf("TestBasic padding marshal: got %#v, want %#v", buf, rawPkt)
 	}
 }
 
@@ -332,6 +134,7 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  18,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -339,6 +142,7 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
+		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -394,6 +198,7 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -401,6 +206,7 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
+		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -517,6 +323,7 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -524,6 +331,7 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[28:],
+		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -559,6 +367,7 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  42,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -566,6 +375,7 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[44:],
+		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -660,6 +470,7 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  40,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -667,6 +478,7 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[40:],
+		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -685,6 +497,7 @@ func TestRFC8285GetExtensionReturnsNilWhenExtensionsDisabled(t *testing.T) {
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -716,6 +529,7 @@ func TestRFC8285DelExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -765,6 +579,7 @@ func TestRFC8285GetExtensionIDs(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -800,6 +615,7 @@ func TestRFC8285GetExtensionIDsReturnsErrorWhenExtensionsDisabled(t *testing.T) 
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -825,6 +641,7 @@ func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -850,6 +667,7 @@ func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -892,6 +710,7 @@ func TestRFC8285OneByteSetExtensionShouldSetCorrectExtensionProfileFor16ByteExte
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -933,6 +752,7 @@ func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -973,6 +793,7 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1030,6 +851,7 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1057,6 +879,7 @@ func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
+			PayloadOffset:  31,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1108,6 +931,7 @@ func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1151,6 +975,7 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1208,6 +1033,7 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1239,6 +1065,7 @@ func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 			Extension:        true,
 			ExtensionProfile: 0x1111,
 			Version:          2,
+			PayloadOffset:    26,
 			PayloadType:      96,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -1307,7 +1134,7 @@ func TestUnmarshal_ErrorHandling(t *testing.T) {
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
 			h := &Header{}
-			_, err := h.Unmarshal(testCase.input)
+			err := h.Unmarshal(testCase.input)
 			if !errors.Is(err, testCase.err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.err, err)
 			}
@@ -1326,6 +1153,9 @@ func TestRoundtrip(t *testing.T) {
 	if err := p.Unmarshal(rawPkt); err != nil {
 		t.Fatal(err)
 	}
+	if !bytes.Equal(rawPkt, p.Raw) {
+		t.Errorf("p.Raw must be same as rawPkt.\n p.Raw: %+v,\nrawPkt: %+v", p.Raw, rawPkt)
+	}
 	if !bytes.Equal(payload, p.Payload) {
 		t.Errorf("p.Payload must be same as payload.\n  payload: %+v,\np.Payload: %+v",
 			payload, p.Payload,
@@ -1339,63 +1169,13 @@ func TestRoundtrip(t *testing.T) {
 	if !bytes.Equal(rawPkt, buf) {
 		t.Errorf("buf must be same as rawPkt.\n   buf: %+v,\nrawPkt: %+v", buf, rawPkt)
 	}
+	if !bytes.Equal(rawPkt, p.Raw) {
+		t.Errorf("p.Raw must be same as rawPkt.\n p.Raw: %+v,\nrawPkt: %+v", p.Raw, rawPkt)
+	}
 	if !bytes.Equal(payload, p.Payload) {
 		t.Errorf("p.Payload must be same as payload.\n  payload: %+v,\np.Payload: %+v",
 			payload, p.Payload,
 		)
-	}
-}
-
-func TestCloneHeader(t *testing.T) {
-	h := Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 1,
-		Extensions: []Extension{
-			{0, []byte{
-				0xFF, 0xFF, 0xFF, 0xFF,
-			}},
-		},
-		Version:        2,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		CSRC:           []uint32{},
-	}
-	clone := h.Clone()
-	if !reflect.DeepEqual(h, clone) {
-		t.Errorf("Cloned clone does not match the original")
-	}
-
-	h.CSRC = append(h.CSRC, 1)
-	if len(clone.CSRC) == len(h.CSRC) {
-		t.Errorf("Expected CSRC to be unchanged")
-	}
-	h.Extensions[0].payload[0] = 0x1F
-	if clone.Extensions[0].payload[0] == 0x1F {
-		t.Errorf("Expected Extensions to be unchanged")
-	}
-}
-
-func TestClonePacket(t *testing.T) {
-	rawPkt := []byte{
-		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01, 0x50, 0xAA, 0x00, 0x00,
-		0x98, 0x36, 0xbe, 0x88, 0x9e,
-	}
-	p := &Packet{
-		Payload: rawPkt[20:],
-	}
-
-	clone := p.Clone()
-	if !reflect.DeepEqual(p, clone) {
-		t.Errorf("Cloned Packet does not match the original")
-	}
-
-	p.Payload[0] = 0x1F
-	if clone.Payload[0] == 0x1F {
-		t.Errorf("Expected Payload to be unchanged")
 	}
 }
 
