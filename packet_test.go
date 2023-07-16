@@ -35,7 +35,6 @@ func TestBasic(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  20,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -43,7 +42,6 @@ func TestBasic(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload:     rawPkt[20:],
-		Raw:         rawPkt,
 		PaddingSize: 0,
 	}
 
@@ -62,19 +60,11 @@ func TestBasic(t *testing.T) {
 				t.Errorf("wrong computed marshal size")
 			}
 
-			if p.PayloadOffset != 20 {
-				t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
-			}
-
 			raw, err := p.Marshal()
 			if err != nil {
 				t.Error(err)
 			} else if !reflect.DeepEqual(raw, rawPkt) {
 				t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
-			}
-
-			if p.PayloadOffset != 20 {
-				t.Errorf("wrong payload offset: %d != %d", p.PayloadOffset, 20)
 			}
 		})
 	}
@@ -101,10 +91,8 @@ func TestBasic(t *testing.T) {
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
-			PayloadOffset:  20,
 		},
 		Payload:     rawPkt[20:21],
-		Raw:         rawPkt,
 		PaddingSize: 4,
 	}
 	if err := p.Unmarshal(rawPkt); err != nil {
@@ -135,10 +123,8 @@ func TestBasic(t *testing.T) {
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
-			PayloadOffset:  20,
 		},
 		Payload:     []byte{},
-		Raw:         rawPkt,
 		PaddingSize: 5,
 	}
 	if err := p.Unmarshal(rawPkt); err != nil {
@@ -345,7 +331,6 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  18,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -353,7 +338,6 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
-		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -409,7 +393,6 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -417,7 +400,6 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[20:],
-		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -534,7 +516,6 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -542,7 +523,6 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[28:],
-		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -578,7 +558,6 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  42,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -586,7 +565,6 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[44:],
-		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -681,7 +659,6 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  40,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -689,7 +666,6 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 			CSRC:           []uint32{},
 		},
 		Payload: rawPkt[40:],
-		Raw:     rawPkt,
 	}
 
 	dstData, _ := p.Marshal()
@@ -708,7 +684,6 @@ func TestRFC8285GetExtensionReturnsNilWhenExtensionsDisabled(t *testing.T) {
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -740,7 +715,6 @@ func TestRFC8285DelExtension(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -790,7 +764,6 @@ func TestRFC8285GetExtensionIDs(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -826,7 +799,6 @@ func TestRFC8285GetExtensionIDsReturnsErrorWhenExtensionsDisabled(t *testing.T) 
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -852,7 +824,6 @@ func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -878,7 +849,6 @@ func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -921,7 +891,6 @@ func TestRFC8285OneByteSetExtensionShouldSetCorrectExtensionProfileFor16ByteExte
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -963,7 +932,6 @@ func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1004,7 +972,6 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1062,7 +1029,6 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1090,7 +1056,6 @@ func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 			Marker:         true,
 			Extension:      false,
 			Version:        2,
-			PayloadOffset:  31,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1142,7 +1107,6 @@ func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1186,7 +1150,6 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1244,7 +1207,6 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 				}},
 			},
 			Version:        2,
-			PayloadOffset:  26,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
@@ -1276,7 +1238,6 @@ func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 			Extension:        true,
 			ExtensionProfile: 0x1111,
 			Version:          2,
-			PayloadOffset:    26,
 			PayloadType:      96,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -1364,9 +1325,6 @@ func TestRoundtrip(t *testing.T) {
 	if err := p.Unmarshal(rawPkt); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(rawPkt, p.Raw) {
-		t.Errorf("p.Raw must be same as rawPkt.\n p.Raw: %+v,\nrawPkt: %+v", p.Raw, rawPkt)
-	}
 	if !bytes.Equal(payload, p.Payload) {
 		t.Errorf("p.Payload must be same as payload.\n  payload: %+v,\np.Payload: %+v",
 			payload, p.Payload,
@@ -1379,9 +1337,6 @@ func TestRoundtrip(t *testing.T) {
 	}
 	if !bytes.Equal(rawPkt, buf) {
 		t.Errorf("buf must be same as rawPkt.\n   buf: %+v,\nrawPkt: %+v", buf, rawPkt)
-	}
-	if !bytes.Equal(rawPkt, p.Raw) {
-		t.Errorf("p.Raw must be same as rawPkt.\n p.Raw: %+v,\nrawPkt: %+v", p.Raw, rawPkt)
 	}
 	if !bytes.Equal(payload, p.Payload) {
 		t.Errorf("p.Payload must be same as payload.\n  payload: %+v,\np.Payload: %+v",
