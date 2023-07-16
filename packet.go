@@ -82,9 +82,10 @@ func (p Packet) String() string {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the Header.
-func (h *Header) Unmarshal(buf []byte) error { //nolint:gocognit
+// It returns the number of bytes read n and any error.
+func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 	if len(buf) < headerLength {
-		return fmt.Errorf("%w: %d < %d", errHeaderSizeInsufficient, len(buf), headerLength)
+		return 0, fmt.Errorf("%w: %d < %d", errHeaderSizeInsufficient, len(buf), headerLength)
 	}
 
 	/*
@@ -112,9 +113,10 @@ func (h *Header) Unmarshal(buf []byte) error { //nolint:gocognit
 		h.CSRC = h.CSRC[:nCSRC]
 	}
 
-	n := csrcOffset + (nCSRC * csrcLength)
+	n = csrcOffset + (nCSRC * csrcLength)
 	if len(buf) < n {
-		return fmt.Errorf("size %d < %d: %w", len(buf), n, errHeaderSizeInsufficient)
+		return n, fmt.Errorf("size %d < %d: %w", len(buf), n,
+			errHeaderSizeInsufficient)
 	}
 
 	h.Marker = (buf[1] >> markerShift & markerMask) > 0
@@ -135,7 +137,7 @@ func (h *Header) Unmarshal(buf []byte) error { //nolint:gocognit
 
 	if h.Extension {
 		if expected := n + 4; len(buf) < expected {
-			return fmt.Errorf("size %d < %d: %w",
+			return n, fmt.Errorf("size %d < %d: %w",
 				len(buf), expected,
 				errHeaderSizeInsufficientForExtension,
 			)
@@ -147,7 +149,7 @@ func (h *Header) Unmarshal(buf []byte) error { //nolint:gocognit
 		n += 2
 
 		if expected := n + extensionLength; len(buf) < expected {
-			return fmt.Errorf("size %d < %d: %w",
+			return n, fmt.Errorf("size %d < %d: %w",
 				len(buf), expected,
 				errHeaderSizeInsufficientForExtension,
 			)
@@ -198,7 +200,8 @@ func (h *Header) Unmarshal(buf []byte) error { //nolint:gocognit
 
 		default: // RFC3550 Extension
 			if len(buf) < n+extensionLength {
-				return fmt.Errorf("%w: %d < %d", errHeaderSizeInsufficientForExtension, len(buf), n+extensionLength)
+				return n, fmt.Errorf("%w: %d < %d",
+					errHeaderSizeInsufficientForExtension, len(buf), n+extensionLength)
 			}
 
 			extension := Extension{id: 0, payload: buf[n : n+extensionLength]}
@@ -209,12 +212,13 @@ func (h *Header) Unmarshal(buf []byte) error { //nolint:gocognit
 
 	h.PayloadOffset = n
 
-	return nil
+	return n, nil
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the Packet.
 func (p *Packet) Unmarshal(buf []byte) error {
-	if err := p.Header.Unmarshal(buf); err != nil {
+	_, err := p.Header.Unmarshal(buf)
+	if err != nil {
 		return err
 	}
 
