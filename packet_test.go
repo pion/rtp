@@ -1345,7 +1345,7 @@ func TestUnmarshal_ErrorHandling(t *testing.T) {
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
 			h := &Header{}
-			err := h.Unmarshal(testCase.input)
+			_, err := h.Unmarshal(testCase.input)
 			if !errors.Is(err, testCase.err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.err, err)
 			}
