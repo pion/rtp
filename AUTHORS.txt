@@ -30,6 +30,7 @@ Michael Uti <utimichael9@gmail.com>
 Raphael Derosso Pereira <raphaelpereira@gmail.com>
 Rob Lofthouse <ri.lofthouse@gmail.com>
 Robin Raymond <robin@goheadroom.com>
+Sean <sean@pion.ly>
 Sean DuBois <duboisea@twitch.tv>
 Sean DuBois <seaduboi@amazon.com>
 Sean DuBois <sean@pion.ly>
