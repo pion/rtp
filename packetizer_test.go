@@ -51,7 +51,6 @@ func TestPacketizer_AbsSendTime(t *testing.T) {
 			Padding:          false,
 			Extension:        true,
 			Marker:           true,
-			PayloadOffset:    0, // not set by Packetize() at now
 			PayloadType:      98,
 			SequenceNumber:   1234,
 			Timestamp:        45678,
@@ -144,9 +143,7 @@ func TestPacketizer_Roundtrip(t *testing.T) {
 			t.Errorf("Packet versions don't match, expected %v but got %v", expectedPkt.Payload, pkt.Payload)
 		}
 
-		pkt.PayloadOffset = 0
 		pkt.PaddingSize = 0
-		pkt.Raw = nil
 
 		if !reflect.DeepEqual(expectedPkt, pkt) {
 			t.Errorf("Packets don't match, expected %v but got %v", expectedPkt, pkt)

@@ -16,13 +16,11 @@ type Extension struct {
 }
 
 // Header represents an RTP packet header
-// NOTE: PayloadOffset is populated by Marshal/Unmarshal and should not be modified
 type Header struct {
 	Version          uint8
 	Padding          bool
 	Extension        bool
 	Marker           bool
-	PayloadOffset    int
 	PayloadType      uint8
 	SequenceNumber   uint16
 	Timestamp        uint32
@@ -30,15 +28,19 @@ type Header struct {
 	CSRC             []uint32
 	ExtensionProfile uint16
 	Extensions       []Extension
+
+	// Deprecated: will be removed in a future version.
+	PayloadOffset int
 }
 
 // Packet represents an RTP Packet
-// NOTE: Raw is populated by Marshal/Unmarshal and should not be modified
 type Packet struct {
 	Header
-	Raw         []byte
 	Payload     []byte
 	PaddingSize byte
+
+	// Deprecated: will be removed in a future version.
+	Raw []byte
 }
 
 const (
@@ -210,14 +212,12 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 		}
 	}
 
-	h.PayloadOffset = n
-
 	return n, nil
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the Packet.
 func (p *Packet) Unmarshal(buf []byte) error {
-	_, err := p.Header.Unmarshal(buf)
+	n, err := p.Header.Unmarshal(buf)
 	if err != nil {
 		return err
 	}
@@ -227,12 +227,11 @@ func (p *Packet) Unmarshal(buf []byte) error {
 		p.PaddingSize = buf[end-1]
 		end -= int(p.PaddingSize)
 	}
-	if end < p.PayloadOffset {
+	if end < n {
 		return errTooSmall
 	}
 
-	p.Payload = buf[p.PayloadOffset:end]
-	p.Raw = buf
+	p.Payload = buf[n:end]
 
 	return nil
 }
@@ -342,8 +341,6 @@ func (h Header) MarshalTo(buf []byte) (n int, err error) {
 			n++
 		}
 	}
-
-	h.PayloadOffset = n
 
 	return n, nil
 }
@@ -499,7 +496,7 @@ func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
 	}
 
 	m := copy(buf[n:], p.Payload)
-	p.Raw = buf[:n+m]
+
 	if p.Header.Padding {
 		buf[n+m+int(p.PaddingSize-1)] = p.PaddingSize
 	}
