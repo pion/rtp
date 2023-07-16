@@ -32,6 +32,7 @@ Rob Lofthouse <ri.lofthouse@gmail.com>
 Robin Raymond <robin@goheadroom.com>
 Sean DuBois <duboisea@twitch.tv>
 Sean DuBois <seaduboi@amazon.com>
+Sean DuBois <sean@pion.ly>
 Sean DuBois <sean@siobud.com>
 Simone Gotti <simone.gotti@gmail.com>
 Steffen Vogel <post@steffenvogel.de>
