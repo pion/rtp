@@ -4,6 +4,7 @@
 package codecs
 
 import (
+	"bytes"
 	"errors"
 	"reflect"
 	"testing"
@@ -12,28 +13,72 @@ import (
 )
 
 func TestAV1_Marshal(t *testing.T) {
-	const mtu = 5
-
-	for _, test := range []struct {
-		input  []byte
-		output [][]byte
-	}{
-		{[]byte{0x01}, [][]byte{{0x00, 0x01, 0x01}}},
-		{[]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x04, 0x05}, [][]byte{{0x40, 0x02, 0x00, 0x01}, {0xc0, 0x02, 0x02, 0x03}, {0xc0, 0x02, 0x04, 0x04}, {0x80, 0x01, 0x05}}},
-	} {
-		test := test
-
-		p := &AV1Payloader{}
-		if payloads := p.Payload(mtu, test.input); !reflect.DeepEqual(payloads, test.output) {
-			t.Fatalf("Expected(%02x) did not equal actual(%02x)", test.output, payloads)
-		}
-	}
-
 	p := &AV1Payloader{}
-	zeroMtuPayload := p.Payload(0, []byte{0x0A, 0x0B, 0x0C})
-	if zeroMtuPayload != nil {
-		t.Fatal("Unexpected output from zero MTU AV1 Payloader")
-	}
+
+	t.Run("Unfragmented OBU", func(t *testing.T) {
+		OBU := []byte{0x00, 0x01, 0x2, 0x3, 0x4, 0x5}
+		payloads := p.Payload(100, OBU)
+
+		if len(payloads) != 1 || len(payloads[0]) != 7 {
+			t.Fatal("Expected one unfragmented Payload")
+		}
+
+		if payloads[0][0] != 0x10 {
+			t.Fatal("Only W bit should be set")
+		}
+
+		if !bytes.Equal(OBU, payloads[0][1:]) {
+			t.Fatal("OBU modified during packetization")
+		}
+	})
+
+	t.Run("Fragmented OBU", func(t *testing.T) {
+		OBU := []byte{0x00, 0x01, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8}
+		payloads := p.Payload(4, OBU)
+
+		if len(payloads) != 3 || len(payloads[0]) != 4 || len(payloads[1]) != 4 || len(payloads[2]) != 4 {
+			t.Fatal("Expected three fragmented Payload")
+		}
+
+		if payloads[0][0] != 0x10|yMask {
+			t.Fatal("W and Y bit should be set")
+		}
+
+		if payloads[1][0] != 0x10|yMask|zMask {
+			t.Fatal("W, Y and Z bit should be set")
+		}
+
+		if payloads[2][0] != 0x10|zMask {
+			t.Fatal("W and Z bit should be set")
+		}
+
+		if !bytes.Equal(OBU[0:3], payloads[0][1:]) || !bytes.Equal(OBU[3:6], payloads[1][1:]) || !bytes.Equal(OBU[6:9], payloads[2][1:]) {
+			t.Fatal("OBU modified during packetization")
+		}
+	})
+
+	t.Run("Sequence Header Caching", func(t *testing.T) {
+		sequenceHeaderFrame := []byte{0xb, 0xA, 0xB, 0xC}
+		normalFrame := []byte{0x0, 0x1, 0x2, 0x3}
+
+		payloads := p.Payload(100, sequenceHeaderFrame)
+		if len(payloads) != 0 {
+			t.Fatal("Sequence Header was not properly cached")
+		}
+
+		payloads = p.Payload(100, normalFrame)
+		if len(payloads) != 1 {
+			t.Fatal("Expected one payload")
+		}
+
+		if payloads[0][0] != 0x20|nMask {
+			t.Fatal("W and N bit should be set")
+		}
+
+		if !bytes.Equal(sequenceHeaderFrame, payloads[0][2:6]) || !bytes.Equal(normalFrame, payloads[0][6:10]) {
+			t.Fatal("OBU modified during packetization")
+		}
+	})
 }
 
 func TestAV1_Unmarshal_Error(t *testing.T) {
