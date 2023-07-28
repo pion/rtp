@@ -254,6 +254,7 @@ func TestBasic(t *testing.T) {
 				}},
 			},
 			Version:        2,
+			Padding:        true,
 			PayloadType:    96,
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,

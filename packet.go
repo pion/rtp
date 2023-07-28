@@ -484,7 +484,6 @@ func (p Packet) Marshal() (buf []byte, err error) {
 
 // MarshalTo serializes the packet and writes to the buffer.
 func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
-	p.Header.Padding = p.PaddingSize != 0
 	n, err = p.Header.MarshalTo(buf)
 	if err != nil {
 		return 0, err
