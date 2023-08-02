@@ -1372,8 +1372,8 @@ func TestCloneHeader(t *testing.T) {
 	if len(clone.CSRC) == len(h.CSRC) {
 		t.Errorf("Expected CSRC to be unchanged")
 	}
-	h.Extensions[0].payload[0] = 0x1F
-	if clone.Extensions[0].payload[0] == 0x1F {
+	h.Extensions[0].Payload[0] = 0x1F
+	if clone.Extensions[0].Payload[0] == 0x1F {
 		t.Errorf("Expected Extensions to be unchanged")
 	}
 }
@@ -1453,8 +1453,8 @@ func BenchmarkUnmarshal(b *testing.B) {
 			CSRC:             []uint32{1, 2},
 			ExtensionProfile: extensionProfileTwoByte,
 			Extensions: []Extension{
-				{id: 1, payload: []byte{3, 4}},
-				{id: 2, payload: []byte{5, 6}},
+				{ID: 1, Payload: []byte{3, 4}},
+				{ID: 2, Payload: []byte{5, 6}},
 			},
 		},
 		Payload: []byte{

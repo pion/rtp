@@ -59,8 +59,8 @@ func TestPacketizer_AbsSendTime(t *testing.T) {
 			ExtensionProfile: 0xBEDE,
 			Extensions: []Extension{
 				{
-					id:      1,
-					payload: []byte{0x40, 0, 0},
+					ID:      1,
+					Payload: []byte{0x40, 0, 0},
 				},
 			},
 		},
