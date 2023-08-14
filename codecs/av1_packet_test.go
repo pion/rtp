@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pion/rtp/pkg/obu"
+	"github.com/pion/rtp/codecs/av1/obu"
 )
 
 func TestAV1_Marshal(t *testing.T) {
