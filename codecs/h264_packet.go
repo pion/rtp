@@ -4,6 +4,7 @@
 package codecs
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -34,40 +35,32 @@ const (
 	outputStapAHeader = 0x78
 )
 
-func annexbNALUStartCode() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
+// nolint:gochecknoglobals
+var (
+	naluStartCode       = []byte{0x00, 0x00, 0x01}
+	annexbNALUStartCode = []byte{0x00, 0x00, 0x00, 0x01}
+)
 
 func emitNalus(nals []byte, emit func([]byte)) {
-	nextInd := func(nalu []byte, start int) (indStart int, indLen int) {
-		zeroCount := 0
+	start := 0
+	length := len(nals)
 
-		for i, b := range nalu[start:] {
-			if b == 0 {
-				zeroCount++
-				continue
-			} else if b == 1 {
-				if zeroCount >= 2 {
-					return start + i - zeroCount, zeroCount + 1
-				}
-			}
-			zeroCount = 0
+	for start < length {
+		end := bytes.Index(nals[start:], annexbNALUStartCode)
+		offset := 4
+		if end == -1 {
+			end = bytes.Index(nals[start:], naluStartCode)
+			offset = 3
 		}
-		return -1, -1
-	}
+		if end == -1 {
+			emit(nals[start:])
+			break
+		}
 
-	nextIndStart, nextIndLen := nextInd(nals, 0)
-	if nextIndStart == -1 {
-		emit(nals)
-	} else {
-		for nextIndStart != -1 {
-			prevStart := nextIndStart + nextIndLen
-			nextIndStart, nextIndLen = nextInd(nals, prevStart)
-			if nextIndStart != -1 {
-				emit(nals[prevStart:nextIndStart])
-			} else {
-				// Emit until end of stream, no end indicator found
-				emit(nals[prevStart:])
-			}
-		}
+		emit(nals[start : start+end])
+
+		// next NAL start position
+		start += end + offset
 	}
 }
 
@@ -203,7 +196,7 @@ func (p *H264Packet) doPackaging(nalu []byte) []byte {
 		return append(naluLength, nalu...)
 	}
 
-	return append(annexbNALUStartCode(), nalu...)
+	return append(annexbNALUStartCode, nalu...)
 }
 
 // IsDetectedFinalPacketInSequence returns true of the packet passed in has the
