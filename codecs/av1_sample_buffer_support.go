@@ -7,10 +7,10 @@ import (
 
 type AV1PacketSampleBufferSupport struct {
 	popFrame bool
-	avframe  *frame.AV1
+	avFrame  *frame.AV1
 }
 
-func (d *AV1PacketSampleBufferSupport) IsPartitionTail(marker bool, payload []byte) bool {
+func (d *AV1PacketSampleBufferSupport) IsPartitionTail(marker bool, _ []byte) bool {
 	d.popFrame = true
 	return marker
 }
@@ -24,7 +24,7 @@ func (d *AV1PacketSampleBufferSupport) IsPartitionHead(payload []byte) bool {
 	return (payload[0] & byte(0b10000000)) == 0
 }
 
-func SizeLeb128(leb128 uint) uint {
+func sizeLeb128(leb128 uint) uint {
 	if (leb128 >> 24) > 0 {
 		return 4
 	} else if (leb128 >> 16) > 0 {
@@ -35,11 +35,11 @@ func SizeLeb128(leb128 uint) uint {
 	return 1
 }
 
-func (p *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error) {
+func (d *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error) {
 
-	if p.popFrame {
-		p.avframe = &frame.AV1{}
-		p.popFrame = false // start frame assembling
+	if d.popFrame {
+		d.avFrame = &frame.AV1{}
+		d.popFrame = false // start frame assembling
 	}
 
 	packet := AV1Packet{}
@@ -49,30 +49,40 @@ func (p *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error)
 		return nil, err
 	}
 
-	OBUS, _ := p.avframe.ReadFrames(&packet)
+	OBUs, _ := d.avFrame.ReadFrames(&packet)
 
-	if len(OBUS) == 0 {
+	if len(OBUs) == 0 {
 		return nil, nil
 	}
 
 	var payloadSize uint = 0
 
-	for i := range OBUS {
-		obulength := uint(len(OBUS[i]))
-		payloadSize += obulength
-		payloadSize += SizeLeb128(obu.EncodeLEB128(obulength))
+	for i := range OBUs {
+		obuLength := uint(len(OBUs[i]))
+		if obuLength == 0 {
+			continue
+		}
+		payloadSize += obuLength
+		payloadSize += sizeLeb128(obu.EncodeLEB128(obuLength - 1))
 	}
 
 	result := make([]byte, payloadSize)
 
 	offset := 0
-	for i := range OBUS {
-		result[offset] = OBUS[i][0] ^ 2 // mark size header exists
-		offset++
-		len_minus := len(OBUS[i]) - 1
-		payloadSize := obu.EncodeLEB128(uint(len_minus))
+	for i := range OBUs {
+		obuLength := len(OBUs[i])
 
-		switch SizeLeb128(payloadSize) {
+		if obuLength == 0 {
+			continue
+		}
+
+		lenMinus := obuLength - 1
+
+		result[offset] = OBUs[i][0] ^ 2 // mark size header exists
+		offset++
+		payloadSize := obu.EncodeLEB128(uint(lenMinus))
+
+		switch sizeLeb128(payloadSize) {
 		case 4:
 			result[offset] = byte(payloadSize >> 24)
 			offset++
@@ -90,8 +100,8 @@ func (p *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error)
 			offset++
 		}
 
-		copy(result[offset:], OBUS[i][1:])
-		offset += len_minus
+		copy(result[offset:], OBUs[i][1:])
+		offset += lenMinus
 	}
 
 	return result, nil
