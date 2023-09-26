@@ -1,14 +1,10 @@
-package main
+package codecs
 
 import (
-	"github.com/pion/rtp/codecs"
 	"github.com/pion/rtp/pkg/frame"
 	"github.com/pion/rtp/pkg/obu"
 )
 
-// TODO: once Pion implement something for unmarshaling AV1 with SampleBuffer support - just remove this code
-// and use Pion version
-// AV1PacketSampleBufferSupport implementation is inspired by proposal https://github.com/pion/rtp/issues/189
 type AV1PacketSampleBufferSupport struct {
 	popFrame bool
 	avframe  *frame.AV1
@@ -46,7 +42,7 @@ func (p *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error)
 		p.popFrame = false // start frame assembling
 	}
 
-	packet := codecs.AV1Packet{}
+	packet := AV1Packet{}
 	_, err := packet.Unmarshal(payload)
 
 	if err != nil {
@@ -80,24 +76,15 @@ func (p *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error)
 		case 4:
 			result[offset] = byte(payloadSize >> 24)
 			offset++
-			result[offset] = byte(payloadSize >> 16)
-			offset++
-			result[offset] = byte(payloadSize >> 8)
-			offset++
-			result[offset] = byte(payloadSize)
-			offset++
+			fallthrough
 		case 3:
 			result[offset] = byte(payloadSize >> 16)
 			offset++
-			result[offset] = byte(payloadSize >> 8)
-			offset++
-			result[offset] = byte(payloadSize)
-			offset++
+			fallthrough
 		case 2:
 			result[offset] = byte(payloadSize >> 8)
 			offset++
-			result[offset] = byte(payloadSize)
-			offset++
+			fallthrough
 		case 1:
 			result[offset] = byte(payloadSize)
 			offset++
