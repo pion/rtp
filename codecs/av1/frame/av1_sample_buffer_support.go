@@ -1,13 +1,13 @@
-package codecs
+package frame
 
 import (
-	"github.com/pion/rtp/pkg/frame"
-	"github.com/pion/rtp/pkg/obu"
+	"github.com/pion/rtp/codecs"
+	"github.com/pion/rtp/codecs/av1/obu"
 )
 
 type AV1PacketSampleBufferSupport struct {
 	popFrame bool
-	avFrame  *frame.AV1
+	avFrame  *AV1
 }
 
 func (d *AV1PacketSampleBufferSupport) IsPartitionTail(marker bool, _ []byte) bool {
@@ -24,25 +24,14 @@ func (d *AV1PacketSampleBufferSupport) IsPartitionHead(payload []byte) bool {
 	return (payload[0] & byte(0b10000000)) == 0
 }
 
-func sizeLeb128(leb128 uint) uint {
-	if (leb128 >> 24) > 0 {
-		return 4
-	} else if (leb128 >> 16) > 0 {
-		return 3
-	} else if (leb128 >> 8) > 0 {
-		return 2
-	}
-	return 1
-}
-
 func (d *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error) {
 
 	if d.popFrame {
-		d.avFrame = &frame.AV1{}
+		d.avFrame = &AV1{}
 		d.popFrame = false // start frame assembling
 	}
 
-	packet := AV1Packet{}
+	packet := codecs.AV1Packet{}
 	_, err := packet.Unmarshal(payload)
 
 	if err != nil {
@@ -63,7 +52,7 @@ func (d *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error)
 			continue
 		}
 		payloadSize += obuLength
-		payloadSize += sizeLeb128(obu.EncodeLEB128(obuLength - 1))
+		payloadSize += obu.SizeLeb128(obu.EncodeLEB128(obuLength - 1))
 	}
 
 	result := make([]byte, payloadSize)
@@ -82,7 +71,7 @@ func (d *AV1PacketSampleBufferSupport) Unmarshal(payload []byte) ([]byte, error)
 		offset++
 		payloadSize := obu.EncodeLEB128(uint(lenMinus))
 
-		switch sizeLeb128(payloadSize) {
+		switch obu.SizeLeb128(payloadSize) {
 		case 4:
 			result[offset] = byte(payloadSize >> 24)
 			offset++

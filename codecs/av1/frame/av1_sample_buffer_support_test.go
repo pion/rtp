@@ -1,9 +1,9 @@
-package codecs
+package frame
 
 import (
 	"bytes"
 	"github.com/pion/rtp"
-	"github.com/pion/rtp/pkg/obu"
+	"github.com/pion/rtp/codecs/av1/obu"
 	"github.com/pion/webrtc/v3/pkg/media/samplebuilder"
 	"testing"
 	"time"
@@ -17,13 +17,13 @@ func buildAv1Payload(data byte, padding int) []byte {
 	}
 
 	payloadSize := obu.EncodeLEB128(uint(1 + padding + dataSize))
-	result := make([]byte, 3+sizeLeb128(payloadSize))
+	result := make([]byte, 3+obu.SizeLeb128(payloadSize))
 
 	result[0] = 0 // AV1 RTP header
 
 	offset := 1
 
-	switch sizeLeb128(payloadSize) {
+	switch obu.SizeLeb128(payloadSize) {
 	case 4:
 		result[offset] = byte(payloadSize >> 24)
 		offset++
