@@ -133,18 +133,17 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 		// the FU header.  An FU payload MAY have any number of octets and MAY
 		// be empty.
 
-		naluData := nalu
 		// According to the RFC, the first octet is skipped due to redundant information
-		naluDataIndex := 1
-		naluDataLength := len(nalu) - naluDataIndex
-		naluDataRemaining := naluDataLength
+		naluIndex := 1
+		naluLength := len(nalu) - naluIndex
+		naluRemaining := naluLength
 
-		if min(maxFragmentSize, naluDataRemaining) <= 0 {
+		if min(maxFragmentSize, naluRemaining) <= 0 {
 			return
 		}
 
-		for naluDataRemaining > 0 {
-			currentFragmentSize := min(maxFragmentSize, naluDataRemaining)
+		for naluRemaining > 0 {
+			currentFragmentSize := min(maxFragmentSize, naluRemaining)
 			out := make([]byte, fuaHeaderSize+currentFragmentSize)
 
 			// +---------------+
@@ -162,19 +161,19 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 			// +---------------+
 
 			out[1] = naluType
-			if naluDataRemaining == naluDataLength {
+			if naluRemaining == naluLength {
 				// Set start bit
 				out[1] |= 1 << 7
-			} else if naluDataRemaining-currentFragmentSize == 0 {
+			} else if naluRemaining-currentFragmentSize == 0 {
 				// Set end bit
 				out[1] |= 1 << 6
 			}
 
-			copy(out[fuaHeaderSize:], naluData[naluDataIndex:naluDataIndex+currentFragmentSize])
+			copy(out[fuaHeaderSize:], nalu[naluIndex:naluIndex+currentFragmentSize])
 			payloads = append(payloads, out)
 
-			naluDataRemaining -= currentFragmentSize
-			naluDataIndex += currentFragmentSize
+			naluRemaining -= currentFragmentSize
+			naluIndex += currentFragmentSize
 		}
 	})
 
