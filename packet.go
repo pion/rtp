@@ -109,7 +109,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 	h.Padding = (buf[0] >> paddingShift & paddingMask) > 0
 	h.Extension = (buf[0] >> extensionShift & extensionMask) > 0
 	nCSRC := int(buf[0] & ccMask)
-	if cap(h.CSRC) < nCSRC || h.CSRC == nil {
+	if cap(h.CSRC) < nCSRC {
 		h.CSRC = make([]uint32, nCSRC)
 	} else {
 		h.CSRC = h.CSRC[:nCSRC]
@@ -133,9 +133,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 		h.CSRC[i] = binary.BigEndian.Uint32(buf[offset:])
 	}
 
-	if h.Extensions != nil {
-		h.Extensions = h.Extensions[:0]
-	}
+	h.Extensions = h.Extensions[:0]
 
 	if h.Extension {
 		if expected := n + 4; len(buf) < expected {
@@ -168,7 +166,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 				}
 
 				extid := buf[n] >> 4
-				payloadLen := int(buf[n]&^0xF0 + 1)
+				payloadLen := int(buf[n]&0x0F + 1)
 				n++
 
 				if extid == extensionIDReserved {

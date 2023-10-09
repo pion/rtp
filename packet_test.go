@@ -39,7 +39,7 @@ func TestBasic(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
+			CSRC:           nil,
 		},
 		Payload:     rawPkt[20:],
 		PaddingSize: 0,
@@ -90,7 +90,7 @@ func TestBasic(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
+			CSRC:           nil,
 		},
 		Payload:     rawPkt[20:21],
 		PaddingSize: 4,
@@ -122,7 +122,7 @@ func TestBasic(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
+			CSRC:           nil,
 		},
 		Payload:     []byte{},
 		PaddingSize: 5,
@@ -157,7 +157,7 @@ func TestBasic(t *testing.T) {
 			SequenceNumber: 27023,
 			Timestamp:      3653407706,
 			SSRC:           476325762,
-			CSRC:           []uint32{},
+			CSRC:           nil,
 		},
 		Payload:     []byte{},
 		PaddingSize: 0,
@@ -1483,6 +1483,42 @@ func BenchmarkUnmarshal(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			p := &Packet{}
 			if err := p.Unmarshal(rawPkt); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+func BenchmarkUnmarshalHeader(b *testing.B) {
+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda,
+		0x1c, 0x64, 0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01,
+		0x50, 0xAA, 0x00, 0x00, 0x98, 0x36, 0xbe, 0x88,
+	}
+	b.Run("NewStructWithoutCSRC", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			h := &Header{}
+			if _, err := h.Unmarshal(rawPkt); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	rawPkt = []byte{
+		0x92, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda,
+		0x1c, 0x64, 0x27, 0x82, 0x00, 0x00, 0x11, 0x11,
+		0x00, 0x00, 0x22, 0x22, 0xBE, 0xDE, 0x00, 0x01,
+		0x50, 0xAA, 0x00, 0x00, 0x98, 0x36, 0xbe, 0x88,
+	}
+	b.Run("NewStructWithCSRC", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			h := &Header{}
+			if _, err := h.Unmarshal(rawPkt); err != nil {
 				b.Fatal(err)
 			}
 		}

@@ -55,7 +55,7 @@ func TestPacketizer_AbsSendTime(t *testing.T) {
 			SequenceNumber:   1234,
 			Timestamp:        45678,
 			SSRC:             0x1234ABCD,
-			CSRC:             []uint32{},
+			CSRC:             nil,
 			ExtensionProfile: 0xBEDE,
 			Extensions: []Extension{
 				{
