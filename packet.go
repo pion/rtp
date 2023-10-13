@@ -11,8 +11,8 @@ import (
 
 // Extension RTP Header extension
 type Extension struct {
-	id      uint8
-	payload []byte
+	ID      uint8
+	Payload []byte
 }
 
 // Header represents an RTP packet header
@@ -175,7 +175,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 					break
 				}
 
-				extension := Extension{id: extid, payload: buf[n : n+payloadLen]}
+				extension := Extension{ID: extid, Payload: buf[n : n+payloadLen]}
 				h.Extensions = append(h.Extensions, extension)
 				n += payloadLen
 			}
@@ -195,7 +195,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 				payloadLen := int(buf[n])
 				n++
 
-				extension := Extension{id: extid, payload: buf[n : n+payloadLen]}
+				extension := Extension{ID: extid, Payload: buf[n : n+payloadLen]}
 				h.Extensions = append(h.Extensions, extension)
 				n += payloadLen
 			}
@@ -206,9 +206,9 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit
 					errHeaderSizeInsufficientForExtension, len(buf), n+extensionLength)
 			}
 
-			extension := Extension{id: 0, payload: buf[n : n+extensionLength]}
+			extension := Extension{ID: 0, Payload: buf[n : n+extensionLength]}
 			h.Extensions = append(h.Extensions, extension)
-			n += len(h.Extensions[0].payload)
+			n += len(h.Extensions[0].Payload)
 		}
 	}
 
@@ -307,26 +307,26 @@ func (h Header) MarshalTo(buf []byte) (n int, err error) {
 		// RFC 8285 RTP One Byte Header Extension
 		case extensionProfileOneByte:
 			for _, extension := range h.Extensions {
-				buf[n] = extension.id<<4 | (uint8(len(extension.payload)) - 1)
+				buf[n] = extension.ID<<4 | (uint8(len(extension.Payload)) - 1)
 				n++
-				n += copy(buf[n:], extension.payload)
+				n += copy(buf[n:], extension.Payload)
 			}
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
 			for _, extension := range h.Extensions {
-				buf[n] = extension.id
+				buf[n] = extension.ID
 				n++
-				buf[n] = uint8(len(extension.payload))
+				buf[n] = uint8(len(extension.Payload))
 				n++
-				n += copy(buf[n:], extension.payload)
+				n += copy(buf[n:], extension.Payload)
 			}
 		default: // RFC3550 Extension
-			extlen := len(h.Extensions[0].payload)
+			extlen := len(h.Extensions[0].Payload)
 			if extlen%4 != 0 {
 				// the payload must be in 32-bit words.
 				return 0, io.ErrShortBuffer
 			}
-			n += copy(buf[n:], h.Extensions[0].payload)
+			n += copy(buf[n:], h.Extensions[0].Payload)
 		}
 
 		// calculate extensions size and round to 4 bytes boundaries
@@ -357,15 +357,15 @@ func (h Header) MarshalSize() int {
 		// RFC 8285 RTP One Byte Header Extension
 		case extensionProfileOneByte:
 			for _, extension := range h.Extensions {
-				extSize += 1 + len(extension.payload)
+				extSize += 1 + len(extension.Payload)
 			}
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
 			for _, extension := range h.Extensions {
-				extSize += 2 + len(extension.payload)
+				extSize += 2 + len(extension.Payload)
 			}
 		default:
-			extSize += len(h.Extensions[0].payload)
+			extSize += len(h.Extensions[0].Payload)
 		}
 
 		// extensions size must have 4 bytes boundaries
@@ -403,12 +403,12 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 
 		// Update existing if it exists else add new extension
 		for i, extension := range h.Extensions {
-			if extension.id == id {
-				h.Extensions[i].payload = payload
+			if extension.ID == id {
+				h.Extensions[i].Payload = payload
 				return nil
 			}
 		}
-		h.Extensions = append(h.Extensions, Extension{id: id, payload: payload})
+		h.Extensions = append(h.Extensions, Extension{ID: id, Payload: payload})
 		return nil
 	}
 
@@ -422,7 +422,7 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 		h.ExtensionProfile = extensionProfileTwoByte
 	}
 
-	h.Extensions = append(h.Extensions, Extension{id: id, payload: payload})
+	h.Extensions = append(h.Extensions, Extension{ID: id, Payload: payload})
 	return nil
 }
 
@@ -438,7 +438,7 @@ func (h *Header) GetExtensionIDs() []uint8 {
 
 	ids := make([]uint8, 0, len(h.Extensions))
 	for _, extension := range h.Extensions {
-		ids = append(ids, extension.id)
+		ids = append(ids, extension.ID)
 	}
 	return ids
 }
@@ -449,8 +449,8 @@ func (h *Header) GetExtension(id uint8) []byte {
 		return nil
 	}
 	for _, extension := range h.Extensions {
-		if extension.id == id {
-			return extension.payload
+		if extension.ID == id {
+			return extension.Payload
 		}
 	}
 	return nil
@@ -462,7 +462,7 @@ func (h *Header) DelExtension(id uint8) error {
 		return errHeaderExtensionsNotEnabled
 	}
 	for i, extension := range h.Extensions {
-		if extension.id == id {
+		if extension.ID == id {
 			h.Extensions = append(h.Extensions[:i], h.Extensions[i+1:]...)
 			return nil
 		}
@@ -531,9 +531,9 @@ func (h Header) Clone() Header {
 		ext := make([]Extension, len(h.Extensions))
 		for i, e := range h.Extensions {
 			ext[i] = e
-			if e.payload != nil {
-				ext[i].payload = make([]byte, len(e.payload))
-				copy(ext[i].payload, e.payload)
+			if e.Payload != nil {
+				ext[i].Payload = make([]byte, len(e.Payload))
+				copy(ext[i].Payload, e.Payload)
 			}
 		}
 		clone.Extensions = ext
