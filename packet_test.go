@@ -1192,6 +1192,34 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 	}
 }
 
+func TestRFC8285Padding(t *testing.T) {
+	header := &Header{}
+
+	for _, payload := range [][]byte{
+		{
+			0b00010000,                      // header.Extension = true
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // SequenceNumber, Timestamp, SSRC
+			0xBE, 0xDE, // header.ExtensionProfile = extensionProfileOneByte
+			0, 1, // extensionLength
+			0, 0, 0, // padding
+			1, // extid
+		},
+		{
+			0b00010000,                      // header.Extension = true
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // SequenceNumber, Timestamp, SSRC
+			0x10, 0x00, // header.ExtensionProfile = extensionProfileOneByte
+			0, 1, // extensionLength
+			0, 0, 0, // padding
+			1, // extid
+		},
+	} {
+		_, err := header.Unmarshal(payload)
+		if !errors.Is(err, errHeaderSizeInsufficientForExtension) {
+			t.Fatal("Expected errHeaderSizeInsufficientForExtension")
+		}
+	}
+}
+
 func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 	payload := []byte{
 		// Payload
