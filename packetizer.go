@@ -58,6 +58,7 @@ func (p *packetizer) EnableAbsSendTime(value int) {
 func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	// Guard against an empty payload
 	if len(payload) == 0 {
+		p.SkipSamples(samples)
 		return nil
 	}
 
