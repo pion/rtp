@@ -67,3 +67,14 @@ func ReadLeb128(in []byte) (uint, uint, error) {
 
 	return 0, 0, ErrFailedToReadLEB128
 }
+
+func SizeLeb128(leb128 uint) uint {
+	if (leb128 >> 24) > 0 {
+		return 4
+	} else if (leb128 >> 16) > 0 {
+		return 3
+	} else if (leb128 >> 8) > 0 {
+		return 2
+	}
+	return 1
+}
