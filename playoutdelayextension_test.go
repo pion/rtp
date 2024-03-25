@@ -20,7 +20,7 @@ func TestPlayoutDelayExtensionTooSmall(t *testing.T) {
 }
 
 func TestPlayoutDelayExtensionTooLarge(t *testing.T) {
-	t1 := PlayoutDelayExtension{minDelay: 1 << 12, maxDelay: 1 << 12}
+	t1 := PlayoutDelayExtension{MinDelay: 1 << 12, MaxDelay: 1 << 12}
 
 	if _, err := t1.Marshal(); !errors.Is(err, errPlayoutDelayInvalidValue) {
 		t.Fatal("err != errPlayoutDelayInvalidValue")
@@ -39,7 +39,7 @@ func TestPlayoutDelayExtension(t *testing.T) {
 	}
 
 	t2 := PlayoutDelayExtension{
-		minDelay: 1 << 4, maxDelay: 1 << 8,
+		MinDelay: 1 << 4, MaxDelay: 1 << 8,
 	}
 
 	if t1 != t2 {
@@ -64,7 +64,7 @@ func TestPlayoutDelayExtensionExtraBytes(t *testing.T) {
 	}
 
 	t2 := PlayoutDelayExtension{
-		minDelay: 1 << 4, maxDelay: 1 << 8,
+		MinDelay: 1 << 4, MaxDelay: 1 << 8,
 	}
 
 	if t1 != t2 {
