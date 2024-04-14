@@ -163,6 +163,9 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) {
 			return nil, errShortPacket
 		}
 		if payload[payloadIndex]&0x80 > 0 { // M == 1, PID is 16bit
+			if payloadIndex + 1 >= payloadLen {
+				return nil, errShortPacket
+			}
 			p.PictureID = (uint16(payload[payloadIndex]&0x7F) << 8) | uint16(payload[payloadIndex+1])
 			payloadIndex += 2
 		} else {

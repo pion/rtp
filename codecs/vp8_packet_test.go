@@ -238,3 +238,8 @@ func TestVP8IsPartitionHead(t *testing.T) {
 		}
 	})
 }
+
+func TestVP8PIDOverflow(t *testing.T) {
+	var vp8 VP8Packet
+	_, _ = vp8.Unmarshal([]byte("\x80\x80\x80"))
+}
