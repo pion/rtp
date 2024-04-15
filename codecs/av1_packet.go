@@ -194,3 +194,42 @@ func (p *AV1Packet) IsPartitionHead(payload []byte) bool {
 	// manually for Z == 0 & N == 1.
 	return len(payload) > 0 && (payload[0] & 0x88) != 0x08
 }
+
+// AppendToSample appends the contents of the packet to a sample.  It
+// reconstructs the size of the last OBU if required.
+func (p *AV1Packet) AppendToSample(sample, payload []byte) []byte {
+	if len(payload) < 1 {
+		return sample
+	}
+
+	switch p.W {
+	case 0:
+		sample = append(sample, payload...)
+	case 1:
+		sample = append(sample, obu.WriteToLeb128(uint(len(payload)))...)
+		sample = append(sample, payload...)
+	case 2:
+		l1, ll1, err := obu.ReadLeb128(payload)
+		if err != nil {
+			return sample
+		}
+		sample = append(sample, payload[:l1+ll1]...)
+		l2 := uint(len(payload)) - (l1 + ll1)
+		sample = append(sample, obu.WriteToLeb128(l2)...)
+		sample = append(sample, payload[l1+ll1:]...)
+	case 3:
+		l1, ll1, err := obu.ReadLeb128(payload)
+		if err != nil {
+			return sample
+		}
+		l2, ll2, err := obu.ReadLeb128(payload[l1+ll1:])
+		if err != nil {
+			return sample
+		}
+		l3 := uint(len(payload)) - (l1 + ll1 + l2 + ll2)
+		sample = append(sample, payload[:l1+ll1+l2+ll2]...)
+		sample = append(sample, obu.WriteToLeb128(l3)...)
+		sample = append(sample, payload[l1+ll1+l2+ll2:]...)
+	}
+	return sample
+}
