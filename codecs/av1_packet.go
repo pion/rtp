@@ -134,6 +134,8 @@ type AV1Packet struct {
 	// Each AV1 RTP Packet is a collection of OBU Elements. Each OBU Element may be a full OBU, or just a fragment of one.
 	// AV1Frame provides the tools to construct a collection of OBUs from a collection of OBU Elements
 	OBUElements [][]byte
+
+	videoDepacketizer
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the AV1Packet this method is called upon
@@ -153,13 +155,26 @@ func (p *AV1Packet) Unmarshal(payload []byte) ([]byte, error) {
 		return nil, errIsKeyframeAndFragment
 	}
 
-	currentIndex := uint(1)
-	p.OBUElements = [][]byte{}
+	if !p.zeroAllocation {
+		obuElements, err := p.parseBody(payload[1:])
+		if err != nil {
+			return nil, err
+		}
+		p.OBUElements = obuElements
+	}
 
-	var (
-		obuElementLength, bytesRead uint
-		err                         error
-	)
+	return payload[1:], nil
+}
+
+func (p *AV1Packet) parseBody(payload []byte) ([][]byte, error) {
+	if p.OBUElements != nil {
+		return p.OBUElements, nil
+	}
+
+	obuElements := [][]byte{}
+
+	var obuElementLength, bytesRead uint
+	currentIndex := uint(0)
 	for i := 1; ; i++ {
 		if currentIndex == uint(len(payload)) {
 			break
@@ -170,6 +185,7 @@ func (p *AV1Packet) Unmarshal(payload []byte) ([]byte, error) {
 			bytesRead = 0
 			obuElementLength = uint(len(payload)) - currentIndex
 		} else {
+			var err error
 			obuElementLength, bytesRead, err = obu.ReadLeb128(payload[currentIndex:])
 			if err != nil {
 				return nil, err
@@ -180,9 +196,9 @@ func (p *AV1Packet) Unmarshal(payload []byte) ([]byte, error) {
 		if uint(len(payload)) < currentIndex+obuElementLength {
 			return nil, errShortPacket
 		}
-		p.OBUElements = append(p.OBUElements, payload[currentIndex:currentIndex+obuElementLength])
+		obuElements = append(obuElements, payload[currentIndex:currentIndex+obuElementLength])
 		currentIndex += obuElementLength
 	}
 
-	return payload[1:], nil
+	return obuElements, nil
 }
