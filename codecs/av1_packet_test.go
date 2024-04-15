@@ -8,8 +8,6 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-
-	"github.com/pion/rtp/codecs/av1/obu"
 )
 
 func TestAV1_Marshal(t *testing.T) {
@@ -89,8 +87,6 @@ func TestAV1_Unmarshal_Error(t *testing.T) {
 		{errNilPacket, nil},
 		{errShortPacket, []byte{0x00}},
 		{errIsKeyframeAndFragment, []byte{byte(0b10001000), 0x00}},
-		{obu.ErrFailedToReadLEB128, []byte{byte(0b10000000), 0xFF, 0xFF}},
-		{errShortPacket, []byte{byte(0b10000000), 0xFF, 0x0F, 0x00, 0x00}},
 	} {
 		test := test
 		av1Pkt := &AV1Packet{}
@@ -284,10 +280,6 @@ func TestAV1_Unmarshal(t *testing.T) {
 		Y: true,
 		W: 2,
 		N: true,
-		OBUElements: [][]byte{
-			av1Payload[2:14],
-			av1Payload[14:],
-		},
 	}) {
 		t.Fatal("AV1 Unmarshal didn't store the expected results in the packet")
 	}

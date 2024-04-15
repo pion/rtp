@@ -130,10 +130,6 @@ type AV1Packet struct {
 
 	// N: MUST be set to 1 if the packet is the first packet of a coded video sequence, and MUST be set to 0 otherwise.
 	N bool
-
-	// Each AV1 RTP Packet is a collection of OBU Elements. Each OBU Element may be a full OBU, or just a fragment of one.
-	// AV1Frame provides the tools to construct a collection of OBUs from a collection of OBU Elements
-	OBUElements [][]byte
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the AV1Packet this method is called upon
@@ -151,37 +147,6 @@ func (p *AV1Packet) Unmarshal(payload []byte) ([]byte, error) {
 
 	if p.Z && p.N {
 		return nil, errIsKeyframeAndFragment
-	}
-
-	currentIndex := uint(1)
-	p.OBUElements = [][]byte{}
-
-	var (
-		obuElementLength, bytesRead uint
-		err                         error
-	)
-	for i := 1; ; i++ {
-		if currentIndex == uint(len(payload)) {
-			break
-		}
-
-		// If W bit is set the last OBU Element will have no length header
-		if byte(i) == p.W {
-			bytesRead = 0
-			obuElementLength = uint(len(payload)) - currentIndex
-		} else {
-			obuElementLength, bytesRead, err = obu.ReadLeb128(payload[currentIndex:])
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		currentIndex += bytesRead
-		if uint(len(payload)) < currentIndex+obuElementLength {
-			return nil, errShortPacket
-		}
-		p.OBUElements = append(p.OBUElements, payload[currentIndex:currentIndex+obuElementLength])
-		currentIndex += obuElementLength
 	}
 
 	return payload[1:], nil
