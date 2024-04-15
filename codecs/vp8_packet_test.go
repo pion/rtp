@@ -106,7 +106,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	// attention to partition boundaries.  In that case, it may
 	// produce packets with minimal headers.
 
-	// The next two have been witnessed in nature.
+	// The next three have been witnessed in nature.
 	_, err = pck.Unmarshal([]byte{0x00})
 	if err != nil {
 		t.Errorf("Empty packet with trivial header: %v", err)
@@ -114,6 +114,13 @@ func TestVP8Packet_Unmarshal(t *testing.T) {
 	_, err = pck.Unmarshal([]byte{0x00, 0x2a, 0x94})
 	if err != nil {
 		t.Errorf("Non-empty packet with trivial header: %v", err)
+	}
+	raw, err = pck.Unmarshal([]byte{0x81, 0x81, 0x94})
+	if raw != nil {
+		t.Fatal("Result should be nil in case of error")
+	}
+	if !errors.Is(err, errShortPacket) {
+		t.Fatal("Error should be:", errShortPacket)
 	}
 
 	// The following two were invented.

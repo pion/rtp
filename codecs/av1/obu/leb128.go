@@ -78,3 +78,19 @@ func SizeLeb128(leb128 uint) uint {
 	}
 	return 1
 }
+
+// WriteToLeb128 writes a uint to a LEB128 encoded byte slice.
+func WriteToLeb128(in uint) []byte {
+	b := make([]byte, 10)
+
+	for i := 0; i < len(b); i++ {
+		b[i] = byte(in & 0x7f)
+		in >>= 7
+		if in == 0 {
+			return b[:i+1]
+		}
+		b[i] |= 0x80
+	}
+
+	return b // unreachable
+}

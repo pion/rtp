@@ -4,7 +4,10 @@
 package obu
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"math"
 	"testing"
 )
 
@@ -38,5 +41,35 @@ func TestReadLeb128(t *testing.T) {
 
 	if _, _, err := ReadLeb128([]byte{0xFF}); !errors.Is(err, ErrFailedToReadLEB128) {
 		t.Fatal("ReadLeb128 on a buffer with all MSB set should fail")
+	}
+}
+
+func TestWriteToLeb128(t *testing.T) {
+	type testVector struct {
+		value  uint
+		leb128 string
+	}
+	testVectors := []testVector{
+		{150, "9601"},
+		{240, "f001"},
+		{400, "9003"},
+		{720, "d005"},
+		{1200, "b009"},
+		{999999, "bf843d"},
+		{0, "00"},
+		{math.MaxUint32, "ffffffff0f"},
+	}
+
+	runTest := func(t *testing.T, v testVector) {
+		b := WriteToLeb128(v.value)
+		if v.leb128 != hex.EncodeToString(b) {
+			t.Errorf("Expected %s, got %s", v.leb128, hex.EncodeToString(b))
+		}
+	}
+
+	for _, v := range testVectors {
+		t.Run(fmt.Sprintf("encode %d", v.value), func(t *testing.T) {
+			runTest(t, v)
+		})
 	}
 }
