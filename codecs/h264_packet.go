@@ -208,6 +208,14 @@ func (p *H264Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bo
 
 // Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon
 func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
+	if p.zeroAllocation {
+		return payload, nil
+	}
+
+	return p.parseBody(payload)
+}
+
+func (p *H264Packet) parseBody(payload []byte) ([]byte, error) {
 	if len(payload) == 0 {
 		return nil, fmt.Errorf("%w: %d <=0", errShortPacket, len(payload))
 	}

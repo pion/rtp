@@ -22,8 +22,18 @@ func (d *audioDepacketizer) IsPartitionHead(_ []byte) bool {
 }
 
 // videoDepacketizer is a mixin for video codec depacketizers
-type videoDepacketizer struct{}
+type videoDepacketizer struct {
+	zeroAllocation bool
+}
 
 func (d *videoDepacketizer) IsPartitionTail(marker bool, _ []byte) bool {
 	return marker
+}
+
+// SetZeroAllocation enables Zero Allocation mode for the depacketizer
+// By default the Depacketizers will allocate as they parse. These allocations
+// are needed for Metadata and other optional values. If you don't need this information
+// enabling SetZeroAllocation gives you higher performance at a reduced feature set.
+func (d *videoDepacketizer) SetZeroAllocation(zeroAllocation bool) {
+	d.zeroAllocation = zeroAllocation
 }
