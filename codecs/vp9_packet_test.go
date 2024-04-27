@@ -5,7 +5,6 @@ package codecs
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -223,62 +222,134 @@ func TestVP9Payloader_Payload(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		b   [][]byte
-		mtu uint16
-		res [][]byte
+		b        [][]byte
+		flexible bool
+		mtu      uint16
+		res      [][]byte
 	}{
-		"NilPayload": {
-			b:   [][]byte{nil},
-			mtu: 100,
-			res: [][]byte{},
+		"flexible NilPayload": {
+			b:        [][]byte{nil},
+			flexible: true,
+			mtu:      100,
+			res:      [][]byte{},
 		},
-		"SmallMTU": {
-			b:   [][]byte{{0x00, 0x00}},
-			mtu: 1,
-			res: [][]byte{},
+		"flexible SmallMTU": {
+			b:        [][]byte{{0x00, 0x00}},
+			flexible: true,
+			mtu:      1,
+			res:      [][]byte{},
 		},
-		"OnePacket": {
-			b:   [][]byte{{0x01, 0x02}},
-			mtu: 10,
+		"flexible OnePacket": {
+			b:        [][]byte{{0x01, 0x02}},
+			flexible: true,
+			mtu:      10,
 			res: [][]byte{
 				{0x9C, rands[0][0], rands[0][1], 0x01, 0x02},
 			},
 		},
-		"TwoPackets": {
-			b:   [][]byte{{0x01, 0x02}},
-			mtu: 4,
+		"flexible TwoPackets": {
+			b:        [][]byte{{0x01, 0x02}},
+			flexible: true,
+			mtu:      4,
 			res: [][]byte{
 				{0x98, rands[0][0], rands[0][1], 0x01},
 				{0x94, rands[0][0], rands[0][1], 0x02},
 			},
 		},
-		"ThreePackets": {
-			b:   [][]byte{{0x01, 0x02, 0x03}},
-			mtu: 4,
+		"flexible ThreePackets": {
+			b:        [][]byte{{0x01, 0x02, 0x03}},
+			flexible: true,
+			mtu:      4,
 			res: [][]byte{
 				{0x98, rands[0][0], rands[0][1], 0x01},
 				{0x90, rands[0][0], rands[0][1], 0x02},
 				{0x94, rands[0][0], rands[0][1], 0x03},
 			},
 		},
-		"TwoFramesFourPackets": {
-			b:   [][]byte{{0x01, 0x02, 0x03}, {0x04}},
-			mtu: 5,
+		"flexible TwoFramesFourPackets": {
+			b:        [][]byte{{0x01, 0x02, 0x03}, {0x04}},
+			flexible: true,
+			mtu:      5,
 			res: [][]byte{
 				{0x98, rands[0][0], rands[0][1], 0x01, 0x02},
 				{0x94, rands[0][0], rands[0][1], 0x03},
 				{0x9C, rands[1][0], rands[1][1], 0x04},
 			},
 		},
-	}
-	for name, c := range cases {
-		pck := VP9Payloader{
-			InitialPictureIDFn: func() uint16 {
-				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
+		"non-flexible NilPayload": {
+			b:   [][]byte{nil},
+			mtu: 100,
+			res: [][]byte{},
+		},
+		"non-flexible SmallMTU": {
+			b:   [][]byte{{0x82, 0x49, 0x83, 0x42, 0x0, 0x77, 0xf0, 0x32, 0x34}},
+			mtu: 1,
+			res: [][]byte{},
+		},
+		"non-flexible OnePacket key frame": {
+			b:   [][]byte{{0x82, 0x49, 0x83, 0x42, 0x0, 0x77, 0xf0, 0x32, 0x34}},
+			mtu: 20,
+			res: [][]byte{{
+				0x8f, 0xa1, 0xf4, 0x18, 0x07, 0x80, 0x03, 0x24,
+				0x01, 0x14, 0x01, 0x82, 0x49, 0x83, 0x42, 0x00,
+				0x77, 0xf0, 0x32, 0x34,
+			}},
+		},
+		"non-flexible TwoPackets key frame": {
+			b:   [][]byte{{0x82, 0x49, 0x83, 0x42, 0x0, 0x77, 0xf0, 0x32, 0x34}},
+			mtu: 12,
+			res: [][]byte{
+				{
+					0x8b, 0xa1, 0xf4, 0x18, 0x07, 0x80, 0x03, 0x24,
+					0x01, 0x14, 0x01, 0x82,
+				},
+				{
+					0x85, 0xa1, 0xf4, 0x49, 0x83, 0x42, 0x00, 0x77,
+					0xf0, 0x32, 0x34,
+				},
 			},
-		}
-		c := c
-		t.Run(fmt.Sprintf("%s_MTU%d", name, c.mtu), func(t *testing.T) {
+		},
+		"non-flexible ThreePackets key frame": {
+			b: [][]byte{{
+				0x82, 0x49, 0x83, 0x42, 0x00, 0x77, 0xf0, 0x32,
+				0x34, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+				0x08,
+			}},
+			mtu: 12,
+			res: [][]byte{
+				{
+					0x8b, 0xa1, 0xf4, 0x18, 0x07, 0x80, 0x03, 0x24,
+					0x01, 0x14, 0x01, 0x82,
+				},
+				{
+					0x81, 0xa1, 0xf4, 0x49, 0x83, 0x42, 0x00, 0x77,
+					0xf0, 0x32, 0x34, 0x01,
+				},
+				{
+					0x85, 0xa1, 0xf4, 0x02, 0x03, 0x04, 0x05, 0x06,
+					0x07, 0x08,
+				},
+			},
+		},
+		"non-flexible OnePacket non key frame": {
+			b:   [][]byte{{0x86, 0x0, 0x40, 0x92, 0xe1, 0x31, 0x42, 0x8c, 0xc0, 0x40}},
+			mtu: 20,
+			res: [][]byte{{
+				0xcd, 0xa1, 0xf4, 0x86, 0x00, 0x40, 0x92, 0xe1,
+				0x31, 0x42, 0x8c, 0xc0, 0x40,
+			}},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			pck := VP9Payloader{
+				FlexibleMode: c.flexible,
+				InitialPictureIDFn: func() uint16 {
+					return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
+				},
+			}
+
 			res := [][]byte{}
 			for _, b := range c.b {
 				res = append(res, pck.Payload(c.mtu, b)...)
@@ -288,8 +359,10 @@ func TestVP9Payloader_Payload(t *testing.T) {
 			}
 		})
 	}
+
 	t.Run("PictureIDOverflow", func(t *testing.T) {
 		pck := VP9Payloader{
+			FlexibleMode: true,
 			InitialPictureIDFn: func() uint16 {
 				return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 			},
