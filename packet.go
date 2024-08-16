@@ -383,7 +383,7 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 			}
 		// RFC 8285 RTP Two Byte Header Extension
 		case extensionProfileTwoByte:
-			if id < 1 || id > 255 {
+			if id < 1 {
 				return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderIDRange, id)
 			}
 			if len(payload) > 255 {
