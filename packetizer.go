@@ -81,7 +81,9 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 			Payload: pp,
 		}
 	}
-	p.Timestamp += samples
+	if len(packets) > 0 {
+		p.Timestamp += samples
+	}
 
 	if len(packets) != 0 && p.extensionNumbers.AbsSendTime != 0 {
 		sendTime := NewAbsSendTimeExtension(p.timegen())
