@@ -27,10 +27,10 @@ const (
 	stapaHeaderSize     = 1
 	stapaNALULengthSize = 2
 
-	naluTypeBitmask   = 0x1F
-	naluRefIdcBitmask = 0x60
-	fuStartBitmask    = 0x80
-	fuEndBitmask      = 0x40
+	naluTypeBitmask   = byte(0x1F)
+	naluRefIdcBitmask = byte(0x60)
+	fuStartBitmask    = byte(0x80)
+	fuEndBitmask      = byte(0x40)
 
 	outputStapAHeader = 0x78
 )
