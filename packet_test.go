@@ -101,6 +101,38 @@ func TestBasic(t *testing.T) {
 		t.Errorf("TestBasic padding unmarshal: got %#v, want %#v", p, parsedPacket)
 	}
 
+	// packet with zero padding following packet with non-zero padding
+	rawPkt = []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	parsedPacket = &Packet{
+		Header: Header{
+			Padding:          false,
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Extensions: []Extension{
+				{0, []byte{
+					0xFF, 0xFF, 0xFF, 0xFF,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
+		Payload:     rawPkt[20:],
+		PaddingSize: 0,
+	}
+	if err := p.Unmarshal(rawPkt); err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(p, parsedPacket) {
+		t.Errorf("TestBasic zero padding unmarshal: got %#v, want %#v", p, parsedPacket)
+	}
+
 	// packet with only padding
 	rawPkt = []byte{
 		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,

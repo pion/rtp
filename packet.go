@@ -220,6 +220,8 @@ func (p *Packet) Unmarshal(buf []byte) error {
 		}
 		p.PaddingSize = buf[end-1]
 		end -= int(p.PaddingSize)
+	} else {
+		p.PaddingSize = 0
 	}
 	if end < n {
 		return errTooSmall
