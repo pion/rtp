@@ -193,15 +193,15 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 			err: errShortPacket,
 		},
 		"ScalabilityMissingNG": {
-			b:   []byte("b00200000000"),
+			b:   []byte("b00800000000"),
 			err: errShortPacket,
 		},
 		"ScalabilityMissingTemporalLayerIDs": {
-			b:   []byte("20B0"),
+			b:   []byte("20H0"),
 			err: errShortPacket,
 		},
 		"ScalabilityMissingReferenceIndices": {
-			b:   []byte("20B007"),
+			b:   []byte("20H007"),
 			err: errShortPacket,
 		},
 	}
