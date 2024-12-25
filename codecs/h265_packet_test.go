@@ -8,6 +8,86 @@ import (
 	"testing"
 )
 
+func TestH265Payloader_Payload(t *testing.T) {
+	pck := H265Payloader{}
+	smallpayload := []byte{0x90, 0x90, 0x90}
+	multiplepayload := []byte{0x00, 0x00, 0x01, 0x90, 0x00, 0x00, 0x01, 0x90}
+
+	largepayload := []byte{0x00, 0x00, 0x01, 0x2, 0x1, 0xd0, 0x0, 0xcd, 0xc4, 0x11, 0x80, 0xfd, 0xc8, 0xe7, 0x81, 0xdc, 0x29, 0xfc, 0xb0, 0x2f, 0xaa, 0x7d, 0xb9, 0x44, 0xaf, 0xa9, 0x5f}
+	largePayloadPacketized := [][]byte{
+		{0x62, 0x1, 0x81, 0xd0, 0x0, 0xcd},
+		{0x62, 0x1, 0x1, 0xc4, 0x11, 0x80},
+		{0x62, 0x1, 0x1, 0xfd, 0xc8, 0xe7},
+		{0x62, 0x1, 0x1, 0x81, 0xdc, 0x29},
+		{0x62, 0x1, 0x1, 0xfc, 0xb0, 0x2f},
+		{0x62, 0x1, 0x1, 0xaa, 0x7d, 0xb9},
+		{0x62, 0x1, 0x1, 0x44, 0xaf, 0xa9},
+		{0x62, 0x1, 0x41, 0x5f},
+	}
+
+	// Positive MTU, nil payload
+	res := pck.Payload(1, nil)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, empty payload
+	res = pck.Payload(1, []byte{})
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, empty NAL
+	res = pck.Payload(1, []byte{0x00, 0x00, 0x01})
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Negative MTU, small payload
+	res = pck.Payload(0, smallpayload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// 0 MTU, small payload
+	res = pck.Payload(0, smallpayload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, small payload
+	res = pck.Payload(1, smallpayload)
+	if len(res) != 0 {
+		t.Fatal("Generated payload should be empty")
+	}
+
+	// Positive MTU, small payload
+	res = pck.Payload(5, smallpayload)
+	if len(res) != 1 {
+		t.Fatal("Generated payload shouldn't be empty")
+	}
+	if len(res[0]) != len(smallpayload) {
+		t.Fatal("Generated payload should be the same size as original payload size")
+	}
+
+	// Multiple NALU in a single payload
+	res = pck.Payload(5, multiplepayload)
+	if len(res) != 2 {
+		t.Fatal("2 nal units should be broken out")
+	}
+	for i := 0; i < 2; i++ {
+		if len(res[i]) != 1 {
+			t.Fatalf("Payload %d of 2 is packed incorrectly", i+1)
+		}
+	}
+
+	// Large Payload split across multiple RTP Packets
+	res = pck.Payload(6, largepayload)
+	if !reflect.DeepEqual(res, largePayloadPacketized) {
+		t.Fatal("FU-A packetization failed")
+	}
+}
+
 func TestH265_NALU_Header(t *testing.T) {
 	tt := [...]struct {
 		RawHeader []byte

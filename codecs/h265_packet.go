@@ -31,7 +31,95 @@ const (
 	h265NaluFragmentationUnitType = 49
 	// https://datatracker.ietf.org/doc/html/rfc7798#section-4.4.4
 	h265NaluPACIPacketType = 50
+
+	h265FuaNALUType = 49
+	h265VpsNALUType = 32
+	h265SpsNALUType = 33
+	h265PpsNALUType = 34
+
+	h265FuaHeaderSize = 3
 )
+
+// H265Payloader payloads H265 packets
+type H265Payloader struct {
+}
+
+// Payload fragments a H265 packet across one or more byte arrays
+func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte {
+	var payloads [][]byte
+	if len(payload) == 0 {
+		return payloads
+	}
+
+	emitNalus(payload, func(nalu []byte) {
+		if len(nalu) == 0 {
+			return
+		}
+
+		naluType := (nalu[0] >> 1) & 0x3f
+
+		if naluType == h265VpsNALUType || naluType == h265SpsNALUType || naluType == h265PpsNALUType {
+			payloads = append(payloads, nalu)
+			return
+		}
+
+		// Single NALU
+		if len(nalu) <= int(mtu) {
+			out := make([]byte, len(nalu))
+			copy(out, nalu)
+			payloads = append(payloads, out)
+			return
+		}
+
+		maxFragmentSize := int(mtu) - h265FuaHeaderSize
+
+		naluIndex := 2
+		naluLength := len(nalu) - naluIndex
+		naluRemaining := naluLength
+
+		if minInt(maxFragmentSize, naluRemaining) <= 0 {
+			return
+		}
+
+		for naluRemaining > 0 {
+			currentFragmentSize := minInt(maxFragmentSize, naluRemaining)
+			out := make([]byte, h265FuaHeaderSize+currentFragmentSize)
+
+			// +---------------+---------------+
+			// |0|1|2|3|4|5|6|7|0|1|2|3|4|5|6|7|
+			// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+			// |F|   Type    |  LayerId  | TID |
+			// +-------------+-----------------+
+			// The fields in the payload header are set as follows.  The Type field
+			// MUST be equal to 49.  The fields F, LayerId, and TID MUST be equal to
+			// the fields F, LayerId, and TID, respectively, of the fragmented NAL
+			// unit.
+			out[0] = (49 << 1) | (nalu[0]<<7)>>7
+			out[1] = nalu[1]
+
+			// +---------------+
+			// |0|1|2|3|4|5|6|7|
+			// +-+-+-+-+-+-+-+-+
+			// |S|E|  FuType   |
+			// +---------------+
+			out[2] = naluType
+			if naluRemaining == naluLength {
+				out[2] |= 1 << 7
+			} else if naluRemaining-currentFragmentSize == 0 {
+				out[2] |= 1 << 6
+			}
+
+			copy(out[h265FuaHeaderSize:], nalu[naluIndex:naluIndex+currentFragmentSize])
+
+			payloads = append(payloads, out)
+
+			naluRemaining -= currentFragmentSize
+			naluIndex += currentFragmentSize
+		}
+	})
+
+	return payloads
+}
 
 // H265NALUHeader is a H265 NAL Unit Header
 // https://datatracker.ietf.org/doc/html/rfc7798#section-1.1.4
