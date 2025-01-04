@@ -998,7 +998,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 			}
 		} else {
 			// construct an aggregation packet
-			aggregationPacketSize := aggregationBufferSize + 2
+			aggregationPacketSize := aggregationBufferSize
 			buf := make([]byte, aggregationPacketSize)
 
 			layerID := uint8(math.MaxUint8)
@@ -1039,23 +1039,32 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 		aggregationBufferSize = 0
 	}
 
+	calcMarginalAggregationSize := func(nalu []byte) int {
+		marginalAggregationSize := len(nalu) + 2 // +2 is NALU size Field size
+		if len(bufferedNALUs) == 1 {
+			marginalAggregationSize = len(nalu) + 4 // +4 are Aggregation header + NALU size Field size
+		}
+		if p.AddDONL {
+			marginalAggregationSize++
+		}
+		return marginalAggregationSize
+	}
+
 	emitNalus(payload, func(nalu []byte) {
 		if len(nalu) < 2 {
 			// NALU header is 2 bytes
 			return
 		}
 
-		if len(nalu) <= int(mtu) {
+		naluLen := len(nalu) + 2
+		if naluLen <= int(mtu) {
 			// this nalu fits into a single packet, either it can be emitted as
 			// a single nalu or appended to the previous aggregation packet
-
-			marginalAggregationSize := len(nalu) + 2
-			if p.AddDONL {
-				marginalAggregationSize++
-			}
+			marginalAggregationSize := calcMarginalAggregationSize(nalu)
 
 			if aggregationBufferSize+marginalAggregationSize > int(mtu) {
 				flushBufferedNals()
+				marginalAggregationSize = calcMarginalAggregationSize(nalu)
 			}
 			bufferedNALUs = append(bufferedNALUs, nalu)
 			aggregationBufferSize += marginalAggregationSize
