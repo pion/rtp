@@ -962,7 +962,7 @@ type H265Payloader struct {
 // Payload fragments a H265 packet across one or more byte arrays
 func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint: gocognit
 	var payloads [][]byte
-	if len(payload) == 0 {
+	if len(payload) == 0 || mtu == 0 {
 		return payloads
 	}
 
@@ -1040,7 +1040,8 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 	}
 
 	emitNalus(payload, func(nalu []byte) {
-		if len(nalu) == 0 {
+		if len(nalu) < 2 {
+			// NALU header is 2 bytes
 			return
 		}
 
@@ -1077,7 +1078,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 			// the nalu header is omitted from the fragmentation packet payload
 			nalu = nalu[h265NaluHeaderSize:]
 
-			if maxFUPayloadSize == 0 || len(nalu) == 0 {
+			if maxFUPayloadSize <= 0 || len(nalu) == 0 {
 				return
 			}
 
