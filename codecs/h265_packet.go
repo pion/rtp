@@ -975,7 +975,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 		if len(bufferedNALUs) == 0 {
 			return
 		}
-		if len(bufferedNALUs) == 1 {
+		if len(bufferedNALUs) == 1 { //nolint:nestif
 			// emit this as a single NALU packet
 			nalu := bufferedNALUs[0]
 
@@ -1067,7 +1067,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 		if p.AddDONL {
 			naluLen += 2
 		}
-		if naluLen <= int(mtu) {
+		if naluLen <= int(mtu) { //nolint:nestif
 			// this nalu fits into a single packet, either it can be emitted as
 			// a single nalu or appended to the previous aggregation packet
 			marginalAggregationSize := calcMarginalAggregationSize(nalu)
