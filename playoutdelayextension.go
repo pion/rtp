@@ -22,11 +22,12 @@ var errPlayoutDelayInvalidValue = errors.New("invalid playout delay value")
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // |  ID   | len=2 |       MIN delay       |       MAX delay       |
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// .
 type PlayoutDelayExtension struct {
 	MinDelay, MaxDelay uint16
 }
 
-// Marshal serializes the members to buffer
+// Marshal serializes the members to buffer.
 func (p PlayoutDelayExtension) Marshal() ([]byte, error) {
 	if p.MinDelay > playoutDelayMaxValue || p.MaxDelay > playoutDelayMaxValue {
 		return nil, errPlayoutDelayInvalidValue
@@ -39,12 +40,13 @@ func (p PlayoutDelayExtension) Marshal() ([]byte, error) {
 	}, nil
 }
 
-// Unmarshal parses the passed byte slice and stores the result in the members
+// Unmarshal parses the passed byte slice and stores the result in the members.
 func (p *PlayoutDelayExtension) Unmarshal(rawData []byte) error {
 	if len(rawData) < playoutDelayExtensionSize {
 		return errTooSmall
 	}
 	p.MinDelay = binary.BigEndian.Uint16(rawData[0:2]) >> 4
 	p.MaxDelay = binary.BigEndian.Uint16(rawData[1:3]) & 0x0FFF
+
 	return nil
 }

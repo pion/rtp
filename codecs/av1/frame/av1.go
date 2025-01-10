@@ -26,10 +26,11 @@ func (f *AV1) pushOBUElement(isFirstOBUFragment *bool, obuElement []byte, obuLis
 		obuElement = append(f.obuBuffer, obuElement...)
 		f.obuBuffer = nil
 	}
+
 	return append(obuList, obuElement)
 }
 
-// ReadFrames processes the codecs.AV1Packet and returns fully constructed frames
+// ReadFrames processes the codecs.AV1Packet and returns fully constructed frames.
 func (f *AV1) ReadFrames(pkt *codecs.AV1Packet) ([][]byte, error) {
 	OBUs := [][]byte{}
 	isFirstOBUFragment := pkt.Z
@@ -43,5 +44,6 @@ func (f *AV1) ReadFrames(pkt *codecs.AV1Packet) ([][]byte, error) {
 		f.obuBuffer = append(f.obuBuffer, append([]byte{}, OBUs[len(OBUs)-1]...)...)
 		OBUs = OBUs[:len(OBUs)-1]
 	}
+
 	return OBUs, nil
 }

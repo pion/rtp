@@ -75,7 +75,7 @@ func TestPacketizer_AbsSendTime(t *testing.T) {
 	}
 }
 
-func TestPacketizer_Roundtrip(t *testing.T) {
+func TestPacketizer_Roundtrip(t *testing.T) { // nolint:funlen, cyclop
 	multiplepayload := make([]byte, 128)
 	packetizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewRandomSequencer(), 90000)
 	packets := packetizer.Packetize(multiplepayload, 1000)

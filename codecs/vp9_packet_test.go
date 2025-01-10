@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestVP9Packet_Unmarshal(t *testing.T) {
+func TestVP9Packet_Unmarshal(t *testing.T) { // nolint: funlen
 	cases := map[string]struct {
 		b   []byte
 		pkt VP9Packet
@@ -186,34 +186,35 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 			err: errShortPacket,
 		},
 	}
-	for name, c := range cases {
-		c := c
+	for name, testCase := range cases {
+		testCase := testCase
+
 		t.Run(name, func(t *testing.T) {
 			p := VP9Packet{}
-			raw, err := p.Unmarshal(c.b)
-			if c.err == nil {
+			raw, err := p.Unmarshal(testCase.b)
+			if testCase.err == nil { // nolint: nestif
 				if raw == nil {
 					t.Error("Result shouldn't be nil in case of success")
 				}
 				if err != nil {
 					t.Error("Error should be nil in case of success")
 				}
-				if !reflect.DeepEqual(c.pkt, p) {
-					t.Errorf("Unmarshalled packet expected to be:\n %v\ngot:\n %v", c.pkt, p)
+				if !reflect.DeepEqual(testCase.pkt, p) {
+					t.Errorf("Unmarshalled packet expected to be:\n %v\ngot:\n %v", testCase.pkt, p)
 				}
 			} else {
 				if raw != nil {
 					t.Error("Result should be nil in case of error")
 				}
-				if !errors.Is(err, c.err) {
-					t.Errorf("Error should be '%v', got '%v'", c.err, err)
+				if !errors.Is(err, testCase.err) {
+					t.Errorf("Error should be '%v', got '%v'", testCase.err, err)
 				}
 			}
 		})
 	}
 }
 
-func TestVP9Payloader_Payload(t *testing.T) {
+func TestVP9Payloader_Payload(t *testing.T) { // nolint: funlen, cyclop
 	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 	var rands [][2]byte
 	for i := 0; i < 10; i++ {
@@ -341,21 +342,21 @@ func TestVP9Payloader_Payload(t *testing.T) {
 		},
 	}
 
-	for name, c := range cases {
+	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
 			pck := VP9Payloader{
-				FlexibleMode: c.flexible,
+				FlexibleMode: testCase.flexible,
 				InitialPictureIDFn: func() uint16 {
 					return uint16(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 				},
 			}
 
 			res := [][]byte{}
-			for _, b := range c.b {
-				res = append(res, pck.Payload(c.mtu, b)...)
+			for _, b := range testCase.b {
+				res = append(res, pck.Payload(testCase.mtu, b)...)
 			}
-			if !reflect.DeepEqual(c.res, res) {
-				t.Errorf("Payloaded packet expected to be:\n %v\ngot:\n %v", c.res, res)
+			if !reflect.DeepEqual(testCase.res, res) {
+				t.Errorf("Payloaded packet expected to be:\n %v\ngot:\n %v", testCase.res, res)
 			}
 		})
 	}
@@ -370,23 +371,23 @@ func TestVP9Payloader_Payload(t *testing.T) {
 		pPrev := VP9Packet{}
 		for i := 0; i < 0x8000; i++ {
 			res := pck.Payload(4, []byte{0x01})
-			p := VP9Packet{}
-			_, err := p.Unmarshal(res[0])
+			packet := VP9Packet{}
+			_, err := packet.Unmarshal(res[0])
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
 			if i > 0 {
 				if pPrev.PictureID == 0x7FFF {
-					if p.PictureID != 0 {
-						t.Errorf("Picture ID next to 0x7FFF must be 0, got %d", p.PictureID)
+					if packet.PictureID != 0 {
+						t.Errorf("Picture ID next to 0x7FFF must be 0, got %d", packet.PictureID)
 					}
-				} else if pPrev.PictureID+1 != p.PictureID {
-					t.Errorf("Picture ID next must be incremented by 1: %d -> %d", pPrev.PictureID, p.PictureID)
+				} else if pPrev.PictureID+1 != packet.PictureID {
+					t.Errorf("Picture ID next must be incremented by 1: %d -> %d", pPrev.PictureID, packet.PictureID)
 				}
 			}
 
-			pPrev = p
+			pPrev = packet
 		}
 	})
 }
