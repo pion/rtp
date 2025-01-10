@@ -778,6 +778,16 @@ func toAbsDON(don uint16, prevDON *uint16, prevAbsDON *int) int {
 	return 0
 }
 
+// WithDONL can be called to specify whether or not DONL might be parsed.
+// DONL may need to be parsed if `sprop-max-don-diff` is greater than 0 on the RTP stream.
+//
+// Deprecated: replaced by WithMaxDONDiff.
+func (p *H265Packet) WithDONL(value bool) {
+	if value {
+		p.maxDONDiff = 1
+	}
+}
+
 // WithMaxDONDiff sets the maximum difference between DON values before being emitted.
 func (p *H265Packet) WithMaxDONDiff(value uint16) {
 	p.maxDONDiff = value
