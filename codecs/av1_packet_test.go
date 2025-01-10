@@ -12,12 +12,12 @@ import (
 	"github.com/pion/rtp/codecs/av1/obu"
 )
 
-func TestAV1_Marshal(t *testing.T) {
-	p := &AV1Payloader{}
+func TestAV1_Marshal(t *testing.T) { // nolint:funlen,cyclop
+	payloader := &AV1Payloader{}
 
 	t.Run("Unfragmented OBU", func(t *testing.T) {
 		OBU := []byte{0x00, 0x01, 0x2, 0x3, 0x4, 0x5}
-		payloads := p.Payload(100, OBU)
+		payloads := payloader.Payload(100, OBU)
 
 		if len(payloads) != 1 || len(payloads[0]) != 7 {
 			t.Fatal("Expected one unfragmented Payload")
@@ -34,7 +34,7 @@ func TestAV1_Marshal(t *testing.T) {
 
 	t.Run("Fragmented OBU", func(t *testing.T) {
 		OBU := []byte{0x00, 0x01, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8}
-		payloads := p.Payload(4, OBU)
+		payloads := payloader.Payload(4, OBU)
 
 		if len(payloads) != 3 || len(payloads[0]) != 4 || len(payloads[1]) != 4 || len(payloads[2]) != 4 {
 			t.Fatal("Expected three fragmented Payload")
@@ -52,7 +52,9 @@ func TestAV1_Marshal(t *testing.T) {
 			t.Fatal("W and Z bit should be set")
 		}
 
-		if !bytes.Equal(OBU[0:3], payloads[0][1:]) || !bytes.Equal(OBU[3:6], payloads[1][1:]) || !bytes.Equal(OBU[6:9], payloads[2][1:]) {
+		if !bytes.Equal(OBU[0:3], payloads[0][1:]) ||
+			!bytes.Equal(OBU[3:6], payloads[1][1:]) ||
+			!bytes.Equal(OBU[6:9], payloads[2][1:]) {
 			t.Fatal("OBU modified during packetization")
 		}
 	})
@@ -61,12 +63,12 @@ func TestAV1_Marshal(t *testing.T) {
 		sequenceHeaderFrame := []byte{0xb, 0xA, 0xB, 0xC}
 		normalFrame := []byte{0x0, 0x1, 0x2, 0x3}
 
-		payloads := p.Payload(100, sequenceHeaderFrame)
+		payloads := payloader.Payload(100, sequenceHeaderFrame)
 		if len(payloads) != 0 {
 			t.Fatal("Sequence Header was not properly cached")
 		}
 
-		payloads = p.Payload(100, normalFrame)
+		payloads = payloader.Payload(100, normalFrame)
 		if len(payloads) != 1 {
 			t.Fatal("Expected one payload")
 		}
@@ -101,7 +103,7 @@ func TestAV1_Unmarshal_Error(t *testing.T) {
 	}
 }
 
-func TestAV1_Unmarshal(t *testing.T) {
+func TestAV1_Unmarshal(t *testing.T) { // nolint: funlen
 	// nolint: dupl
 	av1Payload := []byte{
 		0x68, 0x0c, 0x08, 0x00, 0x00, 0x00, 0x2c,

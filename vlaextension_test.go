@@ -11,8 +11,10 @@ import (
 	"testing"
 )
 
-func TestVLAMarshal(t *testing.T) {
+func TestVLAMarshal(t *testing.T) { // nolint: funlen,cyclop
 	requireNoError := func(t *testing.T, err error) {
+		t.Helper()
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -242,23 +244,31 @@ func TestVLAMarshal(t *testing.T) {
 	})
 }
 
-func TestVLAUnmarshal(t *testing.T) {
+func TestVLAUnmarshal(t *testing.T) { // nolint: funlen
 	requireEqualInt := func(t *testing.T, expected, actual int) {
+		t.Helper()
+
 		if expected != actual {
 			t.Fatalf("expected %d, actual %d", expected, actual)
 		}
 	}
 	requireNoError := func(t *testing.T, err error) {
+		t.Helper()
+
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	requireTrue := func(t *testing.T, val bool) {
+		t.Helper()
+
 		if !val {
 			t.Fatal("expected true")
 		}
 	}
 	requireFalse := func(t *testing.T, val bool) {
+		t.Helper()
+
 		if val {
 			t.Fatal("expected false")
 		}
@@ -425,13 +435,17 @@ func TestVLAUnmarshal(t *testing.T) {
 	})
 }
 
-func TestVLAMarshalThenUnmarshal(t *testing.T) {
+func TestVLAMarshalThenUnmarshal(t *testing.T) { // nolint:funlen, cyclop
 	requireEqualInt := func(t *testing.T, expected, actual int) {
+		t.Helper()
+
 		if expected != actual {
 			t.Fatalf("expected %d, actual %d", expected, actual)
 		}
 	}
 	requireNoError := func(t *testing.T, err error) {
+		t.Helper()
+
 		if err != nil {
 			t.Fatal(err)
 		}
