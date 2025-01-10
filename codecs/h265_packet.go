@@ -774,6 +774,7 @@ func toAbsDON(don uint16, prevDON *uint16, prevAbsDON *int) int {
 	if don < *prevDON && *prevDON-don < 32768 {
 		return *prevAbsDON - int(*prevDON-don)
 	}
+
 	return 0
 }
 
@@ -925,6 +926,7 @@ func (p *H265Packet) Unmarshal(payload []byte) ([]byte, error) { //nolint: gocog
 		}
 		p.naluBuffer = nil
 	}
+
 	return buf, nil
 }
 
@@ -952,14 +954,14 @@ func (*H265Packet) IsPartitionHead(payload []byte) bool {
 	return true
 }
 
-// H265Payloader payloads H265 packets
+// H265Payloader payloads H265 packets.
 type H265Payloader struct {
 	AddDONL         bool
 	SkipAggregation bool
 	donl            uint16
 }
 
-// Payload fragments a H265 packet across one or more byte arrays
+// Payload fragments a H265 packet across one or more byte arrays.
 func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint: gocognit
 	var payloads [][]byte
 	if len(payload) == 0 || mtu == 0 {
@@ -1051,6 +1053,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 				marginalAggregationSize++
 			}
 		}
+
 		return marginalAggregationSize
 	}
 
