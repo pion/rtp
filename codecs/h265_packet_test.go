@@ -794,7 +794,7 @@ func TestH265_Packet(t *testing.T) {
 	for _, cur := range tt {
 		pck := &H265Packet{}
 		if cur.WithDONL {
-			pck.WithMaxDONDiff(1)
+			pck.WithDONL(true)
 		}
 
 		_, err := pck.Unmarshal(cur.Raw)

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
 )
 
 //
@@ -735,67 +734,18 @@ var (
 // Packet implementation
 //
 
-type donKeyedNALU struct {
-	DON  int
-	NALU []byte
-}
-
 // H265Packet represents a H265 packet, stored in the payload of an RTP packet.
 type H265Packet struct {
-	packet         isH265Packet
-	maxDONDiff     uint16
-	depackBufNALUs uint16
-
-	prevDON    *uint16
-	prevAbsDON *int
-
-	naluBuffer []donKeyedNALU
-	fuBuffer   []byte
+	packet        isH265Packet
+	mightNeedDONL bool
 
 	videoDepacketizer
 }
 
-func toAbsDON(don uint16, prevDON *uint16, prevAbsDON *int) int {
-	if prevDON == nil || prevAbsDON == nil {
-		return int(don)
-	}
-	if don == *prevDON {
-		return *prevAbsDON
-	}
-	if don > *prevDON && don-*prevDON < 32768 {
-		return *prevAbsDON + int(don-*prevDON)
-	}
-	if don < *prevDON && *prevDON-don >= 32768 {
-		return *prevAbsDON + 65536 + int(*prevDON-don)
-	}
-	if don > *prevDON && don-*prevDON >= 32768 {
-		return *prevAbsDON - (int(*prevDON) + 65536 - int(don))
-	}
-	if don < *prevDON && *prevDON-don < 32768 {
-		return *prevAbsDON - int(*prevDON-don)
-	}
-
-	return 0
-}
-
 // WithDONL can be called to specify whether or not DONL might be parsed.
 // DONL may need to be parsed if `sprop-max-don-diff` is greater than 0 on the RTP stream.
-//
-// Deprecated: replaced by WithMaxDONDiff.
 func (p *H265Packet) WithDONL(value bool) {
-	if value {
-		p.maxDONDiff = 1
-	}
-}
-
-// WithMaxDONDiff sets the maximum difference between DON values before being emitted.
-func (p *H265Packet) WithMaxDONDiff(value uint16) {
-	p.maxDONDiff = value
-}
-
-// WithDepackBufNALUs sets the maximum number of NALUs to be buffered.
-func (p *H265Packet) WithDepackBufNALUs(value uint16) {
-	p.depackBufNALUs = value
+	p.mightNeedDONL = value
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the H265Packet this method is called upon
@@ -822,122 +772,36 @@ func (p *H265Packet) Unmarshal(payload []byte) ([]byte, error) { //nolint: gocog
 
 	case payloadHeader.IsFragmentationUnit():
 		decoded := &H265FragmentationUnitPacket{}
-		decoded.WithDONL(p.maxDONDiff > 0)
+		decoded.WithDONL(p.mightNeedDONL)
 
 		if _, err := decoded.Unmarshal(payload); err != nil {
 			return nil, err
 		}
 
 		p.packet = decoded
-
-		if decoded.FuHeader().S() {
-			// push the nalu header
-			header := decoded.PayloadHeader()
-			p.fuBuffer = []byte{
-				(uint8(header>>8) & 0b10000001) | (decoded.FuHeader().FuType() << 1),
-				uint8(header),
-			}
-		}
-		p.fuBuffer = append(p.fuBuffer, decoded.Payload()...)
-		if decoded.FuHeader().E() {
-			var absDON int
-			if p.maxDONDiff > 0 {
-				absDON = toAbsDON(*decoded.DONL(), p.prevDON, p.prevAbsDON)
-				p.prevDON = decoded.DONL()
-				p.prevAbsDON = &absDON
-			}
-			p.naluBuffer = append(p.naluBuffer, donKeyedNALU{
-				DON:  absDON,
-				NALU: p.fuBuffer,
-			})
-			p.fuBuffer = nil
-		}
 
 	case payloadHeader.IsAggregationPacket():
 		decoded := &H265AggregationPacket{}
-		decoded.WithDONL(p.maxDONDiff > 0)
+		decoded.WithDONL(p.mightNeedDONL)
 
 		if _, err := decoded.Unmarshal(payload); err != nil {
 			return nil, err
 		}
 
 		p.packet = decoded
-
-		var absDON int
-		if p.maxDONDiff > 0 {
-			absDON = toAbsDON(*decoded.FirstUnit().DONL(), p.prevDON, p.prevAbsDON)
-			p.prevDON = decoded.FirstUnit().DONL()
-			p.prevAbsDON = &absDON
-		}
-		p.naluBuffer = append(p.naluBuffer, donKeyedNALU{DON: absDON, NALU: decoded.FirstUnit().NalUnit()})
-		for _, unit := range decoded.OtherUnits() {
-			if p.maxDONDiff > 0 {
-				donl := uint16(*unit.DOND()) + 1 + *decoded.FirstUnit().DONL()
-				absDON = toAbsDON(donl, p.prevDON, p.prevAbsDON)
-				p.prevDON = &donl
-				p.prevAbsDON = &absDON
-			}
-			p.naluBuffer = append(p.naluBuffer, donKeyedNALU{DON: absDON, NALU: unit.NalUnit()})
-		}
 
 	default:
 		decoded := &H265SingleNALUnitPacket{}
-		decoded.WithDONL(p.maxDONDiff > 0)
+		decoded.WithDONL(p.mightNeedDONL)
 
 		if _, err := decoded.Unmarshal(payload); err != nil {
 			return nil, err
 		}
 
 		p.packet = decoded
-
-		buf := make([]byte, 2+len(decoded.payload))
-		binary.BigEndian.PutUint16(buf[0:2], uint16(decoded.payloadHeader))
-		copy(buf[2:], decoded.payload)
-
-		var absDON int
-		if p.maxDONDiff > 0 {
-			absDON = toAbsDON(*decoded.DONL(), p.prevDON, p.prevAbsDON)
-			p.prevDON = decoded.DONL()
-			p.prevAbsDON = &absDON
-		}
-		p.naluBuffer = append(p.naluBuffer, donKeyedNALU{DON: absDON, NALU: buf})
 	}
 
-	buf := []byte{}
-	if p.maxDONDiff > 0 {
-		// https://datatracker.ietf.org/doc/html/rfc7798#section-6
-		// sort by AbsDON
-		sort.Slice(p.naluBuffer, func(i, j int) bool {
-			return p.naluBuffer[i].DON < p.naluBuffer[j].DON
-		})
-		// find the max DONL value
-		var maxDONL int
-		for _, nalu := range p.naluBuffer {
-			if nalu.DON > maxDONL {
-				maxDONL = nalu.DON
-			}
-		}
-		minDONL := maxDONL - int(p.maxDONDiff)
-		// merge all NALUs while condition A or condition B are true
-		for len(p.naluBuffer) > 0 && (p.naluBuffer[0].DON < minDONL || len(p.naluBuffer) > int(p.depackBufNALUs)) {
-			// nolint
-			// TODO: this is not actually correct following B.2.2, not all NALUs have a 4-byte start code.
-			buf = append(buf, annexbNALUStartCode...)
-			buf = append(buf, p.naluBuffer[0].NALU...)
-			p.naluBuffer = p.naluBuffer[1:]
-		}
-	} else {
-		// return the nalu buffer joined together
-		for _, val := range p.naluBuffer {
-			// nolint
-			// TODO: this is not actually correct following B.2.2, not all NALUs have a 4-byte start code.
-			buf = append(buf, annexbNALUStartCode...)
-			buf = append(buf, val.NALU...)
-		}
-		p.naluBuffer = nil
-	}
-
-	return buf, nil
+	return nil, nil
 }
 
 // Packet returns the populated packet.
