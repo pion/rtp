@@ -860,7 +860,7 @@ type H265Payloader struct {
 }
 
 // Payload fragments a H265 packet across one or more byte arrays.
-func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint: gocognit
+func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint: gocognit,cyclop,funlen
 	var payloads [][]byte
 	if len(payload) == 0 || mtu == 0 {
 		return payloads
@@ -928,6 +928,9 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 						index++
 					}
 				}
+
+				// Since the type of mtu is uint16, len(nalu) fits in as well, so it is safe.
+				// #nosec
 				binary.BigEndian.PutUint16(buf[index:index+2], uint16(len(nalu)))
 				index += 2
 				index += copy(buf[index:], nalu)
