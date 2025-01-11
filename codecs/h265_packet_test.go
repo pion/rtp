@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestH265_NALU_Header(t *testing.T) {
+func TestH265_NALU_Header(t *testing.T) { // nolint: funlen
 	tt := [...]struct {
 		RawHeader []byte
 
@@ -105,7 +105,7 @@ func TestH265_NALU_Header(t *testing.T) {
 	}
 }
 
-func TestH265_FU_Header(t *testing.T) {
+func TestH265_FU_Header(t *testing.T) { // nolint:funlen
 	tt := [...]struct {
 		header H265FragmentationUnitHeader
 
@@ -172,7 +172,7 @@ func TestH265_FU_Header(t *testing.T) {
 	}
 }
 
-func TestH265_SingleNALUnitPacket(t *testing.T) {
+func TestH265_SingleNALUnitPacket(t *testing.T) { // nolint:funlen,cyclop
 	tt := [...]struct {
 		Raw            []byte
 		WithDONL       bool
@@ -269,7 +269,7 @@ func TestH265_SingleNALUnitPacket(t *testing.T) {
 	}
 }
 
-func TestH265_AggregationPacket(t *testing.T) {
+func TestH265_AggregationPacket(t *testing.T) { // nolint:funlen,cyclop
 	tt := [...]struct {
 		Raw            []byte
 		WithDONL       bool
@@ -402,7 +402,8 @@ func TestH265_AggregationPacket(t *testing.T) {
 				t.Fatal("invalid first unit NALUSize")
 			}
 
-			if cur.ExpectedPacket.FirstUnit().DONL() != nil && *cur.ExpectedPacket.FirstUnit().DONL() != *parsed.FirstUnit().DONL() {
+			if cur.ExpectedPacket.FirstUnit().DONL() != nil &&
+				*cur.ExpectedPacket.FirstUnit().DONL() != *parsed.FirstUnit().DONL() {
 				t.Fatal("invalid first unit DONL")
 			}
 
@@ -435,7 +436,7 @@ func TestH265_AggregationPacket(t *testing.T) {
 	}
 }
 
-func TestH265_FragmentationUnitPacket(t *testing.T) {
+func TestH265_FragmentationUnitPacket(t *testing.T) { // nolint:funlen,cyclop
 	tt := [...]struct {
 		Raw         []byte
 		WithDONL    bool
@@ -594,7 +595,7 @@ func TestH265_TemporalScalabilityControlInformation(t *testing.T) {
 	}
 }
 
-func TestH265_PACI_Packet(t *testing.T) {
+func TestH265_PACI_Packet(t *testing.T) { // nolint:funlen, cyclop
 	tt := [...]struct {
 		Raw         []byte
 		ExpectedFU  *H265PACIPacket
@@ -722,7 +723,7 @@ func TestH265_PACI_Packet(t *testing.T) {
 	}
 }
 
-func TestH265_Packet(t *testing.T) {
+func TestH265_Packet(t *testing.T) { // nolint: funlen
 	tt := [...]struct {
 		Raw                []byte
 		WithDONL           bool
@@ -851,6 +852,7 @@ func TestH265IsPartitionHead(t *testing.T) {
 func TestH265_Packet_Real(t *testing.T) {
 	// Tests decoding of real H265 payloads extracted from a Wireshark dump.
 
+	// nolint: lll
 	tt := [...]string{
 		"\x40\x01\x0c\x01\xff\xff\x01\x60\x00\x00\x03\x00\xb0\x00\x00\x03\x00\x00\x03\x00\x7b\xac\x09",
 		"\x42\x01\x01\x01\x60\x00\x00\x03\x00\xb0\x00\x00\x03\x00\x00\x03\x00\x7b\xa0\x03\xc0\x80\x10\xe5\x8d\xae\x49\x32\xf4\xdc\x04\x04\x04\x02",

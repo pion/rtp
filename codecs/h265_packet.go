@@ -24,7 +24,7 @@ var (
 //
 
 const (
-	// sizeof(uint16)
+	// sizeof(uint16).
 	h265NaluHeaderSize = 2
 	// https://datatracker.ietf.org/doc/html/rfc7798#section-4.4.2
 	h265NaluAggregationPacketType = 48
@@ -34,7 +34,7 @@ const (
 	h265NaluPACIPacketType = 50
 )
 
-// H265NALUHeader is a H265 NAL Unit Header
+// H265NALUHeader is a H265 NAL Unit Header.
 // https://datatracker.ietf.org/doc/html/rfc7798#section-1.1.4
 /*
 * +---------------+---------------+
@@ -43,6 +43,7 @@ const (
 * |F|   Type    |  LayerID  | TID |
 * +-------------+-----------------+
 **/
+// .
 type H265NALUHeader uint16
 
 func newH265NALUHeader(highByte, lowByte uint8) H265NALUHeader {
@@ -58,13 +59,15 @@ func (h H265NALUHeader) F() bool {
 func (h H265NALUHeader) Type() uint8 {
 	// 01111110 00000000
 	const mask = 0b01111110 << 8
-	return uint8((uint16(h) & mask) >> (8 + 1))
+
+	return uint8((uint16(h) & mask) >> (8 + 1)) // nolint: gosec // G115 false positive
 }
 
 // IsTypeVCLUnit returns whether or not the NAL Unit type is a VCL NAL unit.
 func (h H265NALUHeader) IsTypeVCLUnit() bool {
 	// Type is coded on 6 bits
 	const msbMask = 0b00100000
+
 	return (h.Type() & msbMask) == 0
 }
 
@@ -72,13 +75,15 @@ func (h H265NALUHeader) IsTypeVCLUnit() bool {
 func (h H265NALUHeader) LayerID() uint8 {
 	// 00000001 11111000
 	const mask = (0b00000001 << 8) | 0b11111000
-	return uint8((uint16(h) & mask) >> 3)
+
+	return uint8((uint16(h) & mask) >> 3) // nolint: gosec // G115 false positive
 }
 
 // TID is the temporal identifier of the NAL unit +1.
 func (h H265NALUHeader) TID() uint8 {
 	const mask = 0b00000111
-	return uint8(uint16(h) & mask)
+
+	return uint8(uint16(h) & mask) // nolint: gosec // G115 false positive
 }
 
 // IsAggregationPacket returns whether or not the packet is an Aggregation packet.
@@ -132,7 +137,8 @@ func (p *H265SingleNALUnitPacket) WithDONL(value bool) {
 	p.mightNeedDONL = value
 }
 
-// Unmarshal parses the passed byte slice and stores the result in the H265SingleNALUnitPacket this method is called upon.
+// Unmarshal parses the passed byte slice and stores the result in the H265SingleNALUnitPacket
+// this method is called upon.
 func (p *H265SingleNALUnitPacket) Unmarshal(payload []byte) ([]byte, error) {
 	// sizeof(headers)
 	const totalHeaderSize = h265NaluHeaderSize
@@ -294,7 +300,7 @@ func (p *H265AggregationPacket) WithDONL(value bool) {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the H265AggregationPacket this method is called upon.
-func (p *H265AggregationPacket) Unmarshal(payload []byte) ([]byte, error) {
+func (p *H265AggregationPacket) Unmarshal(payload []byte) ([]byte, error) { // nolint: funlen, cyclop
 	// sizeof(headers)
 	const totalHeaderSize = h265NaluHeaderSize
 	if payload == nil {
@@ -398,35 +404,38 @@ func (p *H265AggregationPacket) isH265Packet() {}
 //
 
 const (
-	// sizeof(uint8)
+	// sizeof(uint8).
 	h265FragmentationUnitHeaderSize = 1
 )
 
-// H265FragmentationUnitHeader is a H265 FU Header
-/*
-* +---------------+
-* |0|1|2|3|4|5|6|7|
-* +-+-+-+-+-+-+-+-+
-* |S|E|  FuType   |
-* +---------------+
-**/
+// H265FragmentationUnitHeader is a H265 FU Header.
+//
+// +---------------+
+// |0|1|2|3|4|5|6|7|
+// +-+-+-+-+-+-+-+-+
+// |S|E|  FuType   |
+// +---------------+
+// .
 type H265FragmentationUnitHeader uint8
 
 // S represents the start of a fragmented NAL unit.
 func (h H265FragmentationUnitHeader) S() bool {
 	const mask = 0b10000000
+
 	return ((h & mask) >> 7) != 0
 }
 
 // E represents the end of a fragmented NAL unit.
 func (h H265FragmentationUnitHeader) E() bool {
 	const mask = 0b01000000
+
 	return ((h & mask) >> 6) != 0
 }
 
 // FuType MUST be equal to the field Type of the fragmented NAL unit.
 func (h H265FragmentationUnitHeader) FuType() uint8 {
 	const mask = 0b00111111
+
 	return uint8(h) & mask
 }
 
@@ -465,7 +474,8 @@ func (p *H265FragmentationUnitPacket) WithDONL(value bool) {
 	p.mightNeedDONL = value
 }
 
-// Unmarshal parses the passed byte slice and stores the result in the H265FragmentationUnitPacket this method is called upon.
+// Unmarshal parses the passed byte slice and stores the result in the H265FragmentationUnitPacket
+// this method is called upon.
 func (p *H265FragmentationUnitPacket) Unmarshal(payload []byte) ([]byte, error) {
 	// sizeof(headers)
 	const totalHeaderSize = h265NaluHeaderSize + h265FragmentationUnitHeaderSize
@@ -570,42 +580,49 @@ func (p *H265PACIPacket) PayloadHeader() H265NALUHeader {
 // A copies the F bit of the PACI payload NALU.
 func (p *H265PACIPacket) A() bool {
 	const mask = 0b10000000 << 8
+
 	return (p.paciHeaderFields & mask) != 0
 }
 
 // CType copies the Type field of the PACI payload NALU.
 func (p *H265PACIPacket) CType() uint8 {
 	const mask = 0b01111110 << 8
-	return uint8((p.paciHeaderFields & mask) >> (8 + 1))
+
+	return uint8((p.paciHeaderFields & mask) >> (8 + 1)) // nolint: gosec // G115 false positive
 }
 
 // PHSsize indicates the size of the PHES field.
 func (p *H265PACIPacket) PHSsize() uint8 {
 	const mask = (0b00000001 << 8) | 0b11110000
-	return uint8((p.paciHeaderFields & mask) >> 4)
+
+	return uint8((p.paciHeaderFields & mask) >> 4) // nolint: gosec // G115 false positive
 }
 
 // F0 indicates the presence of a Temporal Scalability support extension in the PHES.
 func (p *H265PACIPacket) F0() bool {
 	const mask = 0b00001000
+
 	return (p.paciHeaderFields & mask) != 0
 }
 
 // F1 must be zero, reserved for future extensions.
 func (p *H265PACIPacket) F1() bool {
 	const mask = 0b00000100
+
 	return (p.paciHeaderFields & mask) != 0
 }
 
 // F2 must be zero, reserved for future extensions.
 func (p *H265PACIPacket) F2() bool {
 	const mask = 0b00000010
+
 	return (p.paciHeaderFields & mask) != 0
 }
 
 // Y must be zero, reserved for future extensions.
 func (p *H265PACIPacket) Y() bool {
 	const mask = 0b00000001
+
 	return (p.paciHeaderFields & mask) != 0
 }
 
@@ -626,6 +643,7 @@ func (p *H265PACIPacket) TSCI() *H265TSCI {
 	}
 
 	tsci := H265TSCI((uint32(p.phes[0]) << 16) | (uint32(p.phes[1]) << 8) | uint32(p.phes[0]))
+
 	return &tsci
 }
 
@@ -655,6 +673,7 @@ func (p *H265PACIPacket) Unmarshal(payload []byte) ([]byte, error) {
 
 	if len(payload) < int(headerExtensionSize)+1 {
 		p.paciHeaderFields = 0
+
 		return nil, errShortPacket
 	}
 
@@ -684,35 +703,40 @@ type H265TSCI uint32
 func (h H265TSCI) TL0PICIDX() uint8 {
 	const m1 = 0xFFFF0000
 	const m2 = 0xFF00
-	return uint8((((h & m1) >> 16) & m2) >> 8)
+
+	return uint8((((h & m1) >> 16) & m2) >> 8) // nolint: gosec // G115 false positive
 }
 
 // IrapPicID see RFC7798 for more details.
 func (h H265TSCI) IrapPicID() uint8 {
 	const m1 = 0xFFFF0000
 	const m2 = 0x00FF
-	return uint8(((h & m1) >> 16) & m2)
+
+	return uint8(((h & m1) >> 16) & m2) // nolint: gosec // G115 false positive
 }
 
 // S see RFC7798 for more details.
 func (h H265TSCI) S() bool {
 	const m1 = 0xFF00
 	const m2 = 0b10000000
-	return (uint8((h&m1)>>8) & m2) != 0
+
+	return (uint8((h&m1)>>8) & m2) != 0 // nolint: gosec // G115 false positive
 }
 
 // E see RFC7798 for more details.
 func (h H265TSCI) E() bool {
 	const m1 = 0xFF00
 	const m2 = 0b01000000
-	return (uint8((h&m1)>>8) & m2) != 0
+
+	return (uint8((h&m1)>>8) & m2) != 0 // nolint: gosec // G115 false positive
 }
 
 // RES see RFC7798 for more details.
 func (h H265TSCI) RES() uint8 {
 	const m1 = 0xFF00
 	const m2 = 0b00111111
-	return uint8((h&m1)>>8) & m2
+
+	return uint8((h&m1)>>8) & m2 // nolint: gosec // G115 false positive
 }
 
 //
@@ -748,8 +772,8 @@ func (p *H265Packet) WithDONL(value bool) {
 	p.mightNeedDONL = value
 }
 
-// Unmarshal parses the passed byte slice and stores the result in the H265Packet this method is called upon
-func (p *H265Packet) Unmarshal(payload []byte) ([]byte, error) { //nolint: gocognit
+// Unmarshal parses the passed byte slice and stores the result in the H265Packet this method is called upon.
+func (p *H265Packet) Unmarshal(payload []byte) ([]byte, error) { // nolint:cyclop
 	if payload == nil {
 		return nil, errNilPacket
 	} else if len(payload) <= h265NaluHeaderSize {

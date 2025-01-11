@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-func TestG722Payloader(t *testing.T) {
-	p := G722Payloader{}
+func TestG722Payloader(t *testing.T) { // nolint:funlen
+	payloader := G722Payloader{}
 
 	const (
 		testlen = 10000
@@ -30,7 +30,7 @@ func TestG722Payloader(t *testing.T) {
 	copy(samplesIn, samples)
 
 	// split our samples into payloads
-	payloads := p.Payload(testmtu, samplesIn)
+	payloads := payloader.Payload(testmtu, samplesIn)
 
 	outcnt := int(math.Ceil(float64(testlen) / testmtu))
 	if len(payloads) != outcnt {
@@ -50,25 +50,25 @@ func TestG722Payloader(t *testing.T) {
 	payload := []byte{0x90, 0x90, 0x90}
 
 	// 0 MTU, small payload
-	res := p.Payload(0, payload)
+	res := payloader.Payload(0, payload)
 	if len(res) != 0 {
 		t.Fatal("Generated payload should be empty")
 	}
 
 	// Positive MTU, small payload
-	res = p.Payload(1, payload)
+	res = payloader.Payload(1, payload)
 	if len(res) != len(payload) {
 		t.Fatal("Generated payload should be the same size as original payload size")
 	}
 
 	// Positive MTU, small payload
-	res = p.Payload(uint16(len(payload)-1), payload)
+	res = payloader.Payload(uint16(len(payload)-1), payload) // nolint: gosec // G115
 	if len(res) != len(payload)-1 {
 		t.Fatal("Generated payload should be the same smaller than original payload size")
 	}
 
 	// Positive MTU, small payload
-	res = p.Payload(10, payload)
+	res = payloader.Payload(10, payload)
 	if len(res) != 1 {
 		t.Fatal("Generated payload should be 1")
 	}

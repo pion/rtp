@@ -61,6 +61,8 @@ func TestWriteToLeb128(t *testing.T) {
 	}
 
 	runTest := func(t *testing.T, v testVector) {
+		t.Helper()
+
 		b := WriteToLeb128(v.value)
 		if v.leb128 != hex.EncodeToString(b) {
 			t.Errorf("Expected %s, got %s", v.leb128, hex.EncodeToString(b))

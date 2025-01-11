@@ -27,7 +27,7 @@ func TestHeaderExtension_RFC8285OneByteExtension(t *testing.T) {
 }
 
 func TestHeaderExtension_RFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
-	p := &OneByteHeaderExtension{}
+	ext := &OneByteHeaderExtension{}
 
 	//  0                   1                   2                   3
 	//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -39,30 +39,30 @@ func TestHeaderExtension_RFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 	rawPkt := []byte{
 		0xBE, 0xDE, 0x00, 0x01, 0x10, 0xAA, 0x20, 0xBB,
 	}
-	if _, err := p.Unmarshal(rawPkt); err != nil {
+	if _, err := ext.Unmarshal(rawPkt); err != nil {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	ext1 := p.Get(1)
+	ext1 := ext.Get(1)
 	ext1Expect := []byte{0xAA}
 	if !bytes.Equal(ext1, ext1Expect) {
 		t.Errorf("Extension has incorrect data. Got: %+v, Expected: %+v", ext1, ext1Expect)
 	}
 
-	ext2 := p.Get(2)
+	ext2 := ext.Get(2)
 	ext2Expect := []byte{0xBB}
 	if !bytes.Equal(ext2, ext2Expect) {
 		t.Errorf("Extension has incorrect data. Got: %+v, Expected: %+v", ext2, ext2Expect)
 	}
 
-	dstData, _ := p.Marshal()
+	dstData, _ := ext.Marshal()
 	if !bytes.Equal(dstData, rawPkt) {
 		t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(dstData), hex.Dump(rawPkt))
 	}
 }
 
 func TestHeaderExtension_RFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
-	p := &OneByteHeaderExtension{}
+	ext := &OneByteHeaderExtension{}
 
 	//  0                   1                   2                   3
 	//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -79,23 +79,23 @@ func TestHeaderExtension_RFC8285OneByteMultipleExtensionsWithPadding(t *testing.
 		0xBE, 0xDE, 0x00, 0x03, 0x10, 0xAA, 0x21, 0xBB,
 		0xBB, 0x00, 0x00, 0x33, 0xCC, 0xCC, 0xCC, 0xCC,
 	}
-	if _, err := p.Unmarshal(rawPkt); err != nil {
+	if _, err := ext.Unmarshal(rawPkt); err != nil {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	ext1 := p.Get(1)
+	ext1 := ext.Get(1)
 	ext1Expect := []byte{0xAA}
 	if !bytes.Equal(ext1, ext1Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext1, ext1Expect)
 	}
 
-	ext2 := p.Get(2)
+	ext2 := ext.Get(2)
 	ext2Expect := []byte{0xBB, 0xBB}
 	if !bytes.Equal(ext2, ext2Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext2, ext2Expect)
 	}
 
-	ext3 := p.Get(3)
+	ext3 := ext.Get(3)
 	ext3Expect := []byte{0xCC, 0xCC, 0xCC, 0xCC}
 	if !bytes.Equal(ext3, ext3Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
@@ -111,7 +111,7 @@ func TestHeaderExtension_RFC8285OneByteMultipleExtensionsWithPadding(t *testing.
 	for name, buf := range dstBuf {
 		buf := buf
 		t.Run(name, func(t *testing.T) {
-			n, err := p.MarshalTo(buf)
+			n, err := ext.MarshalTo(buf)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -123,7 +123,7 @@ func TestHeaderExtension_RFC8285OneByteMultipleExtensionsWithPadding(t *testing.
 }
 
 func TestHeaderExtension_RFC8285TwoByteExtension(t *testing.T) {
-	p := &TwoByteHeaderExtension{}
+	ext := &TwoByteHeaderExtension{}
 
 	rawPkt := []byte{
 		0x10, 0x00, 0x00, 0x07, 0x05, 0x18, 0xAA, 0xAA,
@@ -131,18 +131,18 @@ func TestHeaderExtension_RFC8285TwoByteExtension(t *testing.T) {
 		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 		0xAA, 0xAA, 0x00, 0x00,
 	}
-	if _, err := p.Unmarshal(rawPkt); err != nil {
+	if _, err := ext.Unmarshal(rawPkt); err != nil {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	dstData, _ := p.Marshal()
+	dstData, _ := ext.Marshal()
 	if !bytes.Equal(dstData, rawPkt) {
 		t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(dstData), hex.Dump(rawPkt))
 	}
 }
 
 func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithPadding(t *testing.T) {
-	p := &TwoByteHeaderExtension{}
+	ext := &TwoByteHeaderExtension{}
 
 	// 0                   1                   2                   3
 	// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -160,23 +160,23 @@ func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithPadding(t *testing.
 		0xBB, 0x00, 0x03, 0x04, 0xCC, 0xCC, 0xCC, 0xCC,
 	}
 
-	if _, err := p.Unmarshal(rawPkt); err != nil {
+	if _, err := ext.Unmarshal(rawPkt); err != nil {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	ext1 := p.Get(1)
+	ext1 := ext.Get(1)
 	ext1Expect := []byte{}
 	if !bytes.Equal(ext1, ext1Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext1, ext1Expect)
 	}
 
-	ext2 := p.Get(2)
+	ext2 := ext.Get(2)
 	ext2Expect := []byte{0xBB}
 	if !bytes.Equal(ext2, ext2Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext2, ext2Expect)
 	}
 
-	ext3 := p.Get(3)
+	ext3 := ext.Get(3)
 	ext3Expect := []byte{0xCC, 0xCC, 0xCC, 0xCC}
 	if !bytes.Equal(ext3, ext3Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
@@ -184,7 +184,7 @@ func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithPadding(t *testing.
 }
 
 func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
-	p := &TwoByteHeaderExtension{}
+	ext := &TwoByteHeaderExtension{}
 
 	// 0                   1                   2                   3
 	// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -209,23 +209,23 @@ func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithLargeExtension(t *t
 		0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
 	}
 
-	if _, err := p.Unmarshal(rawPkt); err != nil {
+	if _, err := ext.Unmarshal(rawPkt); err != nil {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	ext1 := p.Get(1)
+	ext1 := ext.Get(1)
 	ext1Expect := []byte{}
 	if !bytes.Equal(ext1, ext1Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext1, ext1Expect)
 	}
 
-	ext2 := p.Get(2)
+	ext2 := ext.Get(2)
 	ext2Expect := []byte{0xBB}
 	if !bytes.Equal(ext2, ext2Expect) {
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext2, ext2Expect)
 	}
 
-	ext3 := p.Get(3)
+	ext3 := ext.Get(3)
 	ext3Expect := []byte{
 		0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
 		0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
@@ -234,71 +234,71 @@ func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithLargeExtension(t *t
 		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
 	}
 
-	dstData, _ := p.Marshal()
+	dstData, _ := ext.Marshal()
 	if !bytes.Equal(dstData, rawPkt) {
 		t.Errorf("Marshal failed raw \nMarshaled: %+v,\nrawPkt:    %+v", dstData, rawPkt)
 	}
 }
 
 func TestHeaderExtension_RFC8285OneByteDelExtension(t *testing.T) {
-	p := &OneByteHeaderExtension{}
+	ext := &OneByteHeaderExtension{}
 
-	if _, err := p.Unmarshal([]byte{0xBE, 0xDE, 0x00, 0x00}); err != nil {
+	if _, err := ext.Unmarshal([]byte{0xBE, 0xDE, 0x00, 0x00}); err != nil {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	if err := p.Set(1, []byte{0xBB}); err != nil {
+	if err := ext.Set(1, []byte{0xBB}); err != nil {
 		t.Fatal("Set err for valid extension")
 	}
 
-	ext := p.Get(1)
-	if ext == nil {
+	extExtension := ext.Get(1)
+	if extExtension == nil {
 		t.Error("Extension should exist")
 	}
 
-	err := p.Del(1)
+	err := ext.Del(1)
 	if err != nil {
 		t.Error("Should successfully delete extension")
 	}
 
-	ext = p.Get(1)
-	if ext != nil {
+	extExtension = ext.Get(1)
+	if extExtension != nil {
 		t.Error("Extension should not exist")
 	}
 
-	err = p.Del(1)
+	err = ext.Del(1)
 	if err == nil {
 		t.Error("Should return error when deleting extension that doesnt exist")
 	}
 }
 
 func TestHeaderExtension_RFC8285TwoByteDelExtension(t *testing.T) {
-	p := &TwoByteHeaderExtension{}
+	ext := &TwoByteHeaderExtension{}
 
-	if _, err := p.Unmarshal([]byte{0x10, 0x00, 0x00, 0x00}); err != nil {
+	if _, err := ext.Unmarshal([]byte{0x10, 0x00, 0x00, 0x00}); err != nil {
 		t.Fatal("Unmarshal err for valid extension")
 	}
 
-	if err := p.Set(1, []byte{0xBB}); err != nil {
+	if err := ext.Set(1, []byte{0xBB}); err != nil {
 		t.Fatal("Set err for valid extension")
 	}
 
-	ext := p.Get(1)
-	if ext == nil {
+	extExtension := ext.Get(1)
+	if extExtension == nil {
 		t.Error("Extension should exist")
 	}
 
-	err := p.Del(1)
+	err := ext.Del(1)
 	if err != nil {
 		t.Error("Should successfully delete extension")
 	}
 
-	ext = p.Get(1)
-	if ext != nil {
+	extExtension = ext.Get(1)
+	if extExtension != nil {
 		t.Error("Extension should not exist")
 	}
 
-	err = p.Del(1)
+	err = ext.Del(1)
 	if err == nil {
 		t.Error("Should return error when deleting extension that doesnt exist")
 	}
