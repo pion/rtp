@@ -14,7 +14,7 @@ const (
 )
 
 // Payload fragments a VP8 packet across one or more byte arrays.
-func (p *VP8Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint:funlen,cyclop
+func (p *VP8Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:cyclop
 	/*
 	 * https://tools.ietf.org/html/rfc7741#section-4.2
 	 *
@@ -123,7 +123,7 @@ type VP8Packet struct {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon.
-func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) { // nolint: gocognit, funlen, cyclop
+func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) { //nolint:gocognit,cyclop
 	if payload == nil {
 		return nil, errNilPacket
 	}

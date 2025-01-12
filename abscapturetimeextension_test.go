@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestAbsCaptureTimeExtension_Roundtrip(t *testing.T) { // nolint: funlen,cyclop
+func TestAbsCaptureTimeExtension_Roundtrip(t *testing.T) { //nolint:cyclop
 	t.Run("positive captureClockOffset", func(t *testing.T) {
 		t0 := time.Now()
 		e1 := NewAbsCaptureTimeExtension(t0)

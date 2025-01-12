@@ -24,7 +24,7 @@ func TestCommon_Min(t *testing.T) {
 	}
 }
 
-func TestZeroAllocations(t *testing.T) { // nolint: funlen, maintidx
+func TestZeroAllocations(t *testing.T) { //nolint:maintidx
 	type unmarshaller interface {
 		Unmarshal(data []byte) ([]byte, error)
 	}

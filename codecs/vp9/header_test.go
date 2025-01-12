@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestHeaderUnmarshal(t *testing.T) { // nolint: funlen
+func TestHeaderUnmarshal(t *testing.T) {
 	cases := []struct {
 		name   string
 		byts   []byte

@@ -110,7 +110,7 @@ func (p *VP9Payloader) payloadFlexible(mtu uint16, payload []byte) [][]byte {
 	return payloads
 }
 
-func (p *VP9Payloader) payloadNonFlexible(mtu uint16, payload []byte) [][]byte { // nolint:funlen,cyclop
+func (p *VP9Payloader) payloadNonFlexible(mtu uint16, payload []byte) [][]byte { //nolint:cyclop
 	/*
 	 * Non-flexible mode (F=0)
 	 *        0 1 2 3 4 5 6 7

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestG711Payloader(t *testing.T) { // nolint:funlen
+func TestG711Payloader(t *testing.T) {
 	payloader := G711Payloader{}
 
 	const (

@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestBasic(t *testing.T) { // nolint:funlen,maintidx,cyclop
+func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 	packet := &Packet{}
 
 	if err := packet.Unmarshal([]byte{}); err == nil {
@@ -441,7 +441,7 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 	}
 }
 
-func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) { // nolint:funlen
+func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
 	packet := &Packet{}
 
 	//  0                   1                   2                   3

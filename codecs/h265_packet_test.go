@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestH265_NALU_Header(t *testing.T) { // nolint: funlen
+func TestH265_NALU_Header(t *testing.T) {
 	tt := [...]struct {
 		RawHeader []byte
 
@@ -105,7 +105,7 @@ func TestH265_NALU_Header(t *testing.T) { // nolint: funlen
 	}
 }
 
-func TestH265_FU_Header(t *testing.T) { // nolint:funlen
+func TestH265_FU_Header(t *testing.T) {
 	tt := [...]struct {
 		header H265FragmentationUnitHeader
 
@@ -172,7 +172,7 @@ func TestH265_FU_Header(t *testing.T) { // nolint:funlen
 	}
 }
 
-func TestH265_SingleNALUnitPacket(t *testing.T) { // nolint:funlen,cyclop
+func TestH265_SingleNALUnitPacket(t *testing.T) { //nolint:cyclop
 	tt := [...]struct {
 		Raw            []byte
 		WithDONL       bool
@@ -269,7 +269,7 @@ func TestH265_SingleNALUnitPacket(t *testing.T) { // nolint:funlen,cyclop
 	}
 }
 
-func TestH265_AggregationPacket(t *testing.T) { // nolint:funlen,cyclop
+func TestH265_AggregationPacket(t *testing.T) { //nolint:cyclop
 	tt := [...]struct {
 		Raw            []byte
 		WithDONL       bool
@@ -436,7 +436,7 @@ func TestH265_AggregationPacket(t *testing.T) { // nolint:funlen,cyclop
 	}
 }
 
-func TestH265_FragmentationUnitPacket(t *testing.T) { // nolint:funlen,cyclop
+func TestH265_FragmentationUnitPacket(t *testing.T) { //nolint:cyclop
 	tt := [...]struct {
 		Raw         []byte
 		WithDONL    bool
@@ -595,7 +595,7 @@ func TestH265_TemporalScalabilityControlInformation(t *testing.T) {
 	}
 }
 
-func TestH265_PACI_Packet(t *testing.T) { // nolint:funlen, cyclop
+func TestH265_PACI_Packet(t *testing.T) { //nolint:cyclop
 	tt := [...]struct {
 		Raw         []byte
 		ExpectedFU  *H265PACIPacket
@@ -723,7 +723,7 @@ func TestH265_PACI_Packet(t *testing.T) { // nolint:funlen, cyclop
 	}
 }
 
-func TestH265_Packet(t *testing.T) { // nolint: funlen
+func TestH265_Packet(t *testing.T) {
 	tt := [...]struct {
 		Raw                []byte
 		WithDONL           bool
@@ -873,7 +873,7 @@ func TestH265_Packet_Real(t *testing.T) {
 	}
 }
 
-func TestH265Payloader_Payload(t *testing.T) { // nolint: funlen
+func TestH265Payloader_Payload(t *testing.T) {
 	tt := []struct {
 		Name            string
 		Data            []byte
