@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestVP9Packet_Unmarshal(t *testing.T) { // nolint: funlen
+func TestVP9Packet_Unmarshal(t *testing.T) {
 	cases := map[string]struct {
 		b   []byte
 		pkt VP9Packet
@@ -214,7 +214,7 @@ func TestVP9Packet_Unmarshal(t *testing.T) { // nolint: funlen
 	}
 }
 
-func TestVP9Payloader_Payload(t *testing.T) { // nolint: funlen, cyclop
+func TestVP9Payloader_Payload(t *testing.T) { //nolint:cyclop
 	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 	var rands [][2]byte
 	for i := 0; i < 10; i++ {

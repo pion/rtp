@@ -300,7 +300,7 @@ func (p *H265AggregationPacket) WithDONL(value bool) {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the H265AggregationPacket this method is called upon.
-func (p *H265AggregationPacket) Unmarshal(payload []byte) ([]byte, error) { // nolint: funlen, cyclop
+func (p *H265AggregationPacket) Unmarshal(payload []byte) ([]byte, error) { //nolint:cyclop
 	// sizeof(headers)
 	const totalHeaderSize = h265NaluHeaderSize
 	if payload == nil {
@@ -860,7 +860,7 @@ type H265Payloader struct {
 }
 
 // Payload fragments a H265 packet across one or more byte arrays.
-func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint: gocognit,cyclop,funlen
+func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:gocognit,cyclop
 	var payloads [][]byte
 	if len(payload) == 0 || mtu == 0 {
 		return payloads

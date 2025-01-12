@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestVP8Packet_Unmarshal(t *testing.T) { // nolint: funlen, cyclop
+func TestVP8Packet_Unmarshal(t *testing.T) { //nolint:cyclop
 	pck := VP8Packet{}
 
 	// Nil packet
@@ -134,7 +134,7 @@ func TestVP8Packet_Unmarshal(t *testing.T) { // nolint: funlen, cyclop
 	}
 }
 
-func TestVP8Payloader_Payload(t *testing.T) { // nolint: funlen
+func TestVP8Payloader_Payload(t *testing.T) {
 	testCases := map[string]struct {
 		payloader VP8Payloader
 		mtu       uint16

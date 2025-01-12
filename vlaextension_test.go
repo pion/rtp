@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestVLAMarshal(t *testing.T) { // nolint: funlen,cyclop
+func TestVLAMarshal(t *testing.T) { //nolint:cyclop
 	requireNoError := func(t *testing.T, err error) {
 		t.Helper()
 
@@ -244,7 +244,7 @@ func TestVLAMarshal(t *testing.T) { // nolint: funlen,cyclop
 	})
 }
 
-func TestVLAUnmarshal(t *testing.T) { // nolint: funlen
+func TestVLAUnmarshal(t *testing.T) {
 	requireEqualInt := func(t *testing.T, expected, actual int) {
 		t.Helper()
 
@@ -435,7 +435,7 @@ func TestVLAUnmarshal(t *testing.T) { // nolint: funlen
 	})
 }
 
-func TestVLAMarshalThenUnmarshal(t *testing.T) { // nolint:funlen, cyclop
+func TestVLAMarshalThenUnmarshal(t *testing.T) { //nolint:cyclop
 	requireEqualInt := func(t *testing.T, expected, actual int) {
 		t.Helper()
 

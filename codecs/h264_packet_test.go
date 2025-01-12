@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestH264Payloader_Payload(t *testing.T) { // nolint:funlen,cyclop
+func TestH264Payloader_Payload(t *testing.T) { //nolint:cyclop
 	pck := H264Payloader{}
 	smallpayload := []byte{0x90, 0x90, 0x90}
 	multiplepayload := []byte{0x00, 0x00, 0x01, 0x90, 0x00, 0x00, 0x01, 0x90}
@@ -94,7 +94,7 @@ func TestH264Payloader_Payload(t *testing.T) { // nolint:funlen,cyclop
 	}
 }
 
-func TestH264Packet_Unmarshal(t *testing.T) { // nolint:funlen,cyclop
+func TestH264Packet_Unmarshal(t *testing.T) { //nolint:cyclop
 	singlePayload := []byte{0x90, 0x90, 0x90}
 	singlePayloadUnmarshaled := []byte{0x00, 0x00, 0x00, 0x01, 0x90, 0x90, 0x90}
 	singlePayloadUnmarshaledAVC := []byte{0x00, 0x00, 0x00, 0x03, 0x90, 0x90, 0x90}

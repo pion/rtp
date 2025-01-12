@@ -12,7 +12,7 @@ import (
 	"github.com/pion/rtp/codecs/av1/obu"
 )
 
-func TestAV1_Marshal(t *testing.T) { // nolint:funlen,cyclop
+func TestAV1_Marshal(t *testing.T) { //nolint:cyclop
 	payloader := &AV1Payloader{}
 
 	t.Run("Unfragmented OBU", func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestAV1_Unmarshal_Error(t *testing.T) {
 	}
 }
 
-func TestAV1_Unmarshal(t *testing.T) { // nolint: funlen
+func TestAV1_Unmarshal(t *testing.T) {
 	// nolint: dupl
 	av1Payload := []byte{
 		0x68, 0x0c, 0x08, 0x00, 0x00, 0x00, 0x2c,

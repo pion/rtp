@@ -85,7 +85,7 @@ func (p Packet) String() string {
 
 // Unmarshal parses the passed byte slice and stores the result in the Header.
 // It returns the number of bytes read n and any error.
-func (h *Header) Unmarshal(buf []byte) (n int, err error) { // nolint: funlen,gocognit,cyclop
+func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cyclop
 	if len(buf) < headerLength {
 		return 0, fmt.Errorf("%w: %d < %d", errHeaderSizeInsufficient, len(buf), headerLength)
 	}
@@ -246,7 +246,7 @@ func (h Header) Marshal() (buf []byte, err error) {
 }
 
 // MarshalTo serializes the header and writes to the buffer.
-func (h Header) MarshalTo(buf []byte) (n int, err error) { // nolint: funlen, cyclop
+func (h Header) MarshalTo(buf []byte) (n int, err error) { //nolint:cyclop
 	/*
 	 *  0                   1                   2                   3
 	 *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1

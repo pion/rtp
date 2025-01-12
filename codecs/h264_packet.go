@@ -66,7 +66,7 @@ func emitNalus(nals []byte, emit func([]byte)) {
 }
 
 // Payload fragments a H264 packet across one or more byte arrays.
-func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint:funlen,cyclop
+func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:cyclop
 	var payloads [][]byte
 	if len(payload) == 0 {
 		return payloads
@@ -221,7 +221,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	return p.parseBody(payload)
 }
 
-func (p *H264Packet) parseBody(payload []byte) ([]byte, error) { // nolint:funlen,cyclop
+func (p *H264Packet) parseBody(payload []byte) ([]byte, error) { //nolint:cyclop
 	if len(payload) == 0 {
 		return nil, fmt.Errorf("%w: %d <=0", errShortPacket, len(payload))
 	}

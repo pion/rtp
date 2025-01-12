@@ -119,7 +119,7 @@ type Header struct {
 }
 
 // Unmarshal decodes a Header.
-func (h *Header) Unmarshal(buf []byte) error { // nolint:funlen,cyclop
+func (h *Header) Unmarshal(buf []byte) error { //nolint:cyclop
 	pos := 0
 
 	err := hasSpace(buf, pos, 4)
