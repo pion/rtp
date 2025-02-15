@@ -12,6 +12,7 @@ import (
 // H264Payloader payloads H264 packets.
 type H264Payloader struct {
 	spsNalu, ppsNalu []byte
+	DisableStapA     bool
 }
 
 const (
@@ -84,14 +85,18 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 		case naluType == audNALUType || naluType == fillerNALUType:
 			return
 		case naluType == spsNALUType:
-			p.spsNalu = nalu
+			if !p.DisableStapA {
+				p.spsNalu = nalu
 
-			return
+				return
+			}
 		case naluType == ppsNALUType:
-			p.ppsNalu = nalu
+			if !p.DisableStapA {
+				p.ppsNalu = nalu
 
-			return
-		case p.spsNalu != nil && p.ppsNalu != nil:
+				return
+			}
+		case !p.DisableStapA && p.spsNalu != nil && p.ppsNalu != nil:
 			// Pack current NALU with SPS and PPS as STAP-A
 			spsLen := make([]byte, 2)
 			binary.BigEndian.PutUint16(spsLen, uint16(len(p.spsNalu))) // nolint: gosec // G115

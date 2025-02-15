@@ -303,3 +303,28 @@ func TestH264Payloader_Payload_SPS_and_PPS_handling(t *testing.T) {
 		t.Fatal("SPS and PPS aren't packed together")
 	}
 }
+
+func TestH264Payloader_Payload_SPS_and_PPS_handling_no_stapA(t *testing.T) {
+	pck := H264Payloader{}
+	pck.DisableStapA = true
+
+	expectedSps := []byte{0x07, 0x00, 0x01}
+	// The SPS is packed as a single NALU
+	res := pck.Payload(1500, expectedSps)
+	if len(res) != 1 {
+		t.Fatal("Generated payload should not be empty")
+	}
+	if !reflect.DeepEqual(res[0], expectedSps) {
+		t.Fatal("SPS has not been packed correctly")
+	}
+	// The PPS is packed as a single NALU
+	expectedPps := []byte{0x08, 0x02, 0x03}
+	res = pck.Payload(1500, expectedPps)
+	if len(res) != 1 {
+		t.Fatal("Generated payload should not be empty")
+	}
+
+	if !reflect.DeepEqual(res[0], expectedPps) {
+		t.Fatal("PPS has not been packed correctly")
+	}
+}
