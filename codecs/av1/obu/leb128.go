@@ -68,6 +68,17 @@ func ReadLeb128(in []byte) (uint, uint, error) {
 	return 0, 0, ErrFailedToReadLEB128
 }
 
+func SizeLeb128(leb128 uint) uint {
+	if (leb128 >> 24) > 0 {
+		return 4
+	} else if (leb128 >> 16) > 0 {
+		return 3
+	} else if (leb128 >> 8) > 0 {
+		return 2
+	}
+	return 1
+}
+
 // WriteToLeb128 writes a uint to a LEB128 encoded byte slice.
 func WriteToLeb128(in uint) []byte {
 	b := make([]byte, 10)
