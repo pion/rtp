@@ -39,12 +39,6 @@ func TestAV1Depacketizerr_invalidPackets(t *testing.T) {
 	if !errors.Is(err, errShortPacket) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-
-	_, err = depacketizer.Unmarshal([]byte{0x00})
-	if !errors.Is(err, errShortPacket) {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
 	_, err = depacketizer.Unmarshal([]byte{0b11000000, 0xFF})
 	if !errors.Is(err, obu.ErrFailedToReadLEB128) {
 		t.Fatalf("Unexpected error: %v", err)
@@ -55,7 +49,7 @@ func TestAV1Depacketizerr_invalidPackets(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	_, err = depacketizer.Unmarshal(append([]byte{0b00000000}, obu.WriteToLeb128(0)...))
+	_, err = depacketizer.Unmarshal(append([]byte{0b00000000}, obu.WriteToLeb128(0x01)...))
 	if !errors.Is(err, errShortPacket) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -83,6 +77,29 @@ func TestAV1Depacketizerr_singleOBU(t *testing.T) {
 	packet = append(packet, []byte{0b00000000}...)
 	packet = append(packet, obu.WriteToLeb128(uint(len(obuData)))...)
 	packet = append(packet, obuData...)
+
+	d := AV1Depacketizer{}
+	obu, err := d.Unmarshal(packet)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !bytes.Equal(obu, expectedOBU) {
+		t.Fatalf("OBU data mismatch, expected %v, got %v", expectedOBU, obu)
+	}
+}
+
+func TestAV1Depacketizerr_singleOBUWithPadding(t *testing.T) {
+	payload := []byte{0x01, 0x02, 0x03}
+	obuData, expectedOBU := createAV1OBU(4, payload)
+
+	packet := make([]byte, 0)
+
+	packet = append(packet, []byte{0b00000000}...)
+	packet = append(packet, obu.WriteToLeb128(uint(len(obuData)))...)
+	packet = append(packet, obuData...)
+	// padding
+	packet = append(packet, []byte{0x00, 0x00, 0x00}...)
 
 	d := AV1Depacketizer{}
 	obu, err := d.Unmarshal(packet)
