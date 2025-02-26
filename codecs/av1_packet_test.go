@@ -6,81 +6,1841 @@ package codecs
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/pion/rtp/codecs/av1/obu"
 )
 
-func TestAV1_Marshal(t *testing.T) { //nolint:cyclop
+type testAV1AggregationHeader struct {
+	Z, Y, N bool
+	W       byte
+}
+
+func (t testAV1AggregationHeader) Marshal() []byte {
+	header := byte(0)
+
+	if t.Z {
+		header |= 0b10000000
+	}
+	if t.Y {
+		header |= 0b01000000
+	}
+	if t.N {
+		header |= 0b00001000
+	}
+	header |= (t.W << 4) & 0b00110000
+
+	return []byte{header}
+}
+
+type testAV1OBUPayload struct {
+	Payload           []byte
+	Header            *obu.Header
+	HasRTPLengthField bool
+}
+
+func (t testAV1OBUPayload) Marshal() []byte {
+	payload := make([]byte, 0)
+
+	// obu_size_field() leb128()
+	var obuSize []byte
+	if t.Header != nil && t.Header.HasSizeField {
+		obuSize = obu.WriteToLeb128(uint(len(t.Payload)))
+	}
+
+	// RTP length field leb128()
+	if t.HasRTPLengthField {
+		length := len(t.Payload) + len(obuSize)
+
+		if t.Header != nil {
+			length += t.Header.Size()
+		}
+
+		payload = append(payload, obu.WriteToLeb128(
+			uint(length), //nolint:gosec // G115 false positive
+		)...)
+	}
+	if t.Header != nil {
+		payload = append(payload, t.Header.Marshal()...)
+
+		if t.Header.HasSizeField {
+			payload = append(payload, obuSize...)
+		}
+	}
+	payload = append(payload, t.Payload...)
+
+	return payload
+}
+
+type testAV1MultiOBUsPayload []testAV1OBUPayload
+
+func (t testAV1MultiOBUsPayload) Marshal() []byte {
+	payload := make([]byte, 0)
+
+	for _, obu := range t {
+		payload = append(payload, obu.Marshal()...)
+	}
+
+	return payload
+}
+
+type testAV1Tests struct {
+	Name           string
+	MTU            uint16
+	InputPayload   []byte
+	OutputPayloads [][]byte
+}
+
+func testAV1TestRun(t *testing.T, tests []testAV1Tests) {
+	t.Helper()
 	payloader := &AV1Payloader{}
 
-	t.Run("Unfragmented OBU", func(t *testing.T) {
-		OBU := []byte{0x00, 0x01, 0x2, 0x3, 0x4, 0x5}
-		payloads := payloader.Payload(100, OBU)
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			result := payloader.Payload(test.MTU, test.InputPayload)
 
-		if len(payloads) != 1 || len(payloads[0]) != 7 {
-			t.Fatal("Expected one unfragmented Payload")
+			if len(result) != len(test.OutputPayloads) {
+				t.Fatalf("Expected %d payloads but got %d", len(test.OutputPayloads), len(result))
+			}
+
+			for i := range result {
+				if !bytes.Equal(result[i], test.OutputPayloads[i]) {
+					t.Fatalf("Expected %v but got %v for payload #%d", test.OutputPayloads[i], result[i], i+1)
+				}
+			}
+		})
+	}
+}
+
+func TestAV1Payloader_ShortMtU(t *testing.T) {
+	p := &AV1Payloader{}
+
+	if result := p.Payload(0, []byte{0x00, 0x01, 0x18}); len(result) != 0 {
+		t.Errorf("Expected empty payload but got %v", result)
+	}
+
+	// 2 is the minimum MTU for AV1 (aggregate header + 1 byte)
+	if result := p.Payload(1, []byte{0x00, 0x01, 0x18}); len(result) != 0 {
+		t.Errorf("Expected empty payload but got %v", result)
+	}
+}
+
+func TestAV1Payloader_SinglePacket(t *testing.T) {
+	tests := []testAV1Tests{
+		{
+			Name: "Single Sequence Header",
+			MTU:  1000,
+			InputPayload: (testAV1OBUPayload{
+				Payload: []byte{
+					0x01, 0x02, 0x03, 0x04, 0x05,
+				},
+				Header: &obu.Header{
+					Type:         obu.OBUSequenceHeader,
+					HasSizeField: false,
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						N: true,
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUSequenceHeader,
+						},
+						Payload: []byte{
+							0x01, 0x02, 0x03, 0x04, 0x05,
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Single Frame",
+			MTU:  1000,
+			InputPayload: (testAV1OBUPayload{
+				Header: &obu.Header{
+					Type: obu.OBUFrameHeader,
+				},
+				Payload: []byte{
+					0x01, 0x02, 0x03, 0x04, 0x05,
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{
+							0x01, 0x02, 0x03, 0x04, 0x05,
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			"Should remove size field",
+			1000,
+			(testAV1OBUPayload{
+				Header: &obu.Header{
+					Type:         obu.OBUFrameHeader,
+					HasSizeField: true,
+				},
+				Payload: []byte{
+					0x01, 0x02, 0x03, 0x04, 0x05,
+				},
+			}).Marshal(),
+			[][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{
+							0x01, 0x02, 0x03, 0x04, 0x05,
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should Skip Tile List",
+			MTU:  1000,
+			InputPayload: (testAV1OBUPayload{
+				Header: &obu.Header{
+					Type: obu.OBUTileList,
+				},
+				Payload: []byte{
+					0x01, 0x02, 0x03, 0x04, 0x05,
+				},
+			}).Marshal(),
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+//nolint:maintidx
+func TestAV1Payloader_MultipleOBUsInSinglePacket(t *testing.T) {
+	tests := []testAV1Tests{
+		{
+			Name: "Should pack two OBUs in a single packet with W=2",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 2,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should pack three OBUs in a single packet with W=3",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrameHeader,
+					},
+					Payload: []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 3,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							Payload: []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should pack four OBUs in a single packet with W=0",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x10, 0x11, 0x12, 0x13, 0x14},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x10, 0x11, 0x12, 0x13, 0x14},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should pack five OBUs in a single packet with W=0",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x10, 0x11, 0x12, 0x13, 0x14},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrameHeader,
+					},
+					Payload: []byte{0x15, 0x16, 0x17, 0x18, 0x19},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x10, 0x11, 0x12, 0x13, 0x14},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x15, 0x16, 0x17, 0x18, 0x19},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should read last obu without obu_size_field",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrameHeader,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 2,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+//nolint:maintidx
+func TestAV1Payloader_HandleMTUBasedFragmentation(t *testing.T) {
+	tests := []testAV1Tests{
+		{
+			Name: "Should pack two OBUs in a single packet with W=1 for each",
+			MTU:  7,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should split OBU over two packets with each W=1",
+			MTU:  7,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{
+						0x01, 0x02, 0x03, 0x04, 0x05,
+						0x06, 0x07, 0x08, 0x09, 0x0A,
+					},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should split OBU over three packets with each W=1",
+			MTU:  7,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{
+						0x01, 0x02, 0x03, 0x04, 0x05,
+						0x06, 0x07, 0x08, 0x09, 0x0A,
+						0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+					},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x0C, 0x0D, 0x0E, 0x0F},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should split OBU over three packets and adds extra packet",
+			MTU:  7,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{
+						0x01, 0x02, 0x03, 0x04,
+						0x05, 0x06, 0x07, 0x08,
+						0x09, 0x0A, 0x0B, 0x0C,
+					},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrame,
+					},
+					Payload: []byte{
+						0x01, 0x02,
+					},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 2,
+						Z: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: append(
+							(testAV1OBUPayload{
+								Payload:           []byte{0x0C},
+								HasRTPLengthField: true,
+							}).Marshal(),
+							(testAV1OBUPayload{
+								Header: &obu.Header{
+									Type: obu.OBUFrame,
+								},
+								Payload: []byte{0x01, 0x02},
+							}).Marshal()...,
+						),
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should skip the last byte in the packet if W=0",
+			MTU:  14,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x02},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x03},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x04},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x05, 0x06, 0x07, 0x08, 0x09},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x02},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x03},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x04},
+						},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header:  &obu.Header{Type: obu.OBUFrame},
+						Payload: []byte{0x05, 0x06, 0x07, 0x08, 0x09},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should split OBU after four OBUs in a single packet with W=0",
+			MTU:  15,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x02},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x03},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x04},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x05, 0x06, 0x07, 0x08, 0x09},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						Y: true,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x02},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x03},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x04},
+						},
+						{
+							// only the length field and the header.
+							HasRTPLengthField: true,
+
+							Header: &obu.Header{
+								Type: obu.OBUFrame,
+							},
+						},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x05, 0x06, 0x07, 0x08, 0x09},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should use the correct W size when OBUs ands at the MTU boundary",
+			MTU:  9,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x02},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x03},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x04},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x06},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x07, 0x08, 0x09},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 3,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x02},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							Payload: []byte{0x03},
+						},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 3,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x04},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							Payload: []byte{0x06},
+						},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrame,
+						},
+						Payload: []byte{0x07, 0x08, 0x09},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should use the correct W size for the next OBU when OBU fragment ands at the MTU boundary",
+			MTU:  9,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{
+						0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+						0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+						0x0F,
+					},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x10, 0x11, 0x12},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						Z: true,
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrame,
+						},
+						Payload: []byte{0x10, 0x11, 0x12},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Should split OBU over three packets and adds extra fragmented packet",
+			MTU:  7,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{
+						0x01, 0x02, 0x03, 0x04, 0x05,
+						0x06, 0x07, 0x08, 0x09, 0x0A,
+						0x0B, 0x0C, 0x0D, 0x0E,
+					},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrame,
+					},
+					Payload: []byte{
+						0x01, 0x02, 0x03, 0x04, 0x05,
+					},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 2,
+						Z: true,
+						Y: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: append(
+							(testAV1OBUPayload{
+								Payload:           []byte{0x0C, 0x0D, 0x0E},
+								HasRTPLengthField: true,
+							}).Marshal(),
+							(testAV1OBUPayload{
+								Header: &obu.Header{
+									Type: obu.OBUFrame,
+								},
+								Payload: []byte{0x01},
+							}).Marshal()...,
+						),
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: []byte{0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+			},
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+func TestAV1Payloader_TemporalDelimiter(t *testing.T) {
+	tests := []testAV1Tests{
+		{
+			Name: "Ignore single temporal delimiter",
+			MTU:  1000,
+			InputPayload: (testAV1OBUPayload{
+				Header:  &obu.Header{Type: obu.OBUTemporalDelimiter},
+				Payload: []byte{},
+			}).Marshal(),
+			OutputPayloads: [][]byte{},
+		},
+		{
+			Name: "Ignore mutlitple temporal delimiters",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUTemporalDelimiter,
+						HasSizeField: true,
+					},
+				},
+				{
+					Header: &obu.Header{Type: obu.OBUTemporalDelimiter},
+				},
+			}).Marshal(),
+		},
+		{
+			Name: "Split payloads at temporal delimiter",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUTemporalDelimiter,
+						HasSizeField: true,
+					},
+				},
+				{
+					Header:  &obu.Header{Type: obu.OBUFrame},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header:  &obu.Header{Type: obu.OBUFrame},
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+					}).Marshal()...,
+				),
+			},
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+func TestAV1Payloader_ExtensionHeaders(t *testing.T) {
+	tests := []testAV1Tests{
+		{
+			Name: "Keeps extension headers",
+			MTU:  1000,
+			InputPayload: (testAV1OBUPayload{
+				Header: &obu.Header{
+					Type: obu.OBUFrameHeader,
+					ExtensionHeader: &obu.ExtensionHeader{
+						TemporalID: 1,
+						SpatialID:  2,
+					},
+				},
+				Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+							ExtensionHeader: &obu.ExtensionHeader{
+								TemporalID: 1,
+								SpatialID:  2,
+							},
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Keeps OBUs with the same temporal ID and spatial ID in the same packet",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+						ExtensionHeader: &obu.ExtensionHeader{
+							TemporalID: 1,
+							SpatialID:  2,
+						},
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrame,
+						ExtensionHeader: &obu.ExtensionHeader{
+							TemporalID: 1,
+							SpatialID:  2,
+						},
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 2,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+								ExtensionHeader: &obu.ExtensionHeader{
+									TemporalID: 1,
+									SpatialID:  2,
+								},
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrame,
+								ExtensionHeader: &obu.ExtensionHeader{
+									TemporalID: 1,
+									SpatialID:  2,
+								},
+							},
+							Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Split OBUs with different temporal ID and spatial ID to different packets",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+						ExtensionHeader: &obu.ExtensionHeader{
+							TemporalID: 1,
+							SpatialID:  2,
+						},
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrame,
+						ExtensionHeader: &obu.ExtensionHeader{
+							TemporalID: 2,
+							SpatialID:  1,
+						},
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+								ExtensionHeader: &obu.ExtensionHeader{
+									TemporalID: 1,
+									SpatialID:  2,
+								},
+							},
+							Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrame,
+								ExtensionHeader: &obu.ExtensionHeader{
+									TemporalID: 2,
+									SpatialID:  1,
+								},
+							},
+							Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+func TestAV1Payloader_SequenceHeader(t *testing.T) {
+	tests := []testAV1Tests{
+		{
+			Name: "Should pack sequence header with frame in a single packet",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUSequenceHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrameHeader,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 2,
+						N: true,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUSequenceHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+						},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Sequence header should start a new packet",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUSequenceHeader,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						N: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUSequenceHeader,
+						},
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+					}).Marshal()...,
+				),
+			},
+		},
+		{
+			Name: "Sequence header should start a new packet and break with temporal delimiter",
+			MTU:  1000,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUSequenceHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUTemporalDelimiter,
+						HasSizeField: true,
+					},
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrameHeader,
+					},
+					Payload: []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						N: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUSequenceHeader,
+						},
+						Payload: []byte{0x06, 0x07, 0x08, 0x09, 0x0A},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+					}).Marshal()...,
+				),
+			},
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+func TestAv1Payloader_FragmentedEdgeLeb128Size(t *testing.T) {
+	size := uint16(128)
+	payload := make([]byte, 0, size)
+	for i := uint16(0); i < size; i++ {
+		payload = append(payload, byte(i))
+	}
+
+	tests := []testAV1Tests{
+		{
+			Name: fmt.Sprintf("Should handle leb128 size edge case at %d bytes", size),
+			MTU:  (size * 5) + 14,
+			InputPayload: (testAV1MultiOBUsPayload{
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: payload,
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					},
+					Payload: payload,
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					},
+					Payload: payload,
+				},
+				{
+					Header: &obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					},
+					Payload: payload,
+				},
+				{
+					Header: &obu.Header{
+						Type: obu.OBUFrame,
+					},
+					Payload: payload[:size-1],
+				},
+			}).Marshal(),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						Y: true,
+					}).Marshal(),
+					(testAV1MultiOBUsPayload{
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrameHeader,
+							},
+							HasRTPLengthField: true,
+							Payload:           payload,
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrame,
+							},
+							HasRTPLengthField: true,
+							Payload:           payload,
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrame,
+							},
+							HasRTPLengthField: true,
+							Payload:           payload,
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrame,
+							},
+							HasRTPLengthField: true,
+							Payload:           payload,
+						},
+						{
+							Header: &obu.Header{
+								Type: obu.OBUFrame,
+							},
+							HasRTPLengthField: true,
+							Payload:           payload[:size-2],
+						},
+					}).Marshal()...,
+				),
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+						Z: true,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Payload: payload[size-2 : size-1],
+					}).Marshal()...,
+				),
+			},
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+func TestAV1Payloader_ReturnEarlyOnError(t *testing.T) {
+	tests := []testAV1Tests{
+		{
+			Name:         "Should return early on empty payload",
+			MTU:          1000,
+			InputPayload: []byte{},
+		},
+		{
+			Name:         "Should return early on nil payload",
+			MTU:          1000,
+			InputPayload: nil,
+		},
+		{
+			Name:         "Should return early on invalid OBU (missing extension header)",
+			MTU:          1000,
+			InputPayload: []byte{0x04},
+		},
+		{
+			Name:         "Should return early on invalid OBU (invalid obu_size leb128)",
+			MTU:          1000,
+			InputPayload: []byte{0x4a, 0xff},
+		},
+		{
+			Name: "Should return early on small packets (obu_size is bigger than the payload)",
+			MTU:  1000,
+			InputPayload: append(
+				(testAV1OBUPayload{
+					Header: &obu.Header{
+						Type:         obu.OBUFrameHeader,
+						HasSizeField: true,
+					},
+					Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				}).Marshal(),
+				append(
+					(&obu.Header{
+						Type:         obu.OBUFrame,
+						HasSizeField: true,
+					}).Marshal(),
+					0x03,
+				)...,
+			),
+			OutputPayloads: [][]byte{
+				append(
+					(testAV1AggregationHeader{
+						W: 1,
+					}).Marshal(),
+					(testAV1OBUPayload{
+						Header: &obu.Header{
+							Type: obu.OBUFrameHeader,
+						},
+						Payload: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+					}).Marshal()...,
+				),
+			},
+		},
+	}
+
+	testAV1TestRun(t, tests)
+}
+
+func TestAV1Payloader_Leb128Size(t *testing.T) {
+	tests := []struct {
+		leb128 int
+		size   int
+		edge   bool
+	}{
+		{0, 1, false},
+		{1, 1, false},
+		{127, 1, false},
+		{128, 2, true},
+		{16383, 2, false},
+		{16384, 3, true},
+		{2097151, 3, false},
+		{2097152, 4, true},
+		{268435455, 4, false},
+		{268435456, 5, true},
+	}
+	payloader := &AV1Payloader{}
+
+	for _, test := range tests {
+		actual, edge := payloader.leb128Size(test.leb128)
+		if actual != test.size {
+			t.Fatalf("Expected size %d but got %d", test.size, actual)
 		}
 
-		if payloads[0][0] != 0x10 {
-			t.Fatal("Only W bit should be set")
+		if edge != test.edge {
+			t.Fatalf("Expected edge %t but got %t", test.edge, edge)
 		}
+	}
+}
 
-		if !bytes.Equal(OBU, payloads[0][1:]) {
-			t.Fatal("OBU modified during packetization")
+func TestAV1_depacketizer_to_packetizer(t *testing.T) {
+	type testOBU struct {
+		Type obu.Type
+		Size uint64
+	}
+	obus := []testOBU{
+		{Type: obu.OBUSequenceHeader, Size: 10},
+		{Type: obu.OBUFrameHeader, Size: 20},
+		{Type: obu.OBUFrame, Size: 3000},
+		{Type: obu.OBUFrame, Size: 4800},
+		{Type: obu.OBUFrame, Size: 3024},
+		{Type: obu.OBUFrame, Size: 2841},
+		{Type: obu.OBUFrameHeader, Size: 20},
+		{Type: obu.OBUFrame, Size: 8000},
+		{Type: obu.OBUSequenceHeader, Size: 12},
+		{Type: obu.OBUFrameHeader, Size: 20},
+		{Type: obu.OBUFrame, Size: 6300},
+		{Type: obu.OBUFrame, Size: 53},
+		{Type: obu.OBUFrame, Size: 101},
+		{Type: obu.OBUFrame, Size: 202},
+		{Type: obu.OBUSequenceHeader, Size: 11},
+		{Type: obu.OBUFrameHeader, Size: 20},
+		{Type: obu.OBUFrame, Size: 9000},
+	}
+	payload := make([]byte, 0)
+	for _, testOBU := range obus {
+		header := obu.Header{
+			Type:         testOBU.Type,
+			HasSizeField: true,
 		}
-	})
-
-	t.Run("Fragmented OBU", func(t *testing.T) {
-		OBU := []byte{0x00, 0x01, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8}
-		payloads := payloader.Payload(4, OBU)
-
-		if len(payloads) != 3 || len(payloads[0]) != 4 || len(payloads[1]) != 4 || len(payloads[2]) != 4 {
-			t.Fatal("Expected three fragmented Payload")
+		payload = append(payload, header.Marshal()...)
+		payload = append(payload, obu.WriteToLeb128(uint(testOBU.Size))...)
+		for j := 0; j < int(testOBU.Size); j++ { //nolint:gosec // G115
+			payload = append(payload, byte((j+len(payload))%256))
 		}
+	}
 
-		if payloads[0][0] != 0x10|yMask {
-			t.Fatal("W and Y bit should be set")
-		}
+	mtuSize := []uint16{
+		32,
+		215,
+		1500,
+		8192,
+		9216,
+	}
+	for _, mtu := range mtuSize {
+		t.Run(fmt.Sprintf("MTU %d", mtu), func(t *testing.T) {
+			payloader := &AV1Payloader{}
+			depacketizer := &AV1Depacketizer{}
+			result := make([]byte, 0)
 
-		if payloads[1][0] != 0x10|yMask|zMask {
-			t.Fatal("W, Y and Z bit should be set")
-		}
+			packets := payloader.Payload(mtu, payload)
+			for _, packet := range packets {
+				p, err := depacketizer.Unmarshal(packet)
+				if err != nil {
+					t.Fatalf("Failed to depacketize: %v", err)
+				}
 
-		if payloads[2][0] != 0x10|zMask {
-			t.Fatal("W and Z bit should be set")
-		}
+				if len(packet) > int(mtu) {
+					t.Fatalf("Expected packet size to be %d but got %d", mtu, len(packet))
+				}
 
-		if !bytes.Equal(OBU[0:3], payloads[0][1:]) ||
-			!bytes.Equal(OBU[3:6], payloads[1][1:]) ||
-			!bytes.Equal(OBU[6:9], payloads[2][1:]) {
-			t.Fatal("OBU modified during packetization")
-		}
-	})
+				result = append(result, p...)
+			}
 
-	t.Run("Sequence Header Caching", func(t *testing.T) {
-		sequenceHeaderFrame := []byte{0xb, 0xA, 0xB, 0xC}
-		normalFrame := []byte{0x0, 0x1, 0x2, 0x3}
+			if len(payload) != len(result) {
+				t.Fatalf("Expected to packetize and depacketize to be the same for MTU=%d", mtu)
+			}
 
-		payloads := payloader.Payload(100, sequenceHeaderFrame)
-		if len(payloads) != 0 {
-			t.Fatal("Sequence Header was not properly cached")
-		}
-
-		payloads = payloader.Payload(100, normalFrame)
-		if len(payloads) != 1 {
-			t.Fatal("Expected one payload")
-		}
-
-		if payloads[0][0] != 0x20|nMask {
-			t.Fatal("W and N bit should be set")
-		}
-
-		if !bytes.Equal(sequenceHeaderFrame, payloads[0][2:6]) || !bytes.Equal(normalFrame, payloads[0][6:10]) {
-			t.Fatal("OBU modified during packetization")
-		}
-	})
+			if !bytes.Equal(payload, result) {
+				t.Fatalf("Expected to packetize and depacketize to be the same for MTU=%d", mtu)
+			}
+		})
+	}
 }
 
 func TestAV1_Unmarshal_Error(t *testing.T) {

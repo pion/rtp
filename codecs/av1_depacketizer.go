@@ -35,10 +35,10 @@ func (d *AV1Depacketizer) Unmarshal(payload []byte) (buff []byte, err error) {
 	}
 
 	// |Z|Y| W |N|-|-|-|
-	obuZ := (0b10000000 & payload[0]) != 0     // Z
-	obuY := (0b01000000 & payload[0]) != 0     // Y
-	obuCount := (0b00110000 & payload[0]) >> 4 // W
-	obuN := (0b00001000 & payload[0]) != 0     // N
+	obuZ := (av1ZMask & payload[0]) != 0     // Z
+	obuY := (av1YMask & payload[0]) != 0     // Y
+	obuCount := (av1WMask & payload[0]) >> 4 // W
+	obuN := (av1NMask & payload[0]) != 0     // N
 	d.Z = obuZ
 	d.Y = obuY
 	d.N = obuN
@@ -120,10 +120,7 @@ func (d *AV1Depacketizer) Unmarshal(payload []byte) (buff []byte, err error) {
 		}
 
 		if len(obuBuffer) == 0 {
-			return nil, fmt.Errorf(
-				"%w: OBU size %d is 0",
-				errShortPacket, lengthField,
-			)
+			continue
 		}
 
 		obuHeader, err := obu.ParseOBUHeader(obuBuffer)
@@ -187,5 +184,5 @@ func (d *AV1Depacketizer) IsPartitionHead(payload []byte) bool {
 		return false
 	}
 
-	return (payload[0] & 0b10000000) == 0
+	return (payload[0] & av1ZMask) == 0
 }

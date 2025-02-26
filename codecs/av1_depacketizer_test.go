@@ -33,18 +33,12 @@ func createTestPayload(obuHeader obu.Header, payload []byte) []byte {
 	return buf
 }
 
-func TestAV1Depacketizerr_invalidPackets(t *testing.T) {
+func TestAV1Depacketizer_invalidPackets(t *testing.T) {
 	depacketizer := AV1Depacketizer{}
 	_, err := depacketizer.Unmarshal([]byte{})
 	if !errors.Is(err, errShortPacket) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-
-	_, err = depacketizer.Unmarshal([]byte{0x00})
-	if !errors.Is(err, errShortPacket) {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
 	_, err = depacketizer.Unmarshal([]byte{0b11000000, 0xFF})
 	if !errors.Is(err, obu.ErrFailedToReadLEB128) {
 		t.Fatalf("Unexpected error: %v", err)
@@ -55,7 +49,7 @@ func TestAV1Depacketizerr_invalidPackets(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	_, err = depacketizer.Unmarshal(append([]byte{0b00000000}, obu.WriteToLeb128(0)...))
+	_, err = depacketizer.Unmarshal(append([]byte{0b00000000}, obu.WriteToLeb128(0x01)...))
 	if !errors.Is(err, errShortPacket) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -74,7 +68,7 @@ func TestAV1Depacketizerr_invalidPackets(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_singleOBU(t *testing.T) {
+func TestAV1Depacketizer_singleOBU(t *testing.T) {
 	payload := []byte{0x01, 0x02, 0x03}
 	obuData, expectedOBU := createAV1OBU(4, payload)
 
@@ -95,9 +89,32 @@ func TestAV1Depacketizerr_singleOBU(t *testing.T) {
 	}
 }
 
+func TestAV1Depacketizer_singleOBUWithPadding(t *testing.T) {
+	payload := []byte{0x01, 0x02, 0x03}
+	obuData, expectedOBU := createAV1OBU(4, payload)
+
+	packet := make([]byte, 0)
+
+	packet = append(packet, []byte{0b00000000}...)
+	packet = append(packet, obu.WriteToLeb128(uint(len(obuData)))...)
+	packet = append(packet, obuData...)
+	// padding
+	packet = append(packet, []byte{0x00, 0x00, 0x00}...)
+
+	d := AV1Depacketizer{}
+	obu, err := d.Unmarshal(packet)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !bytes.Equal(obu, expectedOBU) {
+		t.Fatalf("OBU data mismatch, expected %v, got %v", expectedOBU, obu)
+	}
+}
+
 // AV1 OBUs shouldn't include the obu_size_field when packetized in RTP,
 // but we still support it since it's encountered in the wild (Including pion old clients).
-func TestAV1Depacketizerr_withOBUSize(t *testing.T) {
+func TestAV1Depacketizer_withOBUSize(t *testing.T) {
 	payload := []byte{0x01, 0x02, 0x03}
 	_, obuData := createAV1OBU(4, payload)
 
@@ -118,7 +135,7 @@ func TestAV1Depacketizerr_withOBUSize(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_validateOBUSize(t *testing.T) {
+func TestAV1Depacketizer_validateOBUSize(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload []byte
@@ -169,7 +186,7 @@ func TestAV1Depacketizerr_validateOBUSize(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_dropBuffer(t *testing.T) {
+func TestAV1Depacketizer_dropBuffer(t *testing.T) {
 	depacketizer := &AV1Depacketizer{}
 	empty, err := depacketizer.Unmarshal([]byte{0x41, 0x02, 0x00, 0x01})
 	if err != nil {
@@ -200,7 +217,7 @@ func TestAV1Depacketizerr_dropBuffer(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_singleOBUWithW(t *testing.T) {
+func TestAV1Depacketizer_singleOBUWithW(t *testing.T) {
 	payload := []byte{0x01, 0x02, 0x03}
 	obuData, expectedOBU := createAV1OBU(4, payload)
 
@@ -244,7 +261,7 @@ func TestDepacketizer_multipleFullOBUs(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_multipleFullOBUsWithW(t *testing.T) {
+func TestAV1Depacketizer_multipleFullOBUsWithW(t *testing.T) {
 	obu1, expectedOBU1 := createAV1OBU(4, []byte{0x01, 0x02, 0x03})
 	obu2, expectedOBU2 := createAV1OBU(4, []byte{0x04, 0x05, 0x06})
 	obu3, expectedOBU3 := createAV1OBU(4, []byte{0x07, 0x08, 0x09})
@@ -367,7 +384,7 @@ func TestDepacketizer_fragmentedOBUS(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_dropLostFragment(t *testing.T) {
+func TestAV1Depacketizer_dropLostFragment(t *testing.T) {
 	depacketizer := AV1Depacketizer{}
 
 	obus, err := depacketizer.Unmarshal(
@@ -400,7 +417,7 @@ func TestAV1Depacketizerr_dropLostFragment(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_dropIfLostFragment(t *testing.T) {
+func TestAV1Depacketizer_dropIfLostFragment(t *testing.T) {
 	depacketizer := AV1Depacketizer{}
 
 	obus, err := depacketizer.Unmarshal(
@@ -449,7 +466,7 @@ func TestAV1Depacketizerr_dropIfLostFragment(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_IsPartitionTail(t *testing.T) {
+func TestAV1Depacketizer_IsPartitionTail(t *testing.T) {
 	depacketizer := &AV1Depacketizer{
 		buffer: []byte{1, 2},
 	}
@@ -467,7 +484,7 @@ func TestAV1Depacketizerr_IsPartitionTail(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_IsPartitionHead(t *testing.T) {
+func TestAV1Depacketizer_IsPartitionHead(t *testing.T) {
 	depacketizer := &AV1Depacketizer{}
 
 	if depacketizer.IsPartitionHead(nil) {
@@ -487,7 +504,7 @@ func TestAV1Depacketizerr_IsPartitionHead(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_ignoreBadOBUs(t *testing.T) {
+func TestAV1Depacketizer_ignoreBadOBUs(t *testing.T) {
 	shouldIgnore := []obu.Type{
 		obu.OBUTemporalDelimiter,
 		obu.OBUTileList,
@@ -514,7 +531,7 @@ func TestAV1Depacketizerr_ignoreBadOBUs(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_fragmentedOverMultiple(t *testing.T) {
+func TestAV1Depacketizer_fragmentedOverMultiple(t *testing.T) {
 	fullOBU, expected := createAV1OBU(
 		obu.OBUTileGroup,
 		[]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
@@ -583,7 +600,7 @@ func TestAV1Depacketizerr_fragmentedOverMultiple(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_shortOBUHeader(t *testing.T) {
+func TestAV1Depacketizer_shortOBUHeader(t *testing.T) {
 	d := AV1Depacketizer{}
 
 	payload, err := d.Unmarshal([]byte{0x00, 0x01, 0x04})
@@ -596,7 +613,7 @@ func TestAV1Depacketizerr_shortOBUHeader(t *testing.T) {
 	}
 }
 
-func TestAV1Depacketizerr_aggregationHeader(t *testing.T) {
+func TestAV1Depacketizer_aggregationHeader(t *testing.T) {
 	depacketizer := AV1Depacketizer{}
 	tests := []struct {
 		name    string
