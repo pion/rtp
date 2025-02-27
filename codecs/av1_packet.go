@@ -136,7 +136,8 @@ type AV1Packet struct {
 	// AV1Frame provides the tools to construct a collection of OBUs from a collection of OBU Elements
 	OBUElements [][]byte
 
-	videoDepacketizer
+	// zeroAllocation prevents populating the OBUElements field
+	zeroAllocation bool
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the AV1Packet this method is called upon.
