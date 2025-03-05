@@ -4,8 +4,9 @@
 package codecs
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestH265_NALU_Header(t *testing.T) {
@@ -70,38 +71,15 @@ func TestH265_NALU_Header(t *testing.T) {
 	for _, cur := range tt {
 		header := newH265NALUHeader(cur.RawHeader[0], cur.RawHeader[1])
 
-		if header.F() != cur.FBit {
-			t.Fatal("invalid F bit")
-		}
-
-		if header.Type() != cur.Type {
-			t.Fatal("invalid Type")
-		}
-
+		assert.Equal(t, cur.FBit, header.F())
+		assert.Equal(t, cur.Type, header.Type())
 		// For any type < 32, NAL is a VLC NAL unit.
-		if header.IsTypeVCLUnit() != (header.Type() < 32) {
-			t.Fatal("invalid IsTypeVCLUnit")
-		}
-
-		if header.IsAggregationPacket() != cur.IsAP {
-			t.Fatal("invalid Type (aggregation packet)")
-		}
-
-		if header.IsFragmentationUnit() != cur.IsFU {
-			t.Fatal("invalid Type (fragmentation unit)")
-		}
-
-		if header.IsPACIPacket() != cur.IsPACI {
-			t.Fatal("invalid Type (PACI)")
-		}
-
-		if header.LayerID() != cur.LayerID {
-			t.Fatal("invalid LayerID")
-		}
-
-		if header.TID() != cur.TID {
-			t.Fatal("invalid TID")
-		}
+		assert.Equal(t, header.IsTypeVCLUnit(), header.Type() < 32)
+		assert.Equal(t, cur.IsAP, header.IsAggregationPacket())
+		assert.Equal(t, cur.IsFU, header.IsFragmentationUnit())
+		assert.Equal(t, cur.IsPACI, header.IsPACIPacket())
+		assert.Equal(t, cur.LayerID, header.LayerID())
+		assert.Equal(t, cur.TID, header.TID())
 	}
 }
 
@@ -158,21 +136,13 @@ func TestH265_FU_Header(t *testing.T) {
 	}
 
 	for _, cur := range tt {
-		if cur.header.S() != cur.S {
-			t.Fatal("invalid S field")
-		}
-
-		if cur.header.E() != cur.E {
-			t.Fatal("invalid E field")
-		}
-
-		if cur.header.FuType() != cur.Type {
-			t.Fatal("invalid FuType field")
-		}
+		assert.Equal(t, cur.S, cur.header.S())
+		assert.Equal(t, cur.E, cur.header.E())
+		assert.Equal(t, cur.header.FuType(), cur.Type)
 	}
 }
 
-func TestH265_SingleNALUnitPacket(t *testing.T) { //nolint:cyclop
+func TestH265_SingleNALUnitPacket(t *testing.T) {
 	tt := [...]struct {
 		Raw            []byte
 		WithDONL       bool
@@ -193,7 +163,7 @@ func TestH265_SingleNALUnitPacket(t *testing.T) { //nolint:cyclop
 		},
 		{
 			Raw:         []byte{0x62, 0x01, 0x93},
-			ExpectedErr: errShortPacket,
+			ExpectedErr: errInvalidH265PacketType,
 		},
 		// FBit enabled in H265NALUHeader
 		{
@@ -245,31 +215,29 @@ func TestH265_SingleNALUnitPacket(t *testing.T) { //nolint:cyclop
 
 		_, err := parsed.Unmarshal(cur.Raw)
 
-		if cur.ExpectedErr != nil && err == nil {
-			t.Fatal("should error")
-		} else if cur.ExpectedErr == nil && err != nil {
-			t.Fatal("should not error")
+		if cur.ExpectedErr == nil {
+			assert.NoError(t, err)
+		} else {
+			assert.ErrorIs(t, err, cur.ExpectedErr)
 		}
 
 		if cur.ExpectedPacket == nil {
 			continue
 		}
 
-		if cur.ExpectedPacket.PayloadHeader() != parsed.PayloadHeader() {
-			t.Fatal("invalid payload header")
+		assert.Equal(t, cur.ExpectedPacket.PayloadHeader(), parsed.PayloadHeader())
+
+		if cur.ExpectedPacket.DONL() != nil {
+			assert.Equal(t, *cur.ExpectedPacket.DONL(), *parsed.DONL())
+		} else {
+			assert.Nil(t, parsed.DONL())
 		}
 
-		if cur.ExpectedPacket.DONL() != nil && (*parsed.DONL() != *cur.ExpectedPacket.DONL()) {
-			t.Fatal("invalid DONL")
-		}
-
-		if !reflect.DeepEqual(cur.ExpectedPacket.Payload(), parsed.Payload()) {
-			t.Fatal("invalid payload")
-		}
+		assert.Equal(t, cur.ExpectedPacket.Payload(), parsed.Payload())
 	}
 }
 
-func TestH265_AggregationPacket(t *testing.T) { //nolint:cyclop
+func TestH265_AggregationPacket(t *testing.T) {
 	tt := [...]struct {
 		Raw            []byte
 		WithDONL       bool
@@ -290,7 +258,7 @@ func TestH265_AggregationPacket(t *testing.T) { //nolint:cyclop
 		},
 		{
 			Raw:         []byte{0x62, 0x01, 0x93},
-			ExpectedErr: errShortPacket,
+			ExpectedErr: errInvalidH265PacketType,
 		},
 		// FBit enabled in H265NALUHeader
 		{
@@ -300,7 +268,7 @@ func TestH265_AggregationPacket(t *testing.T) { //nolint:cyclop
 		// Type '48' in H265NALUHeader
 		{
 			Raw:         []byte{0xE0, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errInvalidH265PacketType,
+			ExpectedErr: errH265CorruptedPacket,
 		},
 		// Small payload
 		{
@@ -387,10 +355,10 @@ func TestH265_AggregationPacket(t *testing.T) { //nolint:cyclop
 
 		_, err := parsed.Unmarshal(cur.Raw)
 
-		if cur.ExpectedErr != nil && err == nil {
-			t.Fatal("should error")
-		} else if cur.ExpectedErr == nil && err != nil {
-			t.Fatal("should not error")
+		if cur.ExpectedErr == nil {
+			assert.NoError(t, err)
+		} else {
+			assert.ErrorIs(t, err, cur.ExpectedErr)
 		}
 
 		if cur.ExpectedPacket == nil {
@@ -398,45 +366,38 @@ func TestH265_AggregationPacket(t *testing.T) { //nolint:cyclop
 		}
 
 		if cur.ExpectedPacket.FirstUnit() != nil {
-			if parsed.FirstUnit().NALUSize() != cur.ExpectedPacket.FirstUnit().NALUSize() {
-				t.Fatal("invalid first unit NALUSize")
+			assert.Equal(t, cur.ExpectedPacket.FirstUnit().NALUSize(), parsed.FirstUnit().NALUSize())
+
+			if cur.ExpectedPacket.FirstUnit().DONL() != nil {
+				assert.Equal(t, *cur.ExpectedPacket.FirstUnit().DONL(), *parsed.FirstUnit().DONL())
+			} else {
+				assert.Nil(t, parsed.FirstUnit().DONL())
 			}
 
-			if cur.ExpectedPacket.FirstUnit().DONL() != nil &&
-				*cur.ExpectedPacket.FirstUnit().DONL() != *parsed.FirstUnit().DONL() {
-				t.Fatal("invalid first unit DONL")
-			}
-
-			if !reflect.DeepEqual(cur.ExpectedPacket.FirstUnit().NalUnit(), parsed.FirstUnit().NalUnit()) {
-				t.Fatal("invalid first unit NalUnit")
-			}
+			assert.Equal(
+				t, cur.ExpectedPacket.FirstUnit().NalUnit(), parsed.FirstUnit().NalUnit(),
+			)
 		}
 
-		if len(cur.ExpectedPacket.OtherUnits()) != len(parsed.OtherUnits()) {
-			t.Fatal("number of other units mismatch")
-		}
+		assert.Len(t, cur.ExpectedPacket.OtherUnits(), len(parsed.OtherUnits()))
 
 		for ndx, unit := range cur.ExpectedPacket.OtherUnits() {
-			if parsed.OtherUnits()[ndx].NALUSize() != unit.NALUSize() {
-				t.Fatal("invalid unit NALUSize")
+			assert.Equal(t, unit.NALUSize(), parsed.OtherUnits()[ndx].NALUSize())
+
+			if unit.DOND() != nil {
+				assert.Equal(t, *unit.DOND(), *parsed.OtherUnits()[ndx].DOND())
+			} else {
+				assert.Nil(t, parsed.OtherUnits()[ndx].DOND())
 			}
 
-			if unit.DOND() != nil && *unit.DOND() != *parsed.OtherUnits()[ndx].DOND() {
-				t.Fatal("invalid unit DOND")
-			}
-
-			if !reflect.DeepEqual(unit.NalUnit(), parsed.OtherUnits()[ndx].NalUnit()) {
-				t.Fatal("invalid first unit NalUnit")
-			}
+			assert.Equal(t, unit.NalUnit(), parsed.OtherUnits()[ndx].NalUnit())
 		}
 
-		if !reflect.DeepEqual(cur.ExpectedPacket.OtherUnits(), parsed.OtherUnits()) {
-			t.Fatal("invalid payload")
-		}
+		assert.Equal(t, cur.ExpectedPacket.OtherUnits(), parsed.OtherUnits())
 	}
 }
 
-func TestH265_FragmentationUnitPacket(t *testing.T) { //nolint:cyclop
+func TestH265_FragmentationUnitPacket(t *testing.T) {
 	tt := [...]struct {
 		Raw         []byte
 		WithDONL    bool
@@ -509,32 +470,26 @@ func TestH265_FragmentationUnitPacket(t *testing.T) { //nolint:cyclop
 		parsed.isH265Packet()
 
 		_, err := parsed.Unmarshal(cur.Raw)
-
-		if cur.ExpectedErr != nil && err == nil {
-			t.Fatal("should error")
-		} else if cur.ExpectedErr == nil && err != nil {
-			t.Fatal("should not error")
+		if cur.ExpectedErr != nil {
+			assert.ErrorIs(t, err, cur.ExpectedErr)
+		} else {
+			assert.NoError(t, err)
 		}
 
 		if cur.ExpectedFU == nil {
 			continue
 		}
 
-		if parsed.PayloadHeader() != cur.ExpectedFU.PayloadHeader() {
-			t.Fatal("invalid payload header")
+		assert.Equal(t, cur.ExpectedFU.PayloadHeader(), parsed.PayloadHeader())
+		assert.Equal(t, cur.ExpectedFU.FuHeader(), parsed.FuHeader())
+
+		if cur.ExpectedFU.DONL() != nil {
+			assert.Equal(t, *cur.ExpectedFU.DONL(), *parsed.DONL())
+		} else {
+			assert.Nil(t, parsed.DONL())
 		}
 
-		if parsed.FuHeader() != cur.ExpectedFU.FuHeader() {
-			t.Fatal("invalid FU header")
-		}
-
-		if cur.ExpectedFU.DONL() != nil && (*parsed.DONL() != *cur.ExpectedFU.DONL()) {
-			t.Fatal("invalid DONL")
-		}
-
-		if !reflect.DeepEqual(parsed.Payload(), cur.ExpectedFU.Payload()) {
-			t.Fatal("invalid Payload")
-		}
+		assert.Equal(t, cur.ExpectedFU.Payload(), parsed.Payload())
 	}
 }
 
@@ -573,29 +528,15 @@ func TestH265_TemporalScalabilityControlInformation(t *testing.T) {
 	}
 
 	for _, cur := range tt {
-		if cur.Value.TL0PICIDX() != cur.ExpectedTL0PICIDX {
-			t.Fatal("invalid TL0PICIDX")
-		}
-
-		if cur.Value.IrapPicID() != cur.ExpectedIrapPicID {
-			t.Fatal("invalid IrapPicID")
-		}
-
-		if cur.Value.S() != cur.ExpectedS {
-			t.Fatal("invalid S")
-		}
-
-		if cur.Value.E() != cur.ExpectedE {
-			t.Fatal("invalid E")
-		}
-
-		if cur.Value.RES() != cur.ExpectedRES {
-			t.Fatal("invalid RES")
-		}
+		assert.Equal(t, cur.ExpectedTL0PICIDX, cur.Value.TL0PICIDX())
+		assert.Equal(t, cur.ExpectedIrapPicID, cur.Value.IrapPicID())
+		assert.Equal(t, cur.ExpectedS, cur.Value.S())
+		assert.Equal(t, cur.ExpectedE, cur.Value.E())
+		assert.Equal(t, cur.ExpectedRES, cur.Value.RES())
 	}
 }
 
-func TestH265_PACI_Packet(t *testing.T) { //nolint:cyclop
+func TestH265_PACI_Packet(t *testing.T) {
 	tt := [...]struct {
 		Raw         []byte
 		ExpectedFU  *H265PACIPacket
@@ -626,7 +567,7 @@ func TestH265_PACI_Packet(t *testing.T) { //nolint:cyclop
 		// Invalid header extension size
 		{
 			Raw:         []byte{0x64, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errInvalidH265PacketType,
+			ExpectedErr: errShortPacket,
 		},
 		// No Header Extension
 		{
@@ -667,58 +608,30 @@ func TestH265_PACI_Packet(t *testing.T) { //nolint:cyclop
 		// Just for code coverage sake
 		parsed.isH265Packet()
 
-		if cur.ExpectedErr != nil && err == nil {
-			t.Fatal("should error")
-		} else if cur.ExpectedErr == nil && err != nil {
-			t.Fatal("should not error")
+		if cur.ExpectedErr != nil {
+			assert.ErrorIs(t, err, cur.ExpectedErr)
+		} else {
+			assert.NoError(t, err)
 		}
 
 		if cur.ExpectedFU == nil {
 			continue
 		}
 
-		if cur.ExpectedFU.PayloadHeader() != parsed.PayloadHeader() {
-			t.Fatal("invalid PayloadHeader")
-		}
-
-		if cur.ExpectedFU.A() != parsed.A() {
-			t.Fatal("invalid A")
-		}
-
-		if cur.ExpectedFU.CType() != parsed.CType() {
-			t.Fatal("invalid CType")
-		}
-
-		if cur.ExpectedFU.PHSsize() != parsed.PHSsize() {
-			t.Fatal("invalid PHSsize")
-		}
-
-		if cur.ExpectedFU.F0() != parsed.F0() {
-			t.Fatal("invalid F0")
-		}
-
-		if cur.ExpectedFU.F1() != parsed.F1() {
-			t.Fatal("invalid F1")
-		}
-
-		if cur.ExpectedFU.F2() != parsed.F2() {
-			t.Fatal("invalid F2")
-		}
-
-		if cur.ExpectedFU.Y() != parsed.Y() {
-			t.Fatal("invalid Y")
-		}
-
-		if !reflect.DeepEqual(cur.ExpectedFU.PHES(), parsed.PHES()) {
-			t.Fatal("invalid PHES")
-		}
-
-		if !reflect.DeepEqual(cur.ExpectedFU.Payload(), parsed.Payload()) {
-			t.Fatal("invalid Payload")
-		}
-
-		if cur.ExpectedFU.TSCI() != nil && (*cur.ExpectedFU.TSCI() != *parsed.TSCI()) {
-			t.Fatal("invalid TSCI")
+		assert.Equal(t, cur.ExpectedFU.PayloadHeader(), parsed.PayloadHeader())
+		assert.Equal(t, cur.ExpectedFU.A(), parsed.A())
+		assert.Equal(t, cur.ExpectedFU.CType(), parsed.CType())
+		assert.Equal(t, cur.ExpectedFU.PHSsize(), parsed.PHSsize())
+		assert.Equal(t, cur.ExpectedFU.F0(), parsed.F0())
+		assert.Equal(t, cur.ExpectedFU.F1(), parsed.F1())
+		assert.Equal(t, cur.ExpectedFU.F2(), parsed.F2())
+		assert.Equal(t, cur.ExpectedFU.Y(), parsed.Y())
+		assert.Equal(t, cur.ExpectedFU.PHES(), parsed.PHES())
+		assert.Equal(t, cur.ExpectedFU.Payload(), parsed.Payload())
+		if cur.ExpectedFU.TSCI() != nil {
+			assert.Equal(t, cur.ExpectedFU.TSCI(), parsed.TSCI())
+		} else {
+			assert.Nil(t, parsed.TSCI())
 		}
 	}
 }
@@ -727,7 +640,7 @@ func TestH265_Packet(t *testing.T) {
 	tt := [...]struct {
 		Raw                []byte
 		WithDONL           bool
-		ExpectedPacketType reflect.Type
+		ExpectedPacketType interface{}
 		ExpectedErr        error
 	}{
 		{
@@ -759,7 +672,7 @@ func TestH265_Packet(t *testing.T) {
 		// Valid H265SingleNALUnitPacket
 		{
 			Raw:                []byte{0x01, 0x01, 0xab, 0xcd, 0xef},
-			ExpectedPacketType: reflect.TypeOf((*H265SingleNALUnitPacket)(nil)),
+			ExpectedPacketType: &H265SingleNALUnitPacket{},
 		},
 		// Invalid H265SingleNALUnitPacket
 		{
@@ -770,18 +683,18 @@ func TestH265_Packet(t *testing.T) {
 		// Valid H265PACIPacket
 		{
 			Raw:                []byte{0x64, 0x01, 0x64, 0b00111000, 0xaa, 0xbb, 0x80, 0xab, 0xcd, 0xef},
-			ExpectedPacketType: reflect.TypeOf((*H265PACIPacket)(nil)),
+			ExpectedPacketType: &H265PACIPacket{},
 		},
 		// Valid H265FragmentationUnitPacket
 		{
 			Raw:                []byte{0x62, 0x01, 0x93, 0xcc, 0xdd, 0xaf, 0x0d, 0x5a},
-			ExpectedPacketType: reflect.TypeOf((*H265FragmentationUnitPacket)(nil)),
+			ExpectedPacketType: &H265FragmentationUnitPacket{},
 			WithDONL:           true,
 		},
 		// Valid H265AggregationPacket
 		{
 			Raw:                []byte{0x60, 0x01, 0xcc, 0xdd, 0x00, 0x02, 0xff, 0xee, 0x77, 0x00, 0x01, 0xaa},
-			ExpectedPacketType: reflect.TypeOf((*H265AggregationPacket)(nil)),
+			ExpectedPacketType: &H265AggregationPacket{},
 			WithDONL:           true,
 		},
 		// Invalid H265AggregationPacket
@@ -799,54 +712,37 @@ func TestH265_Packet(t *testing.T) {
 		}
 
 		_, err := pck.Unmarshal(cur.Raw)
-
-		if cur.ExpectedErr != nil && err == nil {
-			t.Fatal("should error")
-		} else if cur.ExpectedErr == nil && err != nil {
-			t.Fatal("should not error")
+		if cur.ExpectedErr == nil {
+			assert.NoError(t, err)
+		} else {
+			assert.ErrorIs(t, err, cur.ExpectedErr)
 		}
 
 		if cur.ExpectedErr != nil {
 			continue
 		}
 
-		if reflect.TypeOf(pck.Packet()) != cur.ExpectedPacketType {
-			t.Fatal("invalid packet type")
-		}
+		assert.IsType(t, cur.ExpectedPacketType, pck.Packet())
 	}
 }
 
 func TestH265IsPartitionHead(t *testing.T) {
 	h265 := H265Packet{}
 
-	if h265.IsPartitionHead(nil) {
-		t.Fatal("nil must not be a partition head")
-	}
-
-	emptyNalu := []byte{}
-	if h265.IsPartitionHead(emptyNalu) {
-		t.Fatal("empty nalu must not be a partition head")
-	}
+	assert.False(t, h265.IsPartitionHead(nil), "nil must not be a partition head")
+	assert.False(t, h265.IsPartitionHead([]byte{}), "empty nalu must not be a partition head")
 
 	singleNalu := []byte{0x01, 0x01, 0xab, 0xcd, 0xef}
-	if h265.IsPartitionHead(singleNalu) == false {
-		t.Fatal("single nalu must be a partition head")
-	}
+	assert.True(t, h265.IsPartitionHead(singleNalu), "single nalu must be a partition head")
 
 	fbitNalu := []byte{0x80, 0x00, 0x00}
-	if h265.IsPartitionHead(fbitNalu) == false {
-		t.Fatal("fbit nalu must be a partition head")
-	}
+	assert.True(t, h265.IsPartitionHead(fbitNalu), "fbit nalu must be a partition head")
 
 	fuStartNalu := []byte{0x62, 0x01, 0x93}
-	if h265.IsPartitionHead(fuStartNalu) == false {
-		t.Fatal("fu start nalu must be a partition head")
-	}
+	assert.True(t, h265.IsPartitionHead(fuStartNalu), "fu start nalu must be a partition head")
 
 	fuEndNalu := []byte{0x62, 0x01, 0x53}
-	if h265.IsPartitionHead(fuEndNalu) {
-		t.Fatal("fu end nalu must not be a partition head")
-	}
+	assert.False(t, h265.IsPartitionHead(fuEndNalu), "fu end nalu must not be a partition head")
 }
 
 func TestH265_Packet_Real(t *testing.T) {
@@ -867,9 +763,7 @@ func TestH265_Packet_Real(t *testing.T) {
 	for _, cur := range tt {
 		pck := &H265Packet{}
 		_, err := pck.Unmarshal([]byte(cur))
-		if err != nil {
-			t.Fatal("invalid packet type")
-		}
+		assert.NoError(t, err)
 	}
 }
 
@@ -1125,13 +1019,9 @@ func TestH265Payloader_Payload(t *testing.T) {
 			pck := H265Payloader{AddDONL: cur.AddDONL, SkipAggregation: cur.SkipAggregation}
 			res := pck.Payload(cur.MTU, cur.Data)
 			if cur.ExpectedData != nil {
-				if !reflect.DeepEqual(res, *cur.ExpectedData) {
-					t.Fatal(cur.Msg)
-				}
+				assert.Equal(t, *cur.ExpectedData, res)
 			} else {
-				if len(res) != cur.ExpectedLen {
-					t.Fatal(cur.Msg)
-				}
+				assert.Len(t, res, cur.ExpectedLen)
 			}
 		})
 	}
@@ -1151,12 +1041,10 @@ func TestH265Payloader_Real(t *testing.T) {
 	}
 	pck := H265Payloader{}
 	res := pck.Payload(1400, payload)
-	if len(res) != 3 {
-		// 1. Aggregating three NALUs into a single payload
-		// 2. Fragmented packets divided by MTU=1400
-		// 3. Remaining fragment packets split by MTU
-		t.Fatal("Generated payload should be 3")
-	}
+	// 1. Aggregating three NALUs into a single payload
+	// 2. Fragmented packets divided by MTU=1400
+	// 3. Remaining fragment packets split by MTU
+	assert.Len(t, res, 3, "Generated payload should be 3")
 }
 
 func uint8ptr(v uint8) *uint8 {

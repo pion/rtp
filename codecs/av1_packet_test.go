@@ -4,13 +4,11 @@
 package codecs
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/pion/rtp/codecs/av1/obu"
+	"github.com/stretchr/testify/assert"
 )
 
 type testAV1AggregationHeader struct {
@@ -101,14 +99,10 @@ func testAV1TestRun(t *testing.T, tests []testAV1Tests) {
 		t.Run(test.Name, func(t *testing.T) {
 			result := payloader.Payload(test.MTU, test.InputPayload)
 
-			if len(result) != len(test.OutputPayloads) {
-				t.Fatalf("Expected %d payloads but got %d", len(test.OutputPayloads), len(result))
-			}
+			assert.Equal(t, len(test.OutputPayloads), len(result))
 
 			for i := range result {
-				if !bytes.Equal(result[i], test.OutputPayloads[i]) {
-					t.Fatalf("Expected %v but got %v for payload #%d", test.OutputPayloads[i], result[i], i+1)
-				}
+				assert.Equal(t, test.OutputPayloads[i], result[i])
 			}
 		})
 	}
@@ -117,14 +111,10 @@ func testAV1TestRun(t *testing.T, tests []testAV1Tests) {
 func TestAV1Payloader_ShortMtU(t *testing.T) {
 	p := &AV1Payloader{}
 
-	if result := p.Payload(0, []byte{0x00, 0x01, 0x18}); len(result) != 0 {
-		t.Errorf("Expected empty payload but got %v", result)
-	}
-
+	assert.Len(t, p.Payload(0, []byte{0x00, 0x01, 0x18}), 0, "Expected empty payload")
+	assert.Len(t, p.Payload(1, []byte{0x00, 0x01, 0x18}), 0, "Expected empty payload")
 	// 2 is the minimum MTU for AV1 (aggregate header + 1 byte)
-	if result := p.Payload(1, []byte{0x00, 0x01, 0x18}); len(result) != 0 {
-		t.Errorf("Expected empty payload but got %v", result)
-	}
+	assert.Greater(t, len(p.Payload(2, []byte{0x00, 0x01, 0x18})), 0)
 }
 
 func TestAV1Payloader_SinglePacket(t *testing.T) {
@@ -1758,13 +1748,9 @@ func TestAV1Payloader_Leb128Size(t *testing.T) {
 
 	for _, test := range tests {
 		actual, edge := payloader.leb128Size(test.leb128)
-		if actual != test.size {
-			t.Fatalf("Expected size %d but got %d", test.size, actual)
-		}
 
-		if edge != test.edge {
-			t.Fatalf("Expected edge %t but got %t", test.edge, edge)
-		}
+		assert.Equal(t, test.size, actual)
+		assert.Equal(t, test.edge, edge)
 	}
 }
 
@@ -1821,24 +1807,20 @@ func TestAV1_depacketizer_to_packetizer(t *testing.T) {
 			packets := payloader.Payload(mtu, payload)
 			for _, packet := range packets {
 				p, err := depacketizer.Unmarshal(packet)
-				if err != nil {
-					t.Fatalf("Failed to depacketize: %v", err)
-				}
-
-				if len(packet) > int(mtu) {
-					t.Fatalf("Expected packet size to be %d but got %d", mtu, len(packet))
-				}
+				assert.NoError(t, err)
+				assert.GreaterOrEqual(t, int(mtu), len(packet), "Expected packet size to be smaller or equal to %d", mtu)
 
 				result = append(result, p...)
 			}
 
-			if len(payload) != len(result) {
-				t.Fatalf("Expected to packetize and depacketize to be the same for MTU=%d", mtu)
-			}
-
-			if !bytes.Equal(payload, result) {
-				t.Fatalf("Expected to packetize and depacketize to be the same for MTU=%d", mtu)
-			}
+			assert.Equalf(
+				t,
+				len(payload),
+				len(result),
+				"Expected to packetize and depacketize to be the same for MTU=%d",
+				mtu,
+			)
+			assert.Equalf(t, payload, result, "Expected to packetize and depacketize to be the same for MTU=%d", mtu)
 		})
 	}
 }
@@ -1857,9 +1839,8 @@ func TestAV1_Unmarshal_Error(t *testing.T) {
 		test := test
 		av1Pkt := &AV1Packet{}
 
-		if _, err := av1Pkt.Unmarshal(test.input); !errors.Is(err, test.expectedError) {
-			t.Fatalf("Expected error(%s) but got (%s)", test.expectedError, err)
-		}
+		_, err := av1Pkt.Unmarshal(test.input)
+		assert.ErrorIs(t, err, test.expectedError)
 	}
 }
 
@@ -2038,11 +2019,10 @@ func TestAV1_Unmarshal(t *testing.T) {
 	}
 
 	av1Pkt := &AV1Packet{}
-	if _, err := av1Pkt.Unmarshal(av1Payload); err != nil {
-		t.Fatal(err)
-	}
+	_, err := av1Pkt.Unmarshal(av1Payload)
+	assert.NoError(t, err)
 
-	if !reflect.DeepEqual(av1Pkt, &AV1Packet{
+	expect := &AV1Packet{
 		Z: false,
 		Y: true,
 		W: 2,
@@ -2051,7 +2031,6 @@ func TestAV1_Unmarshal(t *testing.T) {
 			av1Payload[2:14],
 			av1Payload[14:],
 		},
-	}) {
-		t.Fatal("AV1 Unmarshal didn't store the expected results in the packet")
 	}
+	assert.Equal(t, expect, av1Pkt, "AV1 Unmarshal didn't store the expected results in the packet")
 }

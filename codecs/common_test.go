@@ -5,23 +5,19 @@ package codecs
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCommon_Min(t *testing.T) {
 	res := minInt(1, -1)
-	if res != -1 {
-		t.Fatal("Error: -1 < 1")
-	}
+	assert.Equal(t, -1, res)
 
 	res = minInt(1, 2)
-	if res != 1 {
-		t.Fatal("Error: 1 < 2")
-	}
+	assert.Equal(t, 1, res)
 
 	res = minInt(3, 3)
-	if res != 3 {
-		t.Fatal("Error: 3 == 3")
-	}
+	assert.Equal(t, 3, res)
 }
 
 func TestZeroAllocations(t *testing.T) { //nolint:maintidx
@@ -240,13 +236,9 @@ func TestZeroAllocations(t *testing.T) { //nolint:maintidx
 				d.SetZeroAllocation(true)
 			}
 			_, err := test.packet.Unmarshal(test.data)
-			if err != nil {
-				t.Errorf("Unmarshal failed: %v", err)
-			}
+			assert.NoError(t, err)
 		})
 
-		if allocs != 0 {
-			t.Errorf("%T: %v allocs", test.packet, allocs)
-		}
+		assert.Equal(t, 0.0, allocs)
 	}
 }
