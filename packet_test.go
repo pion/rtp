@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
@@ -1196,7 +1198,7 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		Payload: payload,
 	}
 
-	if packet.SetExtension(1, []byte{
+	err := packet.SetExtension(1, []byte{
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
@@ -1223,9 +1225,8 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-	}) == nil {
-		t.Error("SetExtension did not error on too large payload")
-	}
+	})
+	assert.Error(t, err, "SetExtension did not error on too large payload")
 }
 
 func TestRFC8285Padding(t *testing.T) {
@@ -1250,9 +1251,7 @@ func TestRFC8285Padding(t *testing.T) {
 		},
 	} {
 		_, err := header.Unmarshal(payload)
-		if !errors.Is(err, errHeaderSizeInsufficientForExtension) {
-			t.Fatal("Expected errHeaderSizeInsufficientForExtension")
-		}
+		assert.ErrorIs(t, err, errHeaderSizeInsufficientForExtension)
 	}
 }
 
@@ -1282,14 +1281,10 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 	}
 
 	expect := []byte{0xBB}
-	if packet.SetExtension(0, expect) != nil {
-		t.Error("SetExtension should not error on valid id")
-	}
+	assert.NoError(t, packet.SetExtension(0, expect), "SetExtension should not error on valid id")
 
 	actual := packet.GetExtension(0)
-	if !bytes.Equal(actual, expect) {
-		t.Error("p.GetExtension returned incorrect value.")
-	}
+	assert.Equal(t, expect, actual)
 }
 
 func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
@@ -1312,9 +1307,7 @@ func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 		Payload: payload,
 	}
 
-	if packet.SetExtension(1, []byte{0xBB}) == nil {
-		t.Error("SetExtension did not error on invalid id")
-	}
+	assert.Error(t, packet.SetExtension(1, []byte{0xBB}), "SetExtension should error on invalid id")
 }
 
 func TestUnmarshal_ErrorHandling(t *testing.T) {
@@ -1428,18 +1421,12 @@ func TestCloneHeader(t *testing.T) {
 		CSRC:           []uint32{},
 	}
 	clone := header.Clone()
-	if !reflect.DeepEqual(header, clone) {
-		t.Errorf("Cloned clone does not match the original")
-	}
+	assert.Equal(t, header, clone)
 
 	header.CSRC = append(header.CSRC, 1)
-	if len(clone.CSRC) == len(header.CSRC) {
-		t.Errorf("Expected CSRC to be unchanged")
-	}
+	assert.NotEqual(t, len(clone.CSRC), len(header.CSRC), "Expected CSRC to be unchanged")
 	header.Extensions[0].payload[0] = 0x1F
-	if clone.Extensions[0].payload[0] == 0x1F {
-		t.Errorf("Expected Extensions to be unchanged")
-	}
+	assert.NotEqual(t, clone.Extensions[0].payload[0], byte(0x1F), "Expected extension to be unchanged")
 }
 
 func TestClonePacket(t *testing.T) {
@@ -1453,14 +1440,10 @@ func TestClonePacket(t *testing.T) {
 	}
 
 	clone := packet.Clone()
-	if !reflect.DeepEqual(packet, clone) {
-		t.Errorf("Cloned Packet does not match the original")
-	}
+	assert.Equal(t, packet, clone)
 
 	packet.Payload[0] = 0x1F
-	if clone.Payload[0] == 0x1F {
-		t.Errorf("Expected Payload to be unchanged")
-	}
+	assert.NotEqual(t, clone.Payload[0], 0x1F, "Expected payload to be unchanged")
 }
 
 func BenchmarkMarshal(b *testing.B) {
