@@ -43,26 +43,47 @@ var (
 )
 
 func emitNalus(nals []byte, emit func([]byte)) {
-	start := 0
+	// look for 3-byte NALU start code
+	start := bytes.Index(nals, naluStartCode)
+	offset := 3
+
+	if start == -1 {
+		// no start code, emit the whole buffer
+		emit(nals)
+
+		return
+	}
+
 	length := len(nals)
 
 	for start < length {
-		end := bytes.Index(nals[start:], annexbNALUStartCode)
-		offset := 4
+		// look for the next NALU start (end of this NALU)
+		end := bytes.Index(nals[start+offset:], naluStartCode)
 		if end == -1 {
-			end = bytes.Index(nals[start:], naluStartCode)
-			offset = 3
-		}
-		if end == -1 {
-			emit(nals[start:])
+			// no more NALUs, emit the rest of the buffer
+			emit(nals[start+offset:])
 
 			break
 		}
 
-		emit(nals[start : start+end])
+		// next NALU start
+		nextStart := start + offset + end
 
-		// next NAL start position
-		start += end + offset
+		// check if the next NALU is actually a 4-byte start code
+		endIs4Byte := nals[nextStart-1] == 0
+		if endIs4Byte {
+			nextStart--
+		}
+
+		emit(nals[start+offset : nextStart])
+
+		start = nextStart
+
+		if endIs4Byte {
+			offset = 4
+		} else {
+			offset = 3
+		}
 	}
 }
 
