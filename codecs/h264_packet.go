@@ -43,26 +43,33 @@ var (
 )
 
 func emitNalus(nals []byte, emit func([]byte)) {
-	start := 0
-	length := len(nals)
-
-	for start < length {
-		end := bytes.Index(nals[start:], annexbNALUStartCode)
-		offset := 4
-		if end == -1 {
-			end = bytes.Index(nals[start:], naluStartCode)
-			offset = 3
+	prevIndex := bytes.Index(nals, annexbNALUStartCode)
+	prevLen := 4
+	if prevIndex == -1 {
+		prevIndex = bytes.Index(nals, naluStartCode)
+		prevLen = 3
+	}
+	if prevIndex == -1 {
+		// no start codes found, emit the whole NALU
+		emit(nals)
+		return
+	}
+	for {
+		nextIndex := bytes.Index(nals[prevIndex+prevLen:], annexbNALUStartCode)
+		nextLen := 4
+		if nextIndex == -1 {
+			nextIndex = bytes.Index(nals[prevIndex+prevLen:], naluStartCode)
+			nextLen = 3
 		}
-		if end == -1 {
-			emit(nals[start:])
-
+		if nextIndex == -1 {
+			// no more start codes, emit the rest of the buffer as a NALU
+			emit(nals[prevIndex+prevLen:])
 			break
 		}
-
-		emit(nals[start : start+end])
-
-		// next NAL start position
-		start += end + offset
+		// emit the NALU between the previous and next start code
+		emit(nals[prevIndex+prevLen : prevIndex+prevLen+nextIndex])
+		prevIndex += nextIndex + nextLen
+		prevLen = nextLen
 	}
 }
 
