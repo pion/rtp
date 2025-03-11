@@ -12,6 +12,12 @@ func TestH264Payloader_Payload(t *testing.T) { //nolint:cyclop
 	pck := H264Payloader{}
 	smallpayload := []byte{0x90, 0x90, 0x90}
 	multiplepayload := []byte{0x00, 0x00, 0x01, 0x90, 0x00, 0x00, 0x01, 0x90}
+	mixednalupayload := []byte{
+		0x00, 0x00, 0x01, 0x90,
+		0x00, 0x00, 0x00, 0x01, 0x90,
+		0x00, 0x00, 0x01, 0x90,
+		0x00, 0x00, 0x00, 0x01, 0x90,
+	}
 
 	largepayload := []byte{
 		0x00, 0x00, 0x01, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -78,6 +84,17 @@ func TestH264Payloader_Payload(t *testing.T) { //nolint:cyclop
 	for i := 0; i < 2; i++ {
 		if len(res[i]) != 1 {
 			t.Fatalf("Payload %d of 2 is packed incorrectly", i+1)
+		}
+	}
+
+	// Multiple NALU in a single payload with 3-byte and 4-byte start sequences
+	res = pck.Payload(5, mixednalupayload)
+	if len(res) != 4 {
+		t.Fatal("4 nal units should be broken out", len(res), res)
+	}
+	for i := 0; i < 4; i++ {
+		if len(res[i]) != 1 {
+			t.Fatalf("Payload %d of 4 is packed incorrectly: %v", i+1, res[i])
 		}
 	}
 
