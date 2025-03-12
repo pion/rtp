@@ -4,10 +4,10 @@
 package frame
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/pion/rtp/codecs"
+	"github.com/stretchr/testify/assert"
 )
 
 // First is Fragment (and no buffer)
@@ -17,34 +17,22 @@ func TestAV1_ReadFrames(t *testing.T) {
 	// First is Fragment of OBU, but no OBU Elements is cached
 	fragm := &AV1{}
 	frames, err := fragm.ReadFrames(&codecs.AV1Packet{Z: true, OBUElements: [][]byte{{0x01}}})
-	if err != nil {
-		t.Fatal(err)
-	} else if !reflect.DeepEqual(frames, [][]byte{}) {
-		t.Fatalf("No frames should be generated, %v", frames)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, [][]byte{}, frames, "No frames should be generated")
 
 	fragm = &AV1{}
 	frames, err = fragm.ReadFrames(&codecs.AV1Packet{OBUElements: [][]byte{{0x01}}})
-	if err != nil {
-		t.Fatal(err)
-	} else if !reflect.DeepEqual(frames, [][]byte{{0x01}}) {
-		t.Fatalf("One frame should be generated, %v", frames)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, [][]byte{{0x01}}, frames, "One frame should be generated")
 
 	fragm = &AV1{}
 	frames, err = fragm.ReadFrames(&codecs.AV1Packet{Y: true, OBUElements: [][]byte{{0x00}}})
-	if err != nil {
-		t.Fatal(err)
-	} else if !reflect.DeepEqual(frames, [][]byte{}) {
-		t.Fatalf("No frames should be generated, %v", frames)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, [][]byte{}, frames, "No frames should be generated")
 
 	frames, err = fragm.ReadFrames(&codecs.AV1Packet{Z: true, OBUElements: [][]byte{{0x01}}})
-	if err != nil {
-		t.Fatal(err)
-	} else if !reflect.DeepEqual(frames, [][]byte{{0x00, 0x01}}) {
-		t.Fatalf("One frame should be generated, %v", frames)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, [][]byte{{0x00, 0x01}}, frames, "One frame should be generated")
 }
 
 // Marshal some AV1 Frames to RTP, assert that AV1 can get them back in the original format.
@@ -81,14 +69,14 @@ func TestAV1_ReadFrames_E2E(t *testing.T) {
 	for _, originalFrame := range frames {
 		for _, payload := range payloader.Payload(mtu, originalFrame) {
 			rtpPacket := &codecs.AV1Packet{}
-			if _, err := rtpPacket.Unmarshal(payload); err != nil {
-				t.Fatal(err)
-			}
+			_, err := rtpPacket.Unmarshal(payload)
+			assert.NoError(t, err)
+
 			decodedFrame, err := f.ReadFrames(rtpPacket)
-			if err != nil {
-				t.Fatal(err)
-			} else if len(decodedFrame) != 0 && !reflect.DeepEqual(originalFrame, decodedFrame[0]) {
-				t.Fatalf("Decode(%02x) and Original(%02x) are not equal", decodedFrame[0], originalFrame)
+			assert.NoError(t, err)
+
+			if len(decodedFrame) != 0 {
+				assert.Equal(t, originalFrame, decodedFrame[0])
 			}
 		}
 	}

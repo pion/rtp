@@ -4,20 +4,17 @@
 package rtp
 
 import (
-	"bytes"
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 	packet := &Packet{}
 
-	if err := packet.Unmarshal([]byte{}); err == nil {
-		t.Fatal("Unmarshal did not error on zero length packet")
-	}
+	assert.Error(t, packet.Unmarshal([]byte{}), "Unmarshal did not error on zero length packet")
+	assert.ErrorIs(t, packet.Unmarshal([]byte{}), errHeaderSizeInsufficient)
 
 	rawPkt := []byte{
 		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
@@ -48,24 +45,15 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 	// Unmarshal to the used Packet should work as well.
 	for i := 0; i < 2; i++ {
 		t.Run(fmt.Sprintf("Run%d", i+1), func(t *testing.T) {
-			if err := packet.Unmarshal(rawPkt); err != nil {
-				t.Error(err)
-			} else if !reflect.DeepEqual(packet, parsedPacket) {
-				t.Errorf("TestBasic unmarshal: got %#v, want %#v", packet, parsedPacket)
-			}
+			assert.NoError(t, packet.Unmarshal(rawPkt))
+			assert.Equal(t, packet, parsedPacket)
 
-			if parsedPacket.Header.MarshalSize() != 20 {
-				t.Errorf("wrong computed header marshal size")
-			} else if parsedPacket.MarshalSize() != len(rawPkt) {
-				t.Errorf("wrong computed marshal size")
-			}
+			assert.Equal(t, packet.Header.MarshalSize(), 20, "wrong computed header marshal size")
+			assert.Equal(t, packet.MarshalSize(), len(rawPkt), "wrong computed marshal size")
 
 			raw, err := packet.Marshal()
-			if err != nil {
-				t.Error(err)
-			} else if !reflect.DeepEqual(raw, rawPkt) {
-				t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, rawPkt, raw)
 		})
 	}
 
@@ -95,11 +83,8 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 		Payload:     rawPkt[20:21],
 		PaddingSize: 4,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(packet, parsedPacket) {
-		t.Errorf("TestBasic padding unmarshal: got %#v, want %#v", packet, parsedPacket)
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
+	assert.Equal(t, packet, parsedPacket)
 
 	// packet with zero padding following packet with non-zero padding
 	rawPkt = []byte{
@@ -127,11 +112,8 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 		Payload:     rawPkt[20:],
 		PaddingSize: 0,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(packet, parsedPacket) {
-		t.Errorf("TestBasic zero padding unmarshal: got %#v, want %#v", packet, parsedPacket)
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
+	assert.Equal(t, packet, parsedPacket)
 
 	// packet with only padding
 	rawPkt = []byte{
@@ -159,14 +141,9 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 		Payload:     []byte{},
 		PaddingSize: 5,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(packet, parsedPacket) {
-		t.Errorf("TestBasic padding only unmarshal: got %#v, want %#v", packet, parsedPacket)
-	}
-	if len(packet.Payload) != 0 {
-		t.Errorf("Unmarshal of padding only packet has payload of non-zero length: %d", len(packet.Payload))
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
+	assert.Equal(t, packet, parsedPacket)
+	assert.Len(t, packet.Payload, 0, "Unmarshal of padding only packet has payload of non-zero length")
 
 	// packet with excessive padding
 	rawPkt = []byte{
@@ -195,12 +172,8 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 		PaddingSize: 0,
 	}
 	err := packet.Unmarshal(rawPkt)
-	if err == nil {
-		t.Fatal("Unmarshal did not error on packet with excessive padding")
-	}
-	if !errors.Is(err, errTooSmall) {
-		t.Errorf("Expected error: %v, got: %v", errTooSmall, err)
-	}
+	assert.Error(t, err, "Unmarshal did not error on packet with excessive padding")
+	assert.ErrorIs(t, err, errTooSmall)
 
 	// marshal packet with padding
 	rawPkt = []byte{
@@ -229,12 +202,8 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 		PaddingSize: 4,
 	}
 	buf, err := parsedPacket.Marshal()
-	if err != nil {
-		t.Error(err)
-	}
-	if !reflect.DeepEqual(buf, rawPkt) {
-		t.Errorf("TestBasic padding marshal: got %#v, want %#v", buf, rawPkt)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, buf)
 
 	// marshal packet with padding only
 	rawPkt = []byte{
@@ -263,12 +232,8 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 		PaddingSize: 5,
 	}
 	buf, err = parsedPacket.Marshal()
-	if err != nil {
-		t.Error(err)
-	}
-	if !reflect.DeepEqual(buf, rawPkt) {
-		t.Errorf("TestBasic padding marshal: got %#v, want %#v", buf, rawPkt)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, buf)
 
 	// marshal packet with padding only without setting Padding explicitly in Header
 	rawPkt = []byte{
@@ -297,12 +262,8 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 		PaddingSize: 5,
 	}
 	buf, err = parsedPacket.Marshal()
-	if err != nil {
-		t.Error(err)
-	}
-	if !reflect.DeepEqual(buf, rawPkt) {
-		t.Errorf("TestBasic padding marshal: got %#v, want %#v", buf, rawPkt)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, buf)
 }
 
 func TestExtension(t *testing.T) {
@@ -312,17 +273,19 @@ func TestExtension(t *testing.T) {
 		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
 		0x27, 0x82,
 	}
-	if err := packet.Unmarshal(missingExtensionPkt); err == nil {
-		t.Fatal("Unmarshal did not error on packet with missing extension data")
-	}
+	assert.Error(
+		t, packet.Unmarshal(missingExtensionPkt),
+		"Unmarshal did not error on packet with missing extension data",
+	)
 
 	invalidExtensionLengthPkt := []byte{
 		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
 		0x27, 0x82, 0x99, 0x99, 0x99, 0x99,
 	}
-	if err := packet.Unmarshal(invalidExtensionLengthPkt); err == nil {
-		t.Fatal("Unmarshal did not error on packet with invalid extension length")
-	}
+	assert.Error(
+		t, packet.Unmarshal(invalidExtensionLengthPkt),
+		"Unmarshal did not error on packet with invalid extension length",
+	)
 
 	packet = &Packet{
 		Header: Header{
@@ -336,9 +299,8 @@ func TestExtension(t *testing.T) {
 		},
 		Payload: []byte{},
 	}
-	if _, err := packet.Marshal(); err == nil {
-		t.Fatal("Marshal did not error on packet with invalid extension length")
-	}
+	_, err := packet.Marshal()
+	assert.Error(t, err, "Marshal did not error on packet with invalid extension length")
 }
 
 func TestRFC8285OneByteExtension(t *testing.T) {
@@ -349,9 +311,7 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01, 0x50, 0xAA, 0x00, 0x00,
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Fatal("Unmarshal err for valid extension")
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
 
 	packet = &Packet{
 		Header: Header{
@@ -374,9 +334,7 @@ func TestRFC8285OneByteExtension(t *testing.T) {
 	}
 
 	dstData, _ := packet.Marshal()
-	if !bytes.Equal(dstData, rawPkt) {
-		t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(dstData), hex.Dump(rawPkt))
-	}
+	assert.Equal(t, rawPkt, dstData)
 }
 
 func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
@@ -395,21 +353,15 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Fatal("Unmarshal err for valid extension")
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
 
 	ext1 := packet.GetExtension(1)
 	ext1Expect := []byte{0xAA}
-	if !bytes.Equal(ext1, ext1Expect) {
-		t.Errorf("Extension has incorrect data. Got: %+v, Expected: %+v", ext1, ext1Expect)
-	}
+	assert.Equal(t, ext1Expect, ext1, "Extension has incorrect data")
 
 	ext2 := packet.GetExtension(2)
 	ext2Expect := []byte{0xBB}
-	if !bytes.Equal(ext2, ext2Expect) {
-		t.Errorf("Extension has incorrect data. Got: %+v, Expected: %+v", ext2, ext2Expect)
-	}
+	assert.Equal(t, ext2Expect, ext2, "Extension has incorrect data")
 
 	// Test Marshal
 	packet = &Packet{
@@ -436,9 +388,7 @@ func TestRFC8285OneByteTwoExtensionOfTwoBytes(t *testing.T) {
 	}
 
 	dstData, _ := packet.Marshal()
-	if !bytes.Equal(dstData, rawPkt) {
-		t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(dstData), hex.Dump(rawPkt))
-	}
+	assert.Equal(t, rawPkt, dstData)
 }
 
 func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
@@ -462,27 +412,19 @@ func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
 		// Payload
 		0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Fatal("Unmarshal err for valid extension")
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
 
 	ext1 := packet.GetExtension(1)
 	ext1Expect := []byte{0xAA}
-	if !bytes.Equal(ext1, ext1Expect) {
-		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext1, ext1Expect)
-	}
+	assert.Equal(t, ext1Expect, ext1, "Extension has incorrect data")
 
 	ext2 := packet.GetExtension(2)
 	ext2Expect := []byte{0xBB, 0xBB}
-	if !bytes.Equal(ext2, ext2Expect) {
-		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext2, ext2Expect)
-	}
+	assert.Equal(t, ext2Expect, ext2, "Extension has incorrect data")
 
 	ext3 := packet.GetExtension(3)
 	ext3Expect := []byte{0xCC, 0xCC, 0xCC, 0xCC}
-	if !bytes.Equal(ext3, ext3Expect) {
-		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
-	}
+	assert.Equal(t, ext3Expect, ext3, "Extension has incorrect data")
 
 	rawPktReMarshal := []byte{
 		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
@@ -502,12 +444,8 @@ func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
 		buf := buf
 		t.Run(name, func(t *testing.T) {
 			n, err := packet.MarshalTo(buf)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !bytes.Equal(buf[:n], rawPktReMarshal) {
-				t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(buf[:n]), hex.Dump(rawPktReMarshal))
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, rawPktReMarshal, buf[:n])
 		})
 	}
 }
@@ -559,9 +497,7 @@ func TestRFC8285OneByteMultipleExtensions(t *testing.T) {
 	}
 
 	dstData, _ := packet.Marshal()
-	if !bytes.Equal(dstData, rawPkt) {
-		t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(dstData), hex.Dump(rawPkt))
-	}
+	assert.Equal(t, rawPkt, dstData)
 }
 
 func TestRFC8285TwoByteExtension(t *testing.T) {
@@ -574,9 +510,7 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 		0xAA, 0xAA, 0x00, 0x00, 0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Fatal("Unmarshal err for valid extension")
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
 
 	packet = &Packet{
 		Header: Header{
@@ -601,9 +535,7 @@ func TestRFC8285TwoByteExtension(t *testing.T) {
 	}
 
 	dstData, _ := packet.Marshal()
-	if !bytes.Equal(dstData, rawPkt) {
-		t.Errorf("Marshal failed raw \nMarshaled:\n%s\nrawPkt:\n%s", hex.Dump(dstData), hex.Dump(rawPkt))
-	}
+	assert.Equal(t, rawPkt, dstData)
 }
 
 func TestRFC8285TwoByteMultipleExtensionsWithPadding(t *testing.T) {
@@ -626,27 +558,19 @@ func TestRFC8285TwoByteMultipleExtensionsWithPadding(t *testing.T) {
 		0xBB, 0x00, 0x03, 0x04, 0xCC, 0xCC, 0xCC, 0xCC, 0x98, 0x36,
 		0xbe, 0x88, 0x9e,
 	}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Fatal("Unmarshal err for valid extension")
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
 
 	ext1 := packet.GetExtension(1)
 	ext1Expect := []byte{}
-	if !bytes.Equal(ext1, ext1Expect) {
-		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext1, ext1Expect)
-	}
+	assert.Equal(t, ext1Expect, ext1, "Extension has incorrect data")
 
 	ext2 := packet.GetExtension(2)
 	ext2Expect := []byte{0xBB}
-	if !bytes.Equal(ext2, ext2Expect) {
-		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext2, ext2Expect)
-	}
+	assert.Equal(t, ext2Expect, ext2, "Extension has incorrect data")
 
 	ext3 := packet.GetExtension(3)
 	ext3Expect := []byte{0xCC, 0xCC, 0xCC, 0xCC}
-	if !bytes.Equal(ext3, ext3Expect) {
-		t.Errorf("Extension has incorrect data. Got: %v+, Expected: %v+", ext3, ext3Expect)
-	}
+	assert.Equal(t, ext3Expect, ext3, "Extension has incorrect data")
 }
 
 func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
@@ -700,11 +624,8 @@ func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
 		},
 		Payload: rawPkt[40:],
 	}
-
 	dstData, _ := packet.Marshal()
-	if !bytes.Equal(dstData, rawPkt) {
-		t.Errorf("Marshal failed raw \nMarshaled: %+v,\nrawPkt:    %+v", dstData, rawPkt)
-	}
+	assert.Equal(t, rawPkt, dstData)
 }
 
 func TestRFC8285GetExtensionReturnsNilWhenExtensionsDisabled(t *testing.T) {
@@ -725,11 +646,7 @@ func TestRFC8285GetExtensionReturnsNilWhenExtensionsDisabled(t *testing.T) {
 		},
 		Payload: payload,
 	}
-
-	err := packet.GetExtension(1)
-	if err != nil {
-		t.Error("Should return nil on GetExtension when h.Extension: false")
-	}
+	assert.Nil(t, packet.GetExtension(1), "Should return nil on GetExtension when h.Extension: false")
 }
 
 func TestRFC8285DelExtension(t *testing.T) {
@@ -756,26 +673,10 @@ func TestRFC8285DelExtension(t *testing.T) {
 		},
 		Payload: payload,
 	}
-
-	ext := packet.GetExtension(1)
-	if ext == nil {
-		t.Error("Extension should exist")
-	}
-
-	err := packet.DelExtension(1)
-	if err != nil {
-		t.Error("Should successfully delete extension")
-	}
-
-	ext = packet.GetExtension(1)
-	if ext != nil {
-		t.Error("Extension should not exist")
-	}
-
-	err = packet.DelExtension(1)
-	if err == nil {
-		t.Error("Should return error when deleting extension that doesnt exist")
-	}
+	assert.NotNil(t, packet.GetExtension(1), "Extension should exist")
+	assert.NoError(t, packet.DelExtension(1), "Should successfully delete extension")
+	assert.Nil(t, packet.GetExtension(1), "Extension should not exist")
+	assert.Error(t, packet.DelExtension(1), "Should return error when deleting extension that doesnt exist")
 }
 
 func TestRFC8285GetExtensionIDs(t *testing.T) {
@@ -805,24 +706,13 @@ func TestRFC8285GetExtensionIDs(t *testing.T) {
 		},
 		Payload: payload,
 	}
-
 	ids := packet.GetExtensionIDs()
-	if ids == nil {
-		t.Error("Extension should exist")
-	}
-	if len(ids) != len(packet.Extensions) {
-		t.Errorf(
-			"The number of IDs should be equal to the number of extensions,want=%d,have=%d",
-			len(packet.Extensions),
-			len(ids),
-		)
-	}
+	assert.NotNil(t, ids, "Extension should exist")
+	assert.Len(t, ids, len(packet.Extensions), "The number of IDs should be equal to the number of extensions")
 
 	for _, id := range ids {
 		ext := packet.GetExtension(id)
-		if ext == nil {
-			t.Error("Extension should exist")
-		}
+		assert.NotNil(t, ext, "Extension should exist")
 	}
 }
 
@@ -844,11 +734,7 @@ func TestRFC8285GetExtensionIDsReturnsErrorWhenExtensionsDisabled(t *testing.T) 
 		},
 		Payload: payload,
 	}
-
-	ids := packet.GetExtensionIDs()
-	if ids != nil {
-		t.Error("Should return nil on GetExtensionIDs when h.Extensions is nil")
-	}
+	assert.Nil(t, packet.GetExtensionIDs(), "Should return nil on GetExtensionIDs when h.Extensions is nil")
 }
 
 func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
@@ -869,11 +755,9 @@ func TestRFC8285DelExtensionReturnsErrorWhenExtensionsDisabled(t *testing.T) {
 		},
 		Payload: payload,
 	}
-
-	err := packet.DelExtension(1)
-	if err == nil {
-		t.Error("Should return error on DelExtension when h.Extension: false")
-	}
+	assert.Error(
+		t, packet.DelExtension(1), "DelExtension did not error on h.Extension: false",
+	)
 }
 
 func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
@@ -894,28 +778,12 @@ func TestRFC8285OneByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 		},
 		Payload: payload,
 	}
-
 	extension := []byte{0xAA, 0xAA}
-	err := packet.SetExtension(1, extension)
-	if err != nil {
-		t.Error("Error setting extension")
-	}
-
-	if packet.Extension != true {
-		t.Error("Extension should be set to true")
-	}
-
-	if packet.ExtensionProfile != 0xBEDE {
-		t.Error("Extension profile should be set to 0xBEDE")
-	}
-
-	if len(packet.Extensions) != 1 {
-		t.Error("Extensions should be set to 1")
-	}
-
-	if !bytes.Equal(packet.GetExtension(1), extension) {
-		t.Error("Extension value is not set")
-	}
+	assert.NoError(t, packet.SetExtension(1, extension))
+	assert.True(t, packet.Extension)
+	assert.Equal(t, uint16(0xBEDE), packet.ExtensionProfile)
+	assert.Len(t, packet.Extensions, 1)
+	assert.Equal(t, extension, packet.GetExtension(1))
 }
 
 func TestRFC8285OneByteSetExtensionShouldSetCorrectExtensionProfileFor16ByteExtension(t *testing.T) {
@@ -944,13 +812,8 @@ func TestRFC8285OneByteSetExtensionShouldSetCorrectExtensionProfileFor16ByteExte
 		0xAA, 0xAA, 0xAA, 0xAA,
 	}
 	err := packet.SetExtension(1, extension)
-	if err != nil {
-		t.Error("Error setting extension")
-	}
-
-	if packet.ExtensionProfile != 0xBEDE {
-		t.Error("Extension profile should be set to 0xBEDE")
-	}
+	assert.NoError(t, err, "Error setting extension")
+	assert.Equal(t, uint16(0xBEDE), packet.ExtensionProfile)
 }
 
 func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
@@ -977,20 +840,12 @@ func TestRFC8285OneByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 		},
 		Payload: payload,
 	}
-
-	if !bytes.Equal(packet.GetExtension(1), []byte{0xAA}) {
-		t.Error("Extension value not initialize properly")
-	}
+	assert.Equal(t, []byte{0xAA}, packet.GetExtension(1))
 
 	extension := []byte{0xBB}
 	err := packet.SetExtension(1, extension)
-	if err != nil {
-		t.Error("Error setting extension")
-	}
-
-	if !bytes.Equal(packet.GetExtension(1), extension) {
-		t.Error("Extension value was not set")
-	}
+	assert.NoError(t, err, "Error setting extension")
+	assert.Equal(t, extension, packet.GetExtension(1))
 }
 
 func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T) {
@@ -1017,14 +872,14 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T
 		},
 		Payload: payload,
 	}
-
-	if packet.SetExtension(0, []byte{0xBB}) == nil {
-		t.Error("SetExtension did not error on invalid id")
-	}
-
-	if packet.SetExtension(15, []byte{0xBB}) == nil {
-		t.Error("SetExtension did not error on invalid id")
-	}
+	assert.Error(
+		t, packet.SetExtension(0, []byte{0xBB}),
+		"SetExtension did not error on invalid id",
+	)
+	assert.Error(
+		t, packet.SetExtension(15, []byte{0xBB}),
+		"SetExtension did not error on invalid id",
+	)
 }
 
 func TestRFC8285OneByteExtensionTermianteProcessingWhenReservedIDEncountered(t *testing.T) {
@@ -1034,20 +889,14 @@ func TestRFC8285OneByteExtensionTermianteProcessingWhenReservedIDEncountered(t *
 		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
 		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01, 0xF0, 0xAA, 0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
-	if err := packet.Unmarshal(reservedIDPkt); err != nil {
-		t.Error("Unmarshal error on packet with reserved extension id")
-	}
-
-	if len(packet.Extensions) != 0 {
-		t.Error("Extensions should be empty for invalid id")
-	}
+	assert.NoError(
+		t, packet.Unmarshal(reservedIDPkt),
+		"Unmarshal error on packet with reserved extension id",
+	)
+	assert.Len(t, packet.Extensions, 0, "Extensions should be empty for invalid id")
 
 	payload := reservedIDPkt[17:]
-	if !bytes.Equal(packet.Payload, payload) {
-		t.Errorf("p.Payload must be same as payload.\n  p.Payload: %+v,\n payload: %+v",
-			packet.Payload, payload,
-		)
-	}
+	assert.Equal(t, payload, packet.Payload)
 }
 
 func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) {
@@ -1074,13 +923,14 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		},
 		Payload: payload,
 	}
-
-	if packet.SetExtension(1, []byte{
-		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-	}) == nil {
-		t.Error("SetExtension did not error on too large payload")
-	}
+	assert.Error(
+		t,
+		packet.SetExtension(1, []byte{
+			0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+			0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+		}),
+		"SetExtension did not error on too large payload",
+	)
 }
 
 func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T) {
@@ -1106,26 +956,11 @@ func TestRFC8285TwoByteSetExtensionShouldEnableExensionsWhenAdding(t *testing.T)
 		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 		0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 	}
-	err := packet.SetExtension(1, extension)
-	if err != nil {
-		t.Error("Error setting extension")
-	}
-
-	if packet.Extension != true {
-		t.Error("Extension should be set to true")
-	}
-
-	if packet.ExtensionProfile != 0x1000 {
-		t.Error("Extension profile should be set to 0xBEDE")
-	}
-
-	if len(packet.Extensions) != 1 {
-		t.Error("Extensions should be set to 1")
-	}
-
-	if !bytes.Equal(packet.GetExtension(1), extension) {
-		t.Error("Extension value is not set")
-	}
+	assert.NoError(t, packet.SetExtension(1, extension))
+	assert.True(t, packet.Extension)
+	assert.Equal(t, uint16(0x1000), packet.ExtensionProfile)
+	assert.Len(t, packet.Extensions, 1)
+	assert.Equal(t, extension, packet.GetExtension(1))
 }
 
 func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
@@ -1152,23 +987,15 @@ func TestRFC8285TwoByteSetExtensionShouldUpdateExistingExension(t *testing.T) {
 		},
 		Payload: payload,
 	}
-
-	if !bytes.Equal(packet.GetExtension(1), []byte{0xAA}) {
-		t.Error("Extension value not initialize properly")
-	}
+	assert.Equal(t, []byte{0xAA}, packet.GetExtension(1), "Extension value not initialize properly")
 
 	extension := []byte{
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 	}
 	err := packet.SetExtension(1, extension)
-	if err != nil {
-		t.Error("Error setting extension")
-	}
-
-	if !bytes.Equal(packet.GetExtension(1), extension) {
-		t.Error("Extension value was not set")
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, packet.GetExtension(1), extension)
 }
 
 func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) {
@@ -1196,7 +1023,7 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		Payload: payload,
 	}
 
-	if packet.SetExtension(1, []byte{
+	err := packet.SetExtension(1, []byte{
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
@@ -1223,9 +1050,8 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
 		0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-	}) == nil {
-		t.Error("SetExtension did not error on too large payload")
-	}
+	})
+	assert.Error(t, err, "SetExtension did not error on too large payload")
 }
 
 func TestRFC8285Padding(t *testing.T) {
@@ -1250,9 +1076,7 @@ func TestRFC8285Padding(t *testing.T) {
 		},
 	} {
 		_, err := header.Unmarshal(payload)
-		if !errors.Is(err, errHeaderSizeInsufficientForExtension) {
-			t.Fatal("Expected errHeaderSizeInsufficientForExtension")
-		}
+		assert.ErrorIs(t, err, errHeaderSizeInsufficientForExtension)
 	}
 }
 
@@ -1282,14 +1106,10 @@ func TestRFC3550SetExtensionShouldErrorWhenNonZero(t *testing.T) {
 	}
 
 	expect := []byte{0xBB}
-	if packet.SetExtension(0, expect) != nil {
-		t.Error("SetExtension should not error on valid id")
-	}
+	assert.NoError(t, packet.SetExtension(0, expect), "SetExtension should not error on valid id")
 
 	actual := packet.GetExtension(0)
-	if !bytes.Equal(actual, expect) {
-		t.Error("p.GetExtension returned incorrect value.")
-	}
+	assert.Equal(t, expect, actual)
 }
 
 func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
@@ -1312,9 +1132,7 @@ func TestRFC3550SetExtensionShouldRaiseErrorWhenSettingNonzeroID(t *testing.T) {
 		Payload: payload,
 	}
 
-	if packet.SetExtension(1, []byte{0xBB}) == nil {
-		t.Error("SetExtension did not error on invalid id")
-	}
+	assert.Error(t, packet.SetExtension(1, []byte{0xBB}), "SetExtension should error on invalid id")
 }
 
 func TestUnmarshal_ErrorHandling(t *testing.T) {
@@ -1372,9 +1190,7 @@ func TestUnmarshal_ErrorHandling(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			h := &Header{}
 			_, err := h.Unmarshal(testCase.input)
-			if !errors.Is(err, testCase.err) {
-				t.Errorf("Expected error: %v, got: %v", testCase.err, err)
-			}
+			assert.ErrorIs(t, err, testCase.err)
 		})
 	}
 }
@@ -1387,27 +1203,13 @@ func TestRoundtrip(t *testing.T) {
 	payload := rawPkt[12:]
 
 	packet := &Packet{}
-	if err := packet.Unmarshal(rawPkt); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(payload, packet.Payload) {
-		t.Errorf("p.Payload must be same as payload.\n  payload: %+v,\np.Payload: %+v",
-			payload, packet.Payload,
-		)
-	}
+	assert.NoError(t, packet.Unmarshal(rawPkt))
+	assert.Equal(t, payload, packet.Payload)
 
 	buf, err := packet.Marshal()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(rawPkt, buf) {
-		t.Errorf("buf must be same as rawPkt.\n   buf: %+v,\nrawPkt: %+v", buf, rawPkt)
-	}
-	if !bytes.Equal(payload, packet.Payload) {
-		t.Errorf("p.Payload must be same as payload.\n  payload: %+v,\np.Payload: %+v",
-			payload, packet.Payload,
-		)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, buf)
+	assert.Equal(t, payload, packet.Payload)
 }
 
 func TestCloneHeader(t *testing.T) {
@@ -1428,18 +1230,12 @@ func TestCloneHeader(t *testing.T) {
 		CSRC:           []uint32{},
 	}
 	clone := header.Clone()
-	if !reflect.DeepEqual(header, clone) {
-		t.Errorf("Cloned clone does not match the original")
-	}
+	assert.Equal(t, header, clone)
 
 	header.CSRC = append(header.CSRC, 1)
-	if len(clone.CSRC) == len(header.CSRC) {
-		t.Errorf("Expected CSRC to be unchanged")
-	}
+	assert.NotEqual(t, len(clone.CSRC), len(header.CSRC), "Expected CSRC to be unchanged")
 	header.Extensions[0].payload[0] = 0x1F
-	if clone.Extensions[0].payload[0] == 0x1F {
-		t.Errorf("Expected Extensions to be unchanged")
-	}
+	assert.NotEqual(t, clone.Extensions[0].payload[0], byte(0x1F), "Expected extension to be unchanged")
 }
 
 func TestClonePacket(t *testing.T) {
@@ -1453,14 +1249,10 @@ func TestClonePacket(t *testing.T) {
 	}
 
 	clone := packet.Clone()
-	if !reflect.DeepEqual(packet, clone) {
-		t.Errorf("Cloned Packet does not match the original")
-	}
+	assert.Equal(t, packet, clone)
 
 	packet.Payload[0] = 0x1F
-	if clone.Payload[0] == 0x1F {
-		t.Errorf("Expected Payload to be unchanged")
-	}
+	assert.NotEqual(t, clone.Payload[0], 0x1F, "Expected payload to be unchanged")
 }
 
 func BenchmarkMarshal(b *testing.B) {

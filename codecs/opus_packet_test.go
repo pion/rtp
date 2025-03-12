@@ -4,8 +4,9 @@
 package codecs
 
 import (
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOpusPacket_Unmarshal(t *testing.T) {
@@ -13,30 +14,18 @@ func TestOpusPacket_Unmarshal(t *testing.T) {
 
 	// Nil packet
 	raw, err := pck.Unmarshal(nil)
-	if raw != nil {
-		t.Fatal("Result should be nil in case of error")
-	}
-	if err == nil || err.Error() != errNilPacket.Error() {
-		t.Fatal("Error should be:", errNilPacket)
-	}
+	assert.ErrorIs(t, err, errNilPacket)
+	assert.Nil(t, raw, "Result should be nil in case of error")
 
 	// Empty packet
 	raw, err = pck.Unmarshal([]byte{})
-	if raw != nil {
-		t.Fatal("Result should be nil in case of error")
-	}
-	if !errors.Is(err, errShortPacket) {
-		t.Fatal("Error should be:", errShortPacket)
-	}
+	assert.ErrorIs(t, err, errShortPacket)
+	assert.Nil(t, raw, "Result should be nil in case of error")
 
 	// Normal packet
 	raw, err = pck.Unmarshal([]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x90})
-	if raw == nil {
-		t.Fatal("Result shouldn't be nil in case of success")
-	}
-	if err != nil {
-		t.Fatal("Error should be nil in case of success")
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, raw, "Result shouldn't be nil in case of success")
 }
 
 func TestOpusPayloader_Payload(t *testing.T) {
@@ -45,28 +34,23 @@ func TestOpusPayloader_Payload(t *testing.T) {
 
 	// Positive MTU, nil payload
 	res := pck.Payload(1, nil)
-	if len(res) != 0 {
-		t.Fatal("Generated payload should be empty")
-	}
+	assert.Len(t, res, 0, "Generated payload should be empty")
 
 	// Positive MTU, small payload
 	res = pck.Payload(1, payload)
-	if len(res) != 1 {
-		t.Fatal("Generated payload should be the 1")
-	}
+	assert.Len(t, res, 1, "Generated payload should be the 1")
 
 	// Positive MTU, small payload
 	res = pck.Payload(2, payload)
-	if len(res) != 1 {
-		t.Fatal("Generated payload should be the 1")
-	}
+	assert.Len(t, res, 1, "Generated payload should be the 1")
 }
 
 func TestOpusIsPartitionHead(t *testing.T) {
 	opus := &OpusPacket{}
 	t.Run("NormalPacket", func(t *testing.T) {
-		if !opus.IsPartitionHead([]byte{0x00, 0x00}) {
-			t.Fatal("All OPUS RTP packet should be the head of a new partition")
-		}
+		assert.True(
+			t, opus.IsPartitionHead([]byte{0x00, 0x00}),
+			"All OPUS RTP packet should be the head of a new partition",
+		)
 	})
 }

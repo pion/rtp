@@ -4,9 +4,9 @@
 package obu
 
 import (
-	"bytes"
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOBUType(t *testing.T) {
@@ -28,14 +28,8 @@ func TestOBUType(t *testing.T) {
 		{Type(9), 9, "OBU_RESERVED"},
 	} {
 		test := test
-
-		if test.Type.String() != test.Str {
-			t.Errorf("Expected %s, got %s", test.Str, test.Type.String())
-		}
-
-		if uint8(test.Type) != test.TypeValue {
-			t.Errorf("Expected %d, got %d", test.TypeValue, uint8(test.Type))
-		}
+		assert.Equal(t, test.Str, test.Type.String())
+		assert.Equal(t, test.TypeValue, uint8(test.Type))
 	}
 }
 
@@ -65,27 +59,13 @@ func TestOBUHeader_NoExtension(t *testing.T) {
 
 		buff := []byte{test.Value}
 		header, err := ParseOBUHeader(buff)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-
-		if *header != test.Header {
-			t.Errorf("Expected %v, got %v", test.Header, *header)
-		}
-
-		if test.Header.Size() != 1 {
-			t.Errorf("Expected size 1 for header without extension, got %d", test.Header.Size())
-		}
+		assert.NoError(t, err)
+		assert.Equal(t, test.Header, *header)
+		assert.Equal(t, 1, header.Size())
 
 		value := test.Header.Marshal()
-
-		if len(value) != 1 {
-			t.Errorf("Expected size 1 for header without extension, got %d", len(value))
-		}
-
-		if value[0] != test.Value {
-			t.Errorf("Expected %d for header value, got %d", test.Value, value[0])
-		}
+		assert.Len(t, value, 1, "Expected size 1 for header without extension")
+		assert.Equal(t, test.Value, value[0])
 	}
 }
 
@@ -139,103 +119,62 @@ func TestOBUHeader_Extension(t *testing.T) {
 
 		buff := []byte{test.HeaderValue, test.ExtensionHeaderValue}
 		header, err := ParseOBUHeader(buff)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		assert.NoError(t, err)
 
 		expected := Header{
 			Type:         test.Header.Type,
 			HasSizeField: test.Header.HasSizeField,
 			Reserved1Bit: test.Header.Reserved1Bit,
 		}
-		if expected != test.Header {
-			t.Errorf("Expected %v, got %v", test.Header, *header)
-		}
-
-		if header.Size() != 2 {
-			t.Errorf("Expected size 2 for header with extension, got %d", test.Header.Size())
-		}
+		assert.Equal(t, expected, test.Header)
+		assert.Equal(t, 2, header.Size())
 
 		extension := header.ExtensionHeader
-		if extension == nil {
-			t.Fatalf("Expected extension header to be present")
-		}
-
-		if *extension != test.ExtensionHeader {
-			t.Errorf("Expected %v, got %v", test.ExtensionHeader, *extension)
-		}
-
-		if extension.Marshal() != test.ExtensionHeaderValue {
-			t.Errorf("Expected %d for extension header value, got %d", test.ExtensionHeaderValue, extension.Marshal())
-		}
+		assert.NotNil(t, extension)
+		assert.Equal(t, test.ExtensionHeader, *extension)
+		assert.Equal(t, test.ExtensionHeaderValue, extension.Marshal())
 
 		value := header.Marshal()
-		if len(value) != 2 {
-			t.Errorf("Expected size 2 for header with extension, got %d", len(value))
-		}
-
-		if !bytes.Equal(value, buff) {
-			t.Errorf("Expected %v for header value, got %v", buff, value)
-		}
+		assert.Lenf(
+			t, value, 2,
+			"Expected size 2 for header with extension, got %d", len(value),
+		)
+		assert.Equal(t, buff, value)
 	}
 }
 
 func TestOBUHeader_Short(t *testing.T) {
 	_, err := ParseOBUHeader([]byte{})
-	if err == nil {
-		t.Fatalf("Expected error, got nil")
-	}
-	if !errors.Is(err, ErrShortHeader) {
-		t.Errorf("Expected ErrShortHeader, got %v", err)
-	}
+	assert.ErrorIs(t, err, ErrShortHeader)
 
 	// Missing extension header
 	_, err = ParseOBUHeader([]byte{0b0_0000_1_0_0})
-	if err == nil {
-		t.Fatalf("Expected error, got nil")
-	}
-
-	if !errors.Is(err, ErrShortHeader) {
-		t.Errorf("Expected ErrShortHeader, got %v", err)
-	}
+	assert.ErrorIs(t, err, ErrShortHeader)
 }
 
 func TestOBUHeader_Invalid(t *testing.T) {
+	// forbidden bit is set
 	_, err := ParseOBUHeader([]byte{0b1_0010_0_0_1})
-	if err == nil {
-		t.Fatalf("Expected error, got nil")
-	}
-	if !errors.Is(err, ErrInvalidOBUHeader) {
-		t.Errorf("Expected ErrInvalidOBUHeader, got %v", err)
-	}
+	assert.ErrorIs(t, err, ErrInvalidOBUHeader)
 }
 
 func TestOBUHeader_MarshalOutbound(t *testing.T) {
 	// Marshal should turnicate the extension header values.
 	header := Header{Type: Type(255)}
-	if header.Marshal()[0] != 0b0_1111_000 {
-		t.Errorf("Expected 0b0_1111_000, got %b", header.Marshal()[0])
-	}
+	assert.Equal(t, uint8(0b0_1111_000), header.Marshal()[0])
 
 	extentionHeader := ExtensionHeader{TemporalID: 255}
-
-	if extentionHeader.Marshal() != 0b111_00_000 {
-		t.Errorf("Expected 0b111_00_000, got %b", extentionHeader.Marshal())
-	}
+	assert.Equal(t, uint8(0b111_00_000), extentionHeader.Marshal())
 
 	extensionHeader := ExtensionHeader{SpatialID: 255}
-	if extensionHeader.Marshal() != 0b000_11_000 {
-		t.Errorf("Expected 0b000_11_000, got %b", extensionHeader.Marshal())
-	}
+	assert.Equal(t, uint8(0b000_11_000), extensionHeader.Marshal())
 
 	extensionHeader = ExtensionHeader{Reserved3Bits: 255}
-	if extensionHeader.Marshal() != 0b000_00_111 {
-		t.Errorf("Expected 0b000_00_111, got %b", extensionHeader.Marshal())
-	}
+	assert.Equal(t, uint8(0b000_00_111), extensionHeader.Marshal())
 }
 
 func TestOBUMarshal(t *testing.T) {
-	obu := OBU{
+	testOBU := OBU{
 		Header: Header{
 			Type:         OBUFrame,
 			HasSizeField: false,
@@ -244,23 +183,14 @@ func TestOBUMarshal(t *testing.T) {
 		Payload: []byte{0x01, 0x02, 0x03},
 	}
 
-	data := obu.Marshal()
-
-	if len(data) != 4 {
-		t.Fatalf("Expected 4 bytes, got %d", len(data))
-	}
-
-	if data[0] != obu.Header.Marshal()[0] {
-		t.Errorf("Expected header to be %v, got %v", obu.Header.Marshal(), data[0])
-	}
-
-	if !bytes.Equal(data[1:], obu.Payload) {
-		t.Errorf("Expected payload to be %v, got %v", obu.Payload, data[1:])
-	}
+	data := testOBU.Marshal()
+	assert.Len(t, data, 4)
+	assert.Equal(t, testOBU.Header.Marshal()[0], data[0], "Expected header to be equal")
+	assert.Equal(t, testOBU.Payload, data[1:])
 }
 
 func TestOBUMarshal_ExtensionHeader(t *testing.T) {
-	obu := OBU{
+	testOBU := OBU{
 		Header: Header{
 			Type:         OBUFrame,
 			HasSizeField: false,
@@ -272,24 +202,11 @@ func TestOBUMarshal_ExtensionHeader(t *testing.T) {
 		},
 		Payload: []byte{0x01, 0x02, 0x03},
 	}
-
-	data := obu.Marshal()
-
-	if len(data) != 5 {
-		t.Fatalf("Expected 5 bytes, got %d", len(data))
-	}
-
-	if data[0] != obu.Header.Marshal()[0] {
-		t.Errorf("Expected header to be %v, got %v", obu.Header.Marshal(), data[0])
-	}
-
-	if data[1] != obu.Header.ExtensionHeader.Marshal() {
-		t.Errorf("Expected extension header to be %v, got %v", obu.Header.ExtensionHeader.Marshal(), data[1])
-	}
-
-	if !bytes.Equal(data[2:], obu.Payload) {
-		t.Errorf("Expected payload to be %v, got %v", obu.Payload, data[1:])
-	}
+	data := testOBU.Marshal()
+	assert.Len(t, data, 5)
+	assert.Equal(t, testOBU.Header.Marshal()[0], data[0], "Expected header to be equal")
+	assert.Equal(t, testOBU.Header.ExtensionHeader.Marshal(), data[1], "Expected extension header to equal")
+	assert.Equal(t, testOBU.Payload, data[2:])
 }
 
 func TestOBUMarshal_HasOBUSize(t *testing.T) {
@@ -300,7 +217,7 @@ func TestOBUMarshal_HasOBUSize(t *testing.T) {
 		payload[i] = byte(i)
 	}
 
-	obu := OBU{
+	testOBU := OBU{
 		Header: Header{
 			Type:         OBUFrame,
 			HasSizeField: true,
@@ -309,57 +226,37 @@ func TestOBUMarshal_HasOBUSize(t *testing.T) {
 		Payload: payload,
 	}
 	expected := append(
-		obu.Header.Marshal(),
+		testOBU.Header.Marshal(),
 		append(
 			// obu_size leb128 (128)
 			[]byte{0x80, 0x01},
-			obu.Payload...,
+			testOBU.Payload...,
 		)...,
 	)
 
-	data := obu.Marshal()
-
-	if len(data) != payloadSize+3 {
-		t.Fatalf("Expected 4 bytes, got %d", len(data))
-	}
-
-	if data[0] != obu.Header.Marshal()[0] {
-		t.Errorf("Expected header to be %v, got %v", obu.Header.Marshal(), data[0])
-	}
-
-	if !bytes.Equal(data, expected) {
-		t.Errorf("Expected payload to be %v, got %v", expected, data)
-	}
+	data := testOBU.Marshal()
+	assert.Len(t, data, payloadSize+3)
+	assert.Equal(t, testOBU.Header.Marshal()[0], data[0], "Expected header to be equal")
+	assert.Equal(t, expected, data)
 }
 
 func TestOBUMarshal_ZeroPayload(t *testing.T) {
-	obu := OBU{
+	testOBU := OBU{
 		Header: Header{
 			Type:         OBUTemporalDelimiter,
 			HasSizeField: false,
 		},
 	}
+	data := testOBU.Marshal()
+	assert.Len(t, data, 1)
 
-	data := obu.Marshal()
-
-	if len(data) != 1 {
-		t.Fatalf("Expected 1 byte, got %d", len(data))
-	}
-
-	obu = OBU{
+	testOBU = OBU{
 		Header: Header{
 			Type:         OBUTemporalDelimiter,
 			HasSizeField: true,
 		},
 	}
-
-	data = obu.Marshal()
-
-	if len(data) != 2 {
-		t.Fatalf("Expected two bytes, got %d", len(data))
-	}
-
-	if data[1] != 0 {
-		t.Errorf("Expected 0 for size, got %d", data[1])
-	}
+	data = testOBU.Marshal()
+	assert.Len(t, data, 2)
+	assert.Equal(t, uint8(0), data[1], "Expected 0 for size")
 }

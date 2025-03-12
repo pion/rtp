@@ -4,10 +4,10 @@
 package codecs
 
 import (
-	"errors"
 	"math/rand"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestVP9Packet_Unmarshal(t *testing.T) {
@@ -211,29 +211,19 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			p := VP9Packet{}
 			raw, err := p.Unmarshal(testCase.b)
-			if testCase.err == nil { // nolint: nestif
-				if raw == nil {
-					t.Error("Result shouldn't be nil in case of success")
-				}
-				if err != nil {
-					t.Error("Error should be nil in case of success")
-				}
-				if !reflect.DeepEqual(testCase.pkt, p) {
-					t.Errorf("Unmarshalled packet expected to be:\n %v\ngot:\n %v", testCase.pkt, p)
-				}
+			if testCase.err == nil {
+				assert.NoError(t, err)
+				assert.NotNil(t, raw)
+				assert.Equal(t, testCase.pkt, p)
 			} else {
-				if raw != nil {
-					t.Error("Result should be nil in case of error")
-				}
-				if !errors.Is(err, testCase.err) {
-					t.Errorf("Error should be '%v', got '%v'", testCase.err, err)
-				}
+				assert.Nil(t, raw, "Result should be nil in case of error")
+				assert.ErrorIs(t, err, testCase.err)
 			}
 		})
 	}
 }
 
-func TestVP9Payloader_Payload(t *testing.T) { //nolint:cyclop
+func TestVP9Payloader_Payload(t *testing.T) {
 	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 	var rands [][2]byte
 	for i := 0; i < 10; i++ {
@@ -374,9 +364,7 @@ func TestVP9Payloader_Payload(t *testing.T) { //nolint:cyclop
 			for _, b := range testCase.b {
 				res = append(res, pck.Payload(testCase.mtu, b)...)
 			}
-			if !reflect.DeepEqual(testCase.res, res) {
-				t.Errorf("Payloaded packet expected to be:\n %v\ngot:\n %v", testCase.res, res)
-			}
+			assert.Equal(t, testCase.res, res)
 		})
 	}
 
@@ -392,17 +380,16 @@ func TestVP9Payloader_Payload(t *testing.T) { //nolint:cyclop
 			res := pck.Payload(4, []byte{0x01})
 			packet := VP9Packet{}
 			_, err := packet.Unmarshal(res[0])
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			assert.NoError(t, err)
 
 			if i > 0 {
 				if pPrev.PictureID == 0x7FFF {
-					if packet.PictureID != 0 {
-						t.Errorf("Picture ID next to 0x7FFF must be 0, got %d", packet.PictureID)
-					}
-				} else if pPrev.PictureID+1 != packet.PictureID {
-					t.Errorf("Picture ID next must be incremented by 1: %d -> %d", pPrev.PictureID, packet.PictureID)
+					assert.Equal(
+						t, uint16(0), packet.PictureID,
+						"Picture ID next to 0x7FFF must be 0",
+					)
+				} else {
+					assert.Equal(t, pPrev.PictureID+1, packet.PictureID, "Picture ID next must be incremented by 1")
 				}
 			}
 
@@ -414,16 +401,16 @@ func TestVP9Payloader_Payload(t *testing.T) { //nolint:cyclop
 func TestVP9IsPartitionHead(t *testing.T) {
 	vp9 := &VP9Packet{}
 	t.Run("SmallPacket", func(t *testing.T) {
-		if vp9.IsPartitionHead([]byte{}) {
-			t.Fatal("Small packet should not be the head of a new partition")
-		}
+		assert.False(t, vp9.IsPartitionHead(nil), "Small packet should not be the head of a new partition")
 	})
 	t.Run("NormalPacket", func(t *testing.T) {
-		if !vp9.IsPartitionHead([]byte{0x18, 0x00, 0x00}) {
-			t.Error("VP9 RTP packet with B flag should be head of a new partition")
-		}
-		if vp9.IsPartitionHead([]byte{0x10, 0x00, 0x00}) {
-			t.Error("VP9 RTP packet without B flag should not be head of a new partition")
-		}
+		assert.True(
+			t, vp9.IsPartitionHead([]byte{0x18, 0x00, 0x00}),
+			"VP9 RTP packet with B flag should be head of a new partition",
+		)
+		assert.False(
+			t, vp9.IsPartitionHead([]byte{0x10, 0x00, 0x00}),
+			"VP9 RTP packet without B flag should not be head of a new partition",
+		)
 	})
 }

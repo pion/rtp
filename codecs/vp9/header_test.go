@@ -4,8 +4,9 @@
 package vp9
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHeaderUnmarshal(t *testing.T) {
@@ -66,20 +67,10 @@ func TestHeaderUnmarshal(t *testing.T) {
 	for _, ca := range cases {
 		t.Run(ca.name, func(t *testing.T) {
 			var sh Header
-			err := sh.Unmarshal(ca.byts)
-			if err != nil {
-				t.Fatal("unexpected error")
-			}
-
-			if !reflect.DeepEqual(ca.sh, sh) {
-				t.Fatalf("expected %#+v, got %#+v", ca.sh, sh)
-			}
-			if ca.width != sh.Width() {
-				t.Fatalf("unexpected width")
-			}
-			if ca.height != sh.Height() {
-				t.Fatalf("unexpected height")
-			}
+			assert.NoError(t, sh.Unmarshal(ca.byts))
+			assert.Equal(t, ca.sh, sh)
+			assert.Equal(t, ca.width, sh.Width())
+			assert.Equal(t, ca.height, sh.Height())
 		})
 	}
 }
