@@ -4,71 +4,49 @@
 package rtp
 
 import (
-	"bytes"
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAudioLevelExtensionTooSmall(t *testing.T) {
 	a := AudioLevelExtension{}
-
 	rawData := []byte{}
-
-	if err := a.Unmarshal(rawData); !errors.Is(err, errTooSmall) {
-		t.Fatal("err != errTooSmall")
-	}
+	assert.ErrorIs(t, a.Unmarshal(rawData), errTooSmall)
 }
 
 func TestAudioLevelExtensionVoiceTrue(t *testing.T) {
 	a1 := AudioLevelExtension{}
-
 	rawData := []byte{
 		0x88,
 	}
-
-	if err := a1.Unmarshal(rawData); err != nil {
-		t.Fatal("Unmarshal error on extension data")
-	}
+	assert.NoError(t, a1.Unmarshal(rawData))
 
 	a2 := AudioLevelExtension{
 		Level: 8,
 		Voice: true,
 	}
-
-	if a1 != a2 {
-		t.Error("Unmarshal failed")
-	}
+	assert.Equal(t, a2, a1)
 
 	dstData, _ := a2.Marshal()
-	if !bytes.Equal(dstData, rawData) {
-		t.Error("Marshal failed")
-	}
+	assert.Equal(t, rawData, dstData)
 }
 
 func TestAudioLevelExtensionVoiceFalse(t *testing.T) {
 	a1 := AudioLevelExtension{}
-
 	rawData := []byte{
 		0x8,
 	}
-
-	if err := a1.Unmarshal(rawData); err != nil {
-		t.Fatal("Unmarshal error on extension data")
-	}
+	assert.NoError(t, a1.Unmarshal(rawData))
 
 	a2 := AudioLevelExtension{
 		Level: 8,
 		Voice: false,
 	}
-
-	if a1 != a2 {
-		t.Error("Unmarshal failed")
-	}
+	assert.Equal(t, a2, a1)
 
 	dstData, _ := a2.Marshal()
-	if !bytes.Equal(dstData, rawData) {
-		t.Error("Marshal failed")
-	}
+	assert.Equal(t, rawData, dstData)
 }
 
 func TestAudioLevelExtensionLevelOverflow(t *testing.T) {
@@ -77,7 +55,6 @@ func TestAudioLevelExtensionLevelOverflow(t *testing.T) {
 		Voice: false,
 	}
 
-	if _, err := a.Marshal(); !errors.Is(err, errAudioLevelOverflow) {
-		t.Fatal("err != errAudioLevelOverflow")
-	}
+	_, err := a.Marshal()
+	assert.ErrorIs(t, err, errAudioLevelOverflow)
 }

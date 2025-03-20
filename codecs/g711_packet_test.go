@@ -8,6 +8,8 @@ import (
 	"crypto/rand"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestG711Payloader(t *testing.T) {
@@ -21,9 +23,7 @@ func TestG711Payloader(t *testing.T) {
 	// generate random 8-bit g722 samples
 	samples := make([]byte, testlen)
 	_, err := rand.Read(samples)
-	if err != nil {
-		t.Fatal("RNG Error: ", err)
-	}
+	assert.NoError(t, err)
 
 	// make a copy, for payloader input
 	samplesIn := make([]byte, testlen)
@@ -33,43 +33,27 @@ func TestG711Payloader(t *testing.T) {
 	payloads := payloader.Payload(testmtu, samplesIn)
 
 	outcnt := int(math.Ceil(float64(testlen) / testmtu))
-	if len(payloads) != outcnt {
-		t.Fatalf("Generated %d payloads instead of %d", len(payloads), outcnt)
-	}
-
-	if !bytes.Equal(samplesIn, samples) {
-		t.Fatal("Modified input samples")
-	}
+	assert.Len(t, payloads, outcnt)
+	assert.Equal(t, samplesIn, samples, "Modified input samples")
 
 	samplesOut := bytes.Join(payloads, []byte{})
-
-	if !bytes.Equal(samplesIn, samplesOut) {
-		t.Fatal("Output samples don't match")
-	}
+	assert.Equal(t, samplesIn, samplesOut)
 
 	payload := []byte{0x90, 0x90, 0x90}
 
 	// 0 MTU, small payload
 	res := payloader.Payload(0, payload)
-	if len(res) != 0 {
-		t.Fatal("Generated payload should be empty")
-	}
+	assert.Len(t, res, 0, "Generated payload should be empty")
 
 	// Positive MTU, small payload
 	res = payloader.Payload(1, payload)
-	if len(res) != len(payload) {
-		t.Fatal("Generated payload should be the same size as original payload size")
-	}
+	assert.Len(t, res, len(payload), "Generated payload should be the same size as original payload size")
 
 	// Positive MTU, small payload
 	res = payloader.Payload(uint16(len(payload)-1), payload) // nolint: gosec // G115
-	if len(res) != len(payload)-1 {
-		t.Fatal("Generated payload should be the same smaller than original payload size")
-	}
+	assert.Len(t, res, len(payload)-1, "Generated payload should be the same smaller than original payload size")
 
 	// Positive MTU, small payload
 	res = payloader.Payload(10, payload)
-	if len(res) != 1 {
-		t.Fatal("Generated payload should be 1")
-	}
+	assert.Len(t, res, 1, "Generated payload should be the 1")
 }

@@ -6,6 +6,8 @@ package rtp
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const absSendTimeResolution = 3800 * time.Nanosecond
@@ -24,20 +26,22 @@ func TestNtpConversion(t *testing.T) {
 
 	for i, in := range tests {
 		out := toNtpTime(in.t)
-		if out != in.n {
-			t.Errorf("[%d] Converted NTP time from time.Time differs, expected: %d, got: %d",
-				i, in.n, out,
-			)
-		}
+		assert.Equalf(
+			t, in.n, out,
+			"[%d] Converted NTP time from time.Time differs", i,
+		)
 	}
 	for i, in := range tests {
 		out := toTime(in.n)
 		diff := in.t.Sub(out)
-		if diff < -absSendTimeResolution || absSendTimeResolution < diff {
-			t.Errorf("[%d] Converted time.Time from NTP time differs, expected: %v, got: %v",
-				i, in.t.UTC(), out.UTC(),
-			)
-		}
+		assert.GreaterOrEqualf(
+			t, diff, -absSendTimeResolution,
+			"[%d] Converted time.Time from NTP time differs", i,
+		)
+		assert.LessOrEqual(
+			t, diff, absSendTimeResolution,
+			"[%d] Converted time.Time from NTP time differs", i,
+		)
 	}
 }
 
@@ -52,16 +56,14 @@ func TestAbsSendTimeExtension_Roundtrip(t *testing.T) {
 	}
 	for i, in := range tests {
 		b, err := in.Marshal()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
+
 		var out AbsSendTimeExtension
-		if err = out.Unmarshal(b); err != nil {
-			t.Fatal(err)
-		}
-		if in.Timestamp != out.Timestamp {
-			t.Errorf("[%d] Timestamp differs, expected: %d, got: %d", i, in.Timestamp, out.Timestamp)
-		}
+		assert.NoError(t, out.Unmarshal(b))
+		assert.Equalf(
+			t, in.Timestamp, out.Timestamp,
+			"[%d] Timestamp differs", i,
+		)
 	}
 }
 
@@ -77,20 +79,21 @@ func TestAbsSendTimeExtension_Estimate(t *testing.T) {
 		inTime := toTime(in.sendNTP)
 		send := &AbsSendTimeExtension{in.sendNTP >> 14}
 		b, err := send.Marshal()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		var received AbsSendTimeExtension
-		if err = received.Unmarshal(b); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, received.Unmarshal(b))
 
 		estimated := received.Estimate(toTime(in.receiveNTP))
 		diff := estimated.Sub(inTime)
-		if diff < -absSendTimeResolution || absSendTimeResolution < diff {
-			t.Errorf("[%d] Estimated time differs, expected: %v, estimated: %v (receive time: %v)",
-				i, inTime.UTC(), estimated.UTC(), toTime(in.receiveNTP).UTC(),
-			)
-		}
+		assert.GreaterOrEqualf(
+			t, diff, -absSendTimeResolution,
+			"[%d] Estimated time differs, expected: %v, estimated: %v (receive time: %v)",
+			i, inTime.UTC(), estimated.UTC(), toTime(in.receiveNTP).UTC(),
+		)
+		assert.LessOrEqual(
+			t, diff, absSendTimeResolution,
+			"[%d] Estimated time differs, expected: %v, estimated: %v (receive time: %v)",
+			i, inTime.UTC(), estimated.UTC(), toTime(in.receiveNTP).UTC(),
+		)
 	}
 }

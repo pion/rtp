@@ -5,10 +5,11 @@ package obu
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLEB128(t *testing.T) {
@@ -23,25 +24,19 @@ func TestLEB128(t *testing.T) {
 		test := test
 
 		encoded := EncodeLEB128(test.Value)
-		if encoded != test.Encoded {
-			t.Fatalf("Actual(%d) did not equal expected(%d)", encoded, test.Encoded)
-		}
+		assert.Equal(t, test.Encoded, encoded)
 
 		decoded := decodeLEB128(encoded)
-		if decoded != test.Value {
-			t.Fatalf("Actual(%d) did not equal expected(%d)", decoded, test.Value)
-		}
+		assert.Equal(t, test.Value, decoded)
 	}
 }
 
 func TestReadLeb128(t *testing.T) {
-	if _, _, err := ReadLeb128(nil); !errors.Is(err, ErrFailedToReadLEB128) {
-		t.Fatal("ReadLeb128 on a nil buffer should return an error")
-	}
+	_, _, err := ReadLeb128(nil)
+	assert.ErrorIs(t, err, ErrFailedToReadLEB128, "ReadLeb128 on a nil buffer should return an error")
 
-	if _, _, err := ReadLeb128([]byte{0xFF}); !errors.Is(err, ErrFailedToReadLEB128) {
-		t.Fatal("ReadLeb128 on a buffer with all MSB set should fail")
-	}
+	_, _, err = ReadLeb128([]byte{0xFF})
+	assert.ErrorIs(t, err, ErrFailedToReadLEB128, "ReadLeb128 on a buffer with all MSB set should return an error")
 }
 
 func TestWriteToLeb128(t *testing.T) {
@@ -64,9 +59,7 @@ func TestWriteToLeb128(t *testing.T) {
 		t.Helper()
 
 		b := WriteToLeb128(v.value)
-		if v.leb128 != hex.EncodeToString(b) {
-			t.Errorf("Expected %s, got %s", v.leb128, hex.EncodeToString(b))
-		}
+		assert.Equal(t, v.leb128, hex.EncodeToString(b))
 	}
 
 	for _, v := range testVectors {

@@ -4,11 +4,10 @@
 package codecs
 
 import (
-	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/pion/rtp/codecs/av1/obu"
+	"github.com/stretchr/testify/assert"
 )
 
 // Create an AV1 OBU for testing. Returns one without the obu_size_field and another with it included.
@@ -36,23 +35,16 @@ func createTestPayload(obuHeader obu.Header, payload []byte) []byte {
 func TestAV1Depacketizer_invalidPackets(t *testing.T) {
 	depacketizer := AV1Depacketizer{}
 	_, err := depacketizer.Unmarshal([]byte{})
-	if !errors.Is(err, errShortPacket) {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.ErrorIs(t, err, errShortPacket)
+
 	_, err = depacketizer.Unmarshal([]byte{0b11000000, 0xFF})
-	if !errors.Is(err, obu.ErrFailedToReadLEB128) {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.ErrorIs(t, err, obu.ErrFailedToReadLEB128)
 
 	_, err = depacketizer.Unmarshal(append([]byte{0b00000000}, obu.WriteToLeb128(0x99)...))
-	if !errors.Is(err, errShortPacket) {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.ErrorIs(t, err, errShortPacket)
 
 	_, err = depacketizer.Unmarshal(append([]byte{0b00000000}, obu.WriteToLeb128(0x01)...))
-	if !errors.Is(err, errShortPacket) {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.ErrorIs(t, err, errShortPacket)
 
 	_, err = depacketizer.Unmarshal(
 		append(
@@ -63,9 +55,7 @@ func TestAV1Depacketizer_invalidPackets(t *testing.T) {
 			)...,
 		),
 	)
-	if !errors.Is(err, errShortPacket) {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.ErrorIs(t, err, errShortPacket)
 }
 
 func TestAV1Depacketizer_singleOBU(t *testing.T) {
@@ -80,13 +70,8 @@ func TestAV1Depacketizer_singleOBU(t *testing.T) {
 
 	d := AV1Depacketizer{}
 	obu, err := d.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obu, expectedOBU) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expectedOBU, obu)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOBU, obu)
 }
 
 func TestAV1Depacketizer_singleOBUWithPadding(t *testing.T) {
@@ -103,13 +88,8 @@ func TestAV1Depacketizer_singleOBUWithPadding(t *testing.T) {
 
 	d := AV1Depacketizer{}
 	obu, err := d.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obu, expectedOBU) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expectedOBU, obu)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOBU, obu)
 }
 
 // AV1 OBUs shouldn't include the obu_size_field when packetized in RTP,
@@ -126,13 +106,8 @@ func TestAV1Depacketizer_withOBUSize(t *testing.T) {
 
 	d := AV1Depacketizer{}
 	obu, err := d.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obu, obuData) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", obuData, obu)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, obuData, obu)
 }
 
 func TestAV1Depacketizer_validateOBUSize(t *testing.T) {
@@ -179,9 +154,7 @@ func TestAV1Depacketizer_validateOBUSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			d := AV1Depacketizer{}
 			_, err := d.Unmarshal(tt.payload)
-			if !errors.Is(err, tt.err) {
-				t.Fatalf("Expected error %v, got %v", tt.err, err)
-			}
+			assert.ErrorIs(t, err, tt.err)
 		})
 	}
 }
@@ -189,13 +162,8 @@ func TestAV1Depacketizer_validateOBUSize(t *testing.T) {
 func TestAV1Depacketizer_dropBuffer(t *testing.T) {
 	depacketizer := &AV1Depacketizer{}
 	empty, err := depacketizer.Unmarshal([]byte{0x41, 0x02, 0x00, 0x01})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(empty) != 0 {
-		t.Fatalf("Expected empty OBU")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, empty, 0)
 
 	payload := []byte{0x08, 0x02, 0x03}
 	obuData, expectedOBU := createAV1OBU(4, payload)
@@ -208,13 +176,8 @@ func TestAV1Depacketizer_dropBuffer(t *testing.T) {
 	packet = append(packet, obuData...)
 
 	obu, err := depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obu, expectedOBU) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expectedOBU, obu)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOBU, obu)
 }
 
 func TestAV1Depacketizer_singleOBUWithW(t *testing.T) {
@@ -225,13 +188,8 @@ func TestAV1Depacketizer_singleOBUWithW(t *testing.T) {
 
 	d := AV1Depacketizer{}
 	obu, err := d.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obu, expectedOBU) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", obuData, obu)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOBU, obu)
 }
 
 func TestDepacketizer_multipleFullOBUs(t *testing.T) {
@@ -252,13 +210,8 @@ func TestDepacketizer_multipleFullOBUs(t *testing.T) {
 
 	d := AV1Depacketizer{}
 	obus, err := d.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expected, obus)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expected, obus)
 }
 
 func TestAV1Depacketizer_multipleFullOBUsWithW(t *testing.T) {
@@ -279,13 +232,8 @@ func TestAV1Depacketizer_multipleFullOBUsWithW(t *testing.T) {
 
 	depacketizer := AV1Depacketizer{}
 	obus, err := depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expected, obus)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expected, obus)
 }
 
 func TestDepacketizer_fragmentedOBUS(t *testing.T) {
@@ -316,17 +264,12 @@ func TestDepacketizer_fragmentedOBUS(t *testing.T) {
 	packet = append(packet, obu3f1...)
 
 	obus, err := depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	expected := make([]byte, 0)
 	expected = append(expected, expectedOBU1...)
 	expected = append(expected, expectedOBU2...)
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expected, obus)
-	}
+	assert.Equal(t, expected, obus)
 
 	packet = make([]byte, 0)
 	packet = append(packet, []byte{0b11000000}...)
@@ -340,14 +283,10 @@ func TestDepacketizer_fragmentedOBUS(t *testing.T) {
 	packet = append(packet, obu6f1...)
 
 	obus, err = depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	expected = append(append(expectedOBU3, expectedOBU4...), expectedOBU5...)
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expected, obus)
-	}
+	assert.Equal(t, expected, obus)
 
 	packet = make([]byte, 0)
 	packet = append(packet, []byte{0b10100000}...)
@@ -357,17 +296,12 @@ func TestDepacketizer_fragmentedOBUS(t *testing.T) {
 	packet = append(packet, obu7...)
 
 	obus, err = depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	expected = make([]byte, 0)
 	expected = append(expected, expectedOBU6...)
 	expected = append(expected, expectedOBU7...)
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expected, obus)
-	}
+	assert.Equal(t, expected, obus)
 
 	packet = make([]byte, 0)
 	packet = append(packet, []byte{0b00000000}...)
@@ -375,13 +309,8 @@ func TestDepacketizer_fragmentedOBUS(t *testing.T) {
 	packet = append(packet, obu8...)
 
 	obus, err = depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obus, expectedOBU8) {
-		t.Fatalf("OBU data mismatch, expected %v, got %v", expected, obus)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOBU8, obus)
 }
 
 func TestAV1Depacketizer_dropLostFragment(t *testing.T) {
@@ -393,13 +322,8 @@ func TestAV1Depacketizer_dropLostFragment(t *testing.T) {
 			[]byte{0x01, 0x02, 0x03}...,
 		),
 	)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(obus) != 0 {
-		t.Fatalf("Expected empty OBU for fragmented OBU")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, obus, 0, "Expected empty OBU for fragmented OBU")
 
 	newOBU, expected := createAV1OBU(obu.OBUTileGroup, []byte{0x04, 0x05, 0x06})
 	obus, err = depacketizer.Unmarshal(
@@ -408,13 +332,8 @@ func TestAV1Depacketizer_dropLostFragment(t *testing.T) {
 			newOBU...,
 		),
 	)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("Expected OBU data to be %v, got %v", newOBU, obus)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expected, obus)
 }
 
 func TestAV1Depacketizer_dropIfLostFragment(t *testing.T) {
@@ -426,13 +345,8 @@ func TestAV1Depacketizer_dropIfLostFragment(t *testing.T) {
 			[]byte{0x01, 0x02, 0x03}...,
 		),
 	)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(obus) != 0 {
-		t.Fatalf("Expected empty OBU for fragmented OBU")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, obus, 0, "Expected empty OBU for fragmented OBU")
 
 	newOBU, expected := createAV1OBU(obu.OBUTileGroup, []byte{0x04, 0x05, 0x06})
 	obus, err = depacketizer.Unmarshal(
@@ -441,13 +355,8 @@ func TestAV1Depacketizer_dropIfLostFragment(t *testing.T) {
 			newOBU...,
 		),
 	)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("Expected OBU data to be %v, got %v", newOBU, obus)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expected, obus)
 
 	packet := make([]byte, 0)
 	packet = append(packet, []byte{0b10000000}...)
@@ -457,13 +366,8 @@ func TestAV1Depacketizer_dropIfLostFragment(t *testing.T) {
 	packet = append(packet, newOBU...)
 
 	obus, err = depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("Expected OBU data to be %v, got %v", newOBU, obus)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expected, obus)
 }
 
 func TestAV1Depacketizer_IsPartitionTail(t *testing.T) {
@@ -471,37 +375,18 @@ func TestAV1Depacketizer_IsPartitionTail(t *testing.T) {
 		buffer: []byte{1, 2},
 	}
 
-	if depacketizer.IsPartitionTail(false, []byte{1, 2}) {
-		t.Fatalf("Expected false")
-	}
-
-	if !bytes.Equal(depacketizer.buffer, []byte{1, 2}) {
-		t.Fatalf("Buffer was modified")
-	}
-
-	if !depacketizer.IsPartitionTail(true, []byte{1, 2}) {
-		t.Fatalf("Expected true")
-	}
+	assert.False(t, depacketizer.IsPartitionTail(false, []byte{1, 2}))
+	assert.Equal(t, depacketizer.buffer, []byte{1, 2})
+	assert.True(t, depacketizer.IsPartitionTail(true, []byte{1, 2}))
 }
 
 func TestAV1Depacketizer_IsPartitionHead(t *testing.T) {
 	depacketizer := &AV1Depacketizer{}
 
-	if depacketizer.IsPartitionHead(nil) {
-		t.Fatalf("Expected false")
-	}
-
-	if depacketizer.IsPartitionHead([]byte{}) {
-		t.Fatalf("Expected false")
-	}
-
-	if depacketizer.IsPartitionHead([]byte{0b11000000}) {
-		t.Fatalf("Expected false")
-	}
-
-	if !depacketizer.IsPartitionHead([]byte{0b00000000}) {
-		t.Fatalf("Expected true")
-	}
+	assert.False(t, depacketizer.IsPartitionHead(nil))
+	assert.False(t, depacketizer.IsPartitionHead([]byte{}))
+	assert.False(t, depacketizer.IsPartitionHead([]byte{0b11000000}))
+	assert.True(t, depacketizer.IsPartitionHead([]byte{0b00000000}))
 }
 
 func TestAV1Depacketizer_ignoreBadOBUs(t *testing.T) {
@@ -521,13 +406,8 @@ func TestAV1Depacketizer_ignoreBadOBUs(t *testing.T) {
 
 		depacketizer := AV1Depacketizer{}
 		obu, err := depacketizer.Unmarshal(packet)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-
-		if len(obu) != 0 {
-			t.Fatalf("Expected empty OBU for OBU type %d", obuType)
-		}
+		assert.NoError(t, err)
+		assert.Len(t, obu, 0, "Expected empty payload for OBU type %d", obuType)
 	}
 }
 
@@ -549,13 +429,8 @@ func TestAV1Depacketizer_fragmentedOverMultiple(t *testing.T) {
 	packet = append(packet, obuf1...)
 
 	obus, err := depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(obus) != 0 {
-		t.Fatalf("Expected empty OBU for fragmented OBU")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, obus, 0, "Expected empty OBU for fragmented OBU")
 
 	packet = make([]byte, 0)
 	packet = append(packet, []byte{0b11000000}...)
@@ -563,13 +438,8 @@ func TestAV1Depacketizer_fragmentedOverMultiple(t *testing.T) {
 	packet = append(packet, obuf2...)
 
 	obus, err = depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(obus) != 0 {
-		t.Fatalf("Expected empty OBU for fragmented OBU")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, obus, 0, "Expected empty OBU for fragmented OBU")
 
 	packet = make([]byte, 0)
 	packet = append(packet, []byte{0b11000000}...)
@@ -577,13 +447,8 @@ func TestAV1Depacketizer_fragmentedOverMultiple(t *testing.T) {
 	packet = append(packet, obuf3...)
 
 	obus, err = depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(obus) != 0 {
-		t.Fatalf("Expected empty OBU for fragmented OBU")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, obus, 0, "Expected empty OBU for fragmented OBU")
 
 	packet = make([]byte, 0)
 	packet = append(packet, []byte{0b10000000}...)
@@ -591,26 +456,16 @@ func TestAV1Depacketizer_fragmentedOverMultiple(t *testing.T) {
 	packet = append(packet, obuf4...)
 
 	obus, err = depacketizer.Unmarshal(packet)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(obus, expected) {
-		t.Fatalf("Expected OBU data to be %v, got %v", expected, obus)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expected, obus)
 }
 
 func TestAV1Depacketizer_shortOBUHeader(t *testing.T) {
 	d := AV1Depacketizer{}
 
 	payload, err := d.Unmarshal([]byte{0x00, 0x01, 0x04})
-	if err == nil {
-		t.Fatalf("Expected error")
-	}
-
-	if len(payload) != 0 {
-		t.Fatalf("Expected empty payload")
-	}
+	assert.Error(t, err)
+	assert.Len(t, payload, 0, "Expected empty payload for short OBU header")
 }
 
 func TestAV1Depacketizer_aggregationHeader(t *testing.T) {
@@ -667,25 +522,12 @@ func TestAV1Depacketizer_aggregationHeader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			payload, err := depacketizer.Unmarshal(tt.input)
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			assert.NoError(t, err)
 
-			if !bytes.Equal(payload, tt.payload) {
-				t.Fatalf("Expected payload to be %v, got %v", tt.payload, payload)
-			}
-
-			if depacketizer.Z != tt.Z {
-				t.Fatalf("Expected Z to be %v, got %v", tt.Z, depacketizer.Z)
-			}
-
-			if depacketizer.Y != tt.Y {
-				t.Fatalf("Expected Y to be %v, got %v", tt.Y, depacketizer.Y)
-			}
-
-			if depacketizer.N != tt.N {
-				t.Fatalf("Expected N to be %v, got %v", tt.N, depacketizer.N)
-			}
+			assert.Equal(t, tt.payload, payload)
+			assert.Equal(t, tt.Z, depacketizer.Z)
+			assert.Equal(t, tt.Y, depacketizer.Y)
+			assert.Equal(t, tt.N, depacketizer.N)
 		})
 	}
 }
