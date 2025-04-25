@@ -110,3 +110,61 @@ func TestPacketizer_Roundtrip(t *testing.T) {
 		assert.Equal(t, expectedPkt, pkt)
 	}
 }
+
+func TestNewPacketizerWithOptions_DefaultValues(t *testing.T) {
+	pack := NewPacketizerWithOptions(100, &codecs.G722Payloader{}, NewRandomSequencer(), 90000)
+	p, ok := pack.(*packetizer)
+	assert.True(t, ok, "Failed to cast to *packetizer")
+
+	assert.Equal(t, uint16(100), p.MTU)
+	assert.Equal(t, uint8(0), p.PayloadType)
+	assert.Equal(t, uint32(0), p.SSRC)
+	assert.NotZero(t, p.Timestamp)
+	assert.Equal(t, uint32(90000), p.ClockRate)
+}
+
+func TestNewPacketizerWithOptions_WithOptions(t *testing.T) {
+	pack := NewPacketizerWithOptions(
+		100,
+		&codecs.G722Payloader{},
+		NewRandomSequencer(),
+		90000,
+		WithSSRC(0x1234ABCD),
+		WithPayloadType(98),
+		WithTimestamp(45678),
+	)
+	p, ok := pack.(*packetizer)
+	assert.True(t, ok, "Failed to cast to *packetizer")
+
+	assert.Equal(t, uint16(100), p.MTU)
+	assert.Equal(t, uint8(98), p.PayloadType)
+	assert.Equal(t, uint32(0x1234ABCD), p.SSRC)
+	assert.Equal(t, uint32(45678), p.Timestamp)
+	assert.Equal(t, uint32(90000), p.ClockRate)
+
+	payload := []byte{0x11, 0x12, 0x13, 0x14}
+	packets := pack.Packetize(payload, 2000)
+
+	assert.Len(t, packets, 1, "Should generate exactly one packet")
+	assert.Equal(t, uint8(98), packets[0].PayloadType)
+	assert.Equal(t, uint32(0x1234ABCD), packets[0].SSRC)
+	assert.Equal(t, uint32(45678), packets[0].Timestamp)
+}
+
+func TestNewPacketizerWithOptions_PartialOptions(t *testing.T) {
+	pack := NewPacketizerWithOptions(
+		100,
+		&codecs.G722Payloader{},
+		NewRandomSequencer(),
+		90000,
+		WithPayloadType(98),
+	)
+	p, ok := pack.(*packetizer)
+	assert.True(t, ok, "Failed to cast to *packetizer")
+
+	assert.Equal(t, uint16(100), p.MTU)
+	assert.Equal(t, uint8(98), p.PayloadType)
+	assert.Equal(t, uint32(0), p.SSRC)
+	assert.NotZero(t, p.Timestamp)
+	assert.Equal(t, uint32(90000), p.ClockRate)
+}
