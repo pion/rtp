@@ -80,13 +80,16 @@ func WithTimestamp(timestamp uint32) func(*packetizer) {
 	}
 }
 
+// PacketizerOption is a function that configures a RTP Packetizer.
+type PacketizerOption func(*packetizer)
+
 // NewPacketizerWithOptions returns a new instance of a Packetizer with the given options.
 func NewPacketizerWithOptions(
 	mtu uint16,
 	payloader Payloader,
 	sequencer Sequencer,
 	clockRate uint32,
-	options ...func(*packetizer),
+	options ...PacketizerOption,
 ) Packetizer {
 	packetizerInstance := &packetizer{
 		MTU:       mtu,
