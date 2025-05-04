@@ -29,6 +29,10 @@ type Header struct {
 	ExtensionProfile uint16
 	Extensions       []Extension
 
+	// PaddingLength is the length of the padding in bytes. It is not part of the RTP header
+	// (it is sent in the last byte of RTP packet padding), but logically it belongs here.
+	PaddingSize byte
+
 	// Deprecated: will be removed in a future version.
 	PayloadOffset int
 }
@@ -36,11 +40,16 @@ type Header struct {
 // Packet represents an RTP Packet.
 type Packet struct {
 	Header
-	Payload     []byte
-	PaddingSize byte
+	Payload []byte
+
+	PaddingSize byte // Deprecated: will be removed in a future version. Use Header.PaddingSize instead.
 
 	// Deprecated: will be removed in a future version.
 	Raw []byte
+
+	// Please do not add any new field directly to Packet struct unless you know that it is safe.
+	// pion internally passes Header and Payload separately, what causes bugs like
+	// https://github.com/pion/webrtc/issues/2403 .
 }
 
 const (
@@ -219,11 +228,12 @@ func (p *Packet) Unmarshal(buf []byte) error {
 		if end <= n {
 			return errTooSmall
 		}
-		p.PaddingSize = buf[end-1]
-		end -= int(p.PaddingSize)
+		p.Header.PaddingSize = buf[end-1]
+		end -= int(p.Header.PaddingSize)
 	} else {
-		p.PaddingSize = 0
+		p.Header.PaddingSize = 0
 	}
+	p.PaddingSize = p.Header.PaddingSize
 	if end < n {
 		return errTooSmall
 	}
@@ -490,7 +500,7 @@ func (p Packet) Marshal() (buf []byte, err error) {
 
 // MarshalTo serializes the packet and writes to the buffer.
 func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
-	if p.Header.Padding && p.PaddingSize == 0 {
+	if p.Header.Padding && p.paddingSize() == 0 {
 		return 0, errInvalidRTPPadding
 	}
 
@@ -499,23 +509,28 @@ func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
 		return 0, err
 	}
 
+	return marshalPayloadAndPaddingTo(buf, n, &p.Header, p.Payload, p.paddingSize())
+}
+
+func marshalPayloadAndPaddingTo(buf []byte, offset int, header *Header, payload []byte, paddingSize byte,
+) (n int, err error) {
 	// Make sure the buffer is large enough to hold the packet.
-	if n+len(p.Payload)+int(p.PaddingSize) > len(buf) {
+	if offset+len(payload)+int(paddingSize) > len(buf) {
 		return 0, io.ErrShortBuffer
 	}
 
-	m := copy(buf[n:], p.Payload)
+	m := copy(buf[offset:], payload)
 
-	if p.Header.Padding {
-		buf[n+m+int(p.PaddingSize-1)] = p.PaddingSize
+	if header.Padding {
+		buf[offset+m+int(paddingSize-1)] = paddingSize
 	}
 
-	return n + m + int(p.PaddingSize), nil
+	return offset + m + int(paddingSize), nil
 }
 
 // MarshalSize returns the size of the packet once marshaled.
 func (p Packet) MarshalSize() int {
-	return p.Header.MarshalSize() + len(p.Payload) + int(p.PaddingSize)
+	return p.Header.MarshalSize() + len(p.Payload) + int(p.paddingSize())
 }
 
 // Clone returns a deep copy of p.
@@ -551,4 +566,31 @@ func (h Header) Clone() Header {
 	}
 
 	return clone
+}
+
+func (p *Packet) paddingSize() byte {
+	if p.Header.PaddingSize > 0 {
+		return p.Header.PaddingSize
+	}
+
+	return p.PaddingSize
+}
+
+// MarshalPacketTo serializes the header and payload into bytes.
+// Parts of pion code passes RTP header and payload separately, so this function
+// is provided to help with that.
+func MarshalPacketTo(buf []byte, header *Header, payload []byte) (int, error) {
+	n, err := header.MarshalTo(buf)
+	if err != nil {
+		return 0, err
+	}
+
+	return marshalPayloadAndPaddingTo(buf, n, header, payload, header.PaddingSize)
+}
+
+// PacketMarshalSize returns the size of the header and payload once marshaled.
+// Parts of pion code passes RTP header and payload separately, so this function
+// is provided to help with that.
+func PacketMarshalSize(header *Header, payload []byte) int {
+	return header.MarshalSize() + len(payload) + int(header.PaddingSize)
 }
