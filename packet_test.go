@@ -37,9 +37,9 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    0,
 		},
-		Payload:     rawPkt[20:],
-		PaddingSize: 0,
+		Payload: rawPkt[20:],
 	}
 
 	// Unmarshal to the used Packet should work as well.
@@ -79,6 +79,7 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    4,
 		},
 		Payload:     rawPkt[20:21],
 		PaddingSize: 4,
@@ -108,9 +109,9 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    0,
 		},
-		Payload:     rawPkt[20:],
-		PaddingSize: 0,
+		Payload: rawPkt[20:],
 	}
 	assert.NoError(t, packet.Unmarshal(rawPkt))
 	assert.Equal(t, packet, parsedPacket)
@@ -137,6 +138,7 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    5,
 		},
 		Payload:     []byte{},
 		PaddingSize: 5,
@@ -167,9 +169,9 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    0,
 		},
-		Payload:     []byte{},
-		PaddingSize: 0,
+		Payload: []byte{},
 	}
 	err := packet.Unmarshal(rawPkt)
 	assert.Error(t, err, "Unmarshal did not error on packet with excessive padding")
@@ -197,9 +199,9 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    4,
 		},
-		Payload:     rawPkt[20:21],
-		PaddingSize: 4,
+		Payload: rawPkt[20:21],
 	}
 	buf, err := parsedPacket.Marshal()
 	assert.NoError(t, err)
@@ -227,9 +229,9 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    5,
 		},
-		Payload:     []byte{},
-		PaddingSize: 5,
+		Payload: []byte{},
 	}
 	buf, err = parsedPacket.Marshal()
 	assert.NoError(t, err)
@@ -257,9 +259,9 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 			Timestamp:      3653407706,
 			SSRC:           476325762,
 			CSRC:           []uint32{},
+			PaddingSize:    5,
 		},
-		Payload:     []byte{},
-		PaddingSize: 5,
+		Payload: []byte{},
 	}
 	buf, err = parsedPacket.Marshal()
 	assert.NoError(t, err)
@@ -1253,6 +1255,83 @@ func TestClonePacket(t *testing.T) {
 
 	packet.Payload[0] = 0x1F
 	assert.NotEqual(t, clone.Payload[0], 0x1F, "Expected payload to be unchanged")
+}
+
+func TestMarshalRTPPacketFuncs(t *testing.T) {
+	// packet with only padding
+	rawPkt := []byte{
+		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x05,
+	}
+	parsedPacket := &Packet{
+		Header: Header{
+			Padding:          true,
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Extensions: []Extension{
+				{0, []byte{
+					0xFF, 0xFF, 0xFF, 0xFF,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+			PaddingSize:    5,
+		},
+		Payload: []byte{},
+	}
+
+	buf := make([]byte, 100)
+	n, err := MarshalPacketTo(buf, &parsedPacket.Header, parsedPacket.Payload)
+	assert.NoError(t, err)
+	assert.Equal(t, len(rawPkt), n)
+	assert.Equal(t, rawPkt, buf[:n])
+	assert.Equal(t, n, PacketMarshalSize(&parsedPacket.Header, parsedPacket.Payload))
+}
+
+func TestDeprecatedPaddingSizeField(t *testing.T) {
+	// packet with only padding
+	rawPkt := []byte{
+		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x05,
+	}
+	parsedPacket := &Packet{
+		Header: Header{
+			Padding:          true,
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Extensions: []Extension{
+				{0, []byte{
+					0xFF, 0xFF, 0xFF, 0xFF,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			CSRC:           []uint32{},
+		},
+		Payload:     []byte{},
+		PaddingSize: 5,
+	}
+
+	buf, err := parsedPacket.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, buf)
+	assert.EqualValues(t, 0, parsedPacket.Header.PaddingSize)
+
+	assert.Equal(t, len(rawPkt), parsedPacket.MarshalSize())
+	assert.EqualValues(t, 0, parsedPacket.Header.PaddingSize)
+
+	parsedPacket2 := parsedPacket.Clone()
+	assert.EqualValues(t, 5, parsedPacket2.PaddingSize)
+	assert.EqualValues(t, 0, parsedPacket2.Header.PaddingSize)
 }
 
 func BenchmarkMarshal(b *testing.B) {

@@ -107,6 +107,7 @@ func TestPacketizer_Roundtrip(t *testing.T) {
 		assert.Equal(t, expectedPkt.Payload, pkt.Payload)
 
 		pkt.PaddingSize = 0
+		pkt.Header.PaddingSize = 0
 		assert.Equal(t, expectedPkt, pkt)
 	}
 }
