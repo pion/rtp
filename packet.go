@@ -579,6 +579,8 @@ func (p *Packet) paddingSize() byte {
 // MarshalPacketTo serializes the header and payload into bytes.
 // Parts of pion code passes RTP header and payload separately, so this function
 // is provided to help with that.
+//
+// Deprecated: this function is a temporary workaround and will be removed in pion/webrtc v5.
 func MarshalPacketTo(buf []byte, header *Header, payload []byte) (int, error) {
 	n, err := header.MarshalTo(buf)
 	if err != nil {
@@ -591,6 +593,19 @@ func MarshalPacketTo(buf []byte, header *Header, payload []byte) (int, error) {
 // PacketMarshalSize returns the size of the header and payload once marshaled.
 // Parts of pion code passes RTP header and payload separately, so this function
 // is provided to help with that.
+//
+// Deprecated: this function is a temporary workaround and will be removed in pion/webrtc v5.
 func PacketMarshalSize(header *Header, payload []byte) int {
 	return header.MarshalSize() + len(payload) + int(header.PaddingSize)
+}
+
+// HeaderAndPacketMarshalSize returns the size of the header and full packet once marshaled.
+// Parts of pion code passes RTP header and payload separately, so this function
+// is provided to help with that.
+//
+// Deprecated: this function is a temporary workaround and will be removed in pion/webrtc v5.
+func HeaderAndPacketMarshalSize(header *Header, payload []byte) (headerSize int, packetSize int) {
+	headerSize = header.MarshalSize()
+
+	return headerSize, headerSize + len(payload) + int(header.PaddingSize)
 }
