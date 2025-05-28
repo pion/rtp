@@ -1290,7 +1290,12 @@ func TestMarshalRTPPacketFuncs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(rawPkt), n)
 	assert.Equal(t, rawPkt, buf[:n])
+
 	assert.Equal(t, n, PacketMarshalSize(&parsedPacket.Header, parsedPacket.Payload))
+
+	hdrLen, packetLen := HeaderAndPacketMarshalSize(&parsedPacket.Header, parsedPacket.Payload)
+	assert.Equal(t, parsedPacket.Header.MarshalSize(), hdrLen)
+	assert.Equal(t, n, packetLen)
 }
 
 func TestDeprecatedPaddingSizeField(t *testing.T) {
