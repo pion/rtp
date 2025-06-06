@@ -53,28 +53,37 @@ type Packet struct {
 }
 
 const (
-	headerLength            = 4
-	versionShift            = 6
-	versionMask             = 0x3
-	paddingShift            = 5
-	paddingMask             = 0x1
-	extensionShift          = 4
-	extensionMask           = 0x1
-	extensionProfileOneByte = 0xBEDE
-	extensionProfileTwoByte = 0x1000
-	extensionIDReserved     = 0xF
-	ccMask                  = 0xF
-	markerShift             = 7
-	markerMask              = 0x1
-	ptMask                  = 0x7F
-	seqNumOffset            = 2
-	seqNumLength            = 2
-	timestampOffset         = 4
-	timestampLength         = 4
-	ssrcOffset              = 8
-	ssrcLength              = 4
-	csrcOffset              = 12
-	csrcLength              = 4
+	// ExtensionProfileOneByte is the RTP One Byte Header Extension Profile, defined in RFC 8285.
+	ExtensionProfileOneByte = 0xBEDE
+	// ExtensionProfileTwoByte is the RTP Two Byte Header Extension Profile, defined in RFC 8285.
+	ExtensionProfileTwoByte = 0x1000
+	// CryptexProfileOneByte is the Cryptex One Byte Header Extension Profile, defined in RFC 9335.
+	CryptexProfileOneByte = 0xC0DE
+	// CryptexProfileTwoByte is the Cryptex Two Byte Header Extension Profile, defined in RFC 9335.
+	CryptexProfileTwoByte = 0xC2DE
+)
+
+const (
+	headerLength        = 4
+	versionShift        = 6
+	versionMask         = 0x3
+	paddingShift        = 5
+	paddingMask         = 0x1
+	extensionShift      = 4
+	extensionMask       = 0x1
+	extensionIDReserved = 0xF
+	ccMask              = 0xF
+	markerShift         = 7
+	markerMask          = 0x1
+	ptMask              = 0x7F
+	seqNumOffset        = 2
+	seqNumLength        = 2
+	timestampOffset     = 4
+	timestampLength     = 4
+	ssrcOffset          = 8
+	ssrcLength          = 4
+	csrcOffset          = 12
+	csrcLength          = 4
 )
 
 // String helps with debugging by printing packet information in a readable way.
@@ -164,7 +173,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 			return n, fmt.Errorf("size %d < %d: %w", len(buf), extensionEnd, errHeaderSizeInsufficientForExtension)
 		}
 
-		if h.ExtensionProfile == extensionProfileOneByte || h.ExtensionProfile == extensionProfileTwoByte {
+		if h.ExtensionProfile == ExtensionProfileOneByte || h.ExtensionProfile == ExtensionProfileTwoByte {
 			var (
 				extid      uint8
 				payloadLen int
@@ -177,7 +186,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 					continue
 				}
 
-				if h.ExtensionProfile == extensionProfileOneByte {
+				if h.ExtensionProfile == ExtensionProfileOneByte {
 					extid = buf[n] >> 4
 					payloadLen = int(buf[n]&^0xF0 + 1)
 					n++
@@ -312,14 +321,14 @@ func (h Header) MarshalTo(buf []byte) (n int, err error) { //nolint:cyclop
 
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
-		case extensionProfileOneByte:
+		case ExtensionProfileOneByte:
 			for _, extension := range h.Extensions {
 				buf[n] = extension.id<<4 | (uint8(len(extension.payload)) - 1) // nolint: gosec // G115
 				n++
 				n += copy(buf[n:], extension.payload)
 			}
 		// RFC 8285 RTP Two Byte Header Extension
-		case extensionProfileTwoByte:
+		case ExtensionProfileTwoByte:
 			for _, extension := range h.Extensions {
 				buf[n] = extension.id
 				n++
@@ -363,12 +372,12 @@ func (h Header) MarshalSize() int {
 
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
-		case extensionProfileOneByte:
+		case ExtensionProfileOneByte:
 			for _, extension := range h.Extensions {
 				extSize += 1 + len(extension.payload)
 			}
 		// RFC 8285 RTP Two Byte Header Extension
-		case extensionProfileTwoByte:
+		case ExtensionProfileTwoByte:
 			for _, extension := range h.Extensions {
 				extSize += 2 + len(extension.payload)
 			}
@@ -388,7 +397,7 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 	if h.Extension { // nolint: nestif
 		switch h.ExtensionProfile {
 		// RFC 8285 RTP One Byte Header Extension
-		case extensionProfileOneByte:
+		case ExtensionProfileOneByte:
 			if id < 1 || id > 14 {
 				return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderIDRange, id)
 			}
@@ -396,7 +405,7 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 				return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderSize, len(payload))
 			}
 		// RFC 8285 RTP Two Byte Header Extension
-		case extensionProfileTwoByte:
+		case ExtensionProfileTwoByte:
 			if id < 1 {
 				return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderIDRange, id)
 			}
@@ -428,9 +437,9 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 
 	switch payloadLen := len(payload); {
 	case payloadLen <= 16:
-		h.ExtensionProfile = extensionProfileOneByte
+		h.ExtensionProfile = ExtensionProfileOneByte
 	case payloadLen > 16 && payloadLen < 256:
-		h.ExtensionProfile = extensionProfileTwoByte
+		h.ExtensionProfile = ExtensionProfileTwoByte
 	}
 
 	h.Extensions = append(h.Extensions, Extension{id: id, payload: payload})
