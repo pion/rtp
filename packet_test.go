@@ -1391,7 +1391,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 		Header: Header{
 			Extension:        true,
 			CSRC:             []uint32{1, 2},
-			ExtensionProfile: extensionProfileTwoByte,
+			ExtensionProfile: ExtensionProfileTwoByte,
 			Extensions: []Extension{
 				{id: 1, payload: []byte{3, 4}},
 				{id: 2, payload: []byte{5, 6}},
