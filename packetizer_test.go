@@ -112,6 +112,20 @@ func TestPacketizer_Roundtrip(t *testing.T) {
 	}
 }
 
+func TestPacketizer_GeneratePadding(t *testing.T) {
+	pktizer := NewPacketizer(100, 98, 0x1234ABCD, &codecs.G722Payloader{}, NewFixedSequencer(1234), 90000)
+
+	packets := pktizer.GeneratePadding(5)
+
+	assert.Len(t, packets, 5, "Should generate exactly 5 padding packets")
+	for i, pkt := range packets {
+		assert.Equal(t, true, pkt.Header.Padding, "Packet %d should have Padding set to true", i)
+		assert.Equal(t, byte(255), pkt.Header.PaddingSize, "Packet %d should have PaddingSize set to 255", i)
+		assert.Equal(t, byte(0), pkt.PaddingSize, "Packet %d should have PaddingSize set to 0", i)
+		assert.Nil(t, pkt.Payload, "Packet %d should have no Payload", i)
+	}
+}
+
 func TestNewPacketizerWithOptions_DefaultValues(t *testing.T) {
 	pack := NewPacketizerWithOptions(100, &codecs.G722Payloader{}, NewRandomSequencer(), 90000)
 	p, ok := pack.(*packetizer)
