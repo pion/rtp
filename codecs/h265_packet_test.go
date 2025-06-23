@@ -640,7 +640,7 @@ func TestH265_Packet(t *testing.T) {
 	tt := [...]struct {
 		Raw                []byte
 		WithDONL           bool
-		ExpectedPacketType interface{}
+		ExpectedPacketType any
 		ExpectedErr        error
 	}{
 		{
