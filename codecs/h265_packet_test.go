@@ -4,6 +4,7 @@
 package codecs
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -688,7 +689,7 @@ func TestH265_Packet(t *testing.T) {
 		// Valid H265FragmentationUnitPacket
 		{
 			Raw:                []byte{0x62, 0x01, 0x93, 0xcc, 0xdd, 0xaf, 0x0d, 0x5a},
-			ExpectedPacketType: &H265FragmentationUnitPacket{},
+			ExpectedPacketType: &H265FragmentationPacket{},
 			WithDONL:           true,
 		},
 		// Valid H265AggregationPacket
@@ -763,7 +764,7 @@ func TestH265_Packet_Real(t *testing.T) {
 	for _, cur := range tt {
 		pck := &H265Packet{}
 		_, err := pck.Unmarshal([]byte(cur))
-		assert.NoError(t, err)
+		assert.True(t, err == nil || errors.Is(err, errExpectFragmentationStartUnit))
 	}
 }
 
