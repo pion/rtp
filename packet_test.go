@@ -1428,3 +1428,24 @@ func BenchmarkUnmarshal(b *testing.B) {
 		}
 	})
 }
+
+// https://github.com/pion/rtp/issues/315
+func TestMarshalSizePanic(t *testing.T) {
+	hdr := &Header{
+		Extension: true,
+	}
+
+	assert.Equal(t, 16, hdr.MarshalSize())
+}
+
+// https://github.com/pion/rtp/issues/315
+func TestMarshalToPanic(t *testing.T) {
+	hdr := &Header{
+		Extension: true,
+	}
+
+	buf := make([]byte, 16)
+	n, err := hdr.MarshalTo(buf)
+	assert.NoError(t, err)
+	assert.Equal(t, 16, n)
+}
