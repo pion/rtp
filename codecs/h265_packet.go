@@ -569,6 +569,7 @@ type H265FragmentationPacket struct {
 	payload       []byte
 }
 
+// NewH265FragmentationPacket creates a H265FragmentationPacket.
 func NewH265FragmentationPacket(startUnit *H265FragmentationUnitPacket) *H265FragmentationPacket {
 	return &H265FragmentationPacket{
 		payloadHeader: (startUnit.payloadHeader & 0x81FF) | (H265NALUHeader(startUnit.FuHeader().FuType()) << 9),
@@ -904,11 +905,12 @@ func (p *H265Packet) Unmarshal(payload []byte) ([]byte, error) { // nolint:cyclo
 		if decoded.FuHeader().S() {
 			p.packet = NewH265FragmentationPacket(decoded)
 		} else {
-			if fu, ok := p.packet.(*H265FragmentationPacket); !ok {
+			fu, ok := p.packet.(*H265FragmentationPacket)
+			if !ok {
 				return nil, errExpectFragmentationStartUnit
-			} else {
-				fu.appendUnit(decoded)
 			}
+
+			fu.appendUnit(decoded)
 		}
 
 	case payloadHeader.IsAggregationPacket():
