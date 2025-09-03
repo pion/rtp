@@ -206,7 +206,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 					n++
 				}
 
-				if extensionPayloadEnd := n + payloadLen; len(buf) <= extensionPayloadEnd {
+				if extensionPayloadEnd := n + payloadLen; len(buf) < extensionPayloadEnd {
 					return n, fmt.Errorf("size %d < %d: %w", len(buf), extensionPayloadEnd, errHeaderSizeInsufficientForExtension)
 				}
 
