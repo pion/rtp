@@ -1116,10 +1116,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 
 			fullNALUSize := len(nalu)
 			for len(nalu) > 0 {
-				curentFUPayloadSize := len(nalu)
-				if curentFUPayloadSize > maxFUPayloadSize {
-					curentFUPayloadSize = maxFUPayloadSize
-				}
+				curentFUPayloadSize := min(len(nalu), maxFUPayloadSize)
 
 				out := make([]byte, fuPacketHeaderSize+curentFUPayloadSize)
 

@@ -176,10 +176,7 @@ func (p *AV1Payloader) appendOBUPayload(
 
 	remaining := len(obuPayload)
 	// How much to write to the current packet.
-	toWrite := remaining
-	if toWrite >= freeSpace {
-		toWrite = freeSpace
-	}
+	toWrite := min(remaining, freeSpace)
 
 	// W: two bit field that describes the number of OBU elements in the packet.
 	// This field MUST be set equal to 0 or equal to the number of OBU elements contained in the packet.
@@ -227,10 +224,9 @@ func (p *AV1Payloader) appendOBUPayload(
 			payloads[currentPayload][0] |= av1ZMask
 		}
 
-		toWrite = remaining
-		if toWrite >= mtu-1 { // MTU - aggregation header
-			toWrite = mtu - 1
-		}
+		toWrite = min(remaining,
+			// MTU - aggregation header
+			mtu-1)
 
 		// Last OBU in the current packet, Or this whole packet is a fragment.
 		if isLast || remaining >= mtu-1 {
