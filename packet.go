@@ -72,6 +72,7 @@ const (
 	extensionShift      = 4
 	extensionMask       = 0x1
 	extensionIDReserved = 0xF
+	extensionIDPadding  = 0x0
 	ccMask              = 0xF
 	markerShift         = 7
 	markerMask          = 0x1
@@ -138,6 +139,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 		return n, fmt.Errorf("size %d < %d: %w", len(buf), n,
 			errHeaderSizeInsufficient)
 	}
+	headerLength := n
 
 	h.Marker = (buf[1] >> markerShift & markerMask) > 0
 	h.PayloadType = buf[1] & ptMask
@@ -168,6 +170,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 		extensionLength := int(binary.BigEndian.Uint16(buf[n:])) * 4
 		n += 2
 		extensionEnd := n + extensionLength
+		headerLength = extensionEnd
 
 		if len(buf) < extensionEnd {
 			return n, fmt.Errorf("size %d < %d: %w", len(buf), extensionEnd, errHeaderSizeInsufficientForExtension)
@@ -180,7 +183,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 			)
 
 			for n < extensionEnd {
-				if buf[n] == 0x00 { // padding
+				if buf[n] == extensionIDPadding { // padding
 					n++
 
 					continue
@@ -191,23 +194,24 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 					payloadLen = int(buf[n]&^0xF0 + 1)
 					n++
 
-					if extid == extensionIDReserved {
+					// Stop parsing extensions if we reach the reserved ID or padding with non-zero length
+					if extid == extensionIDReserved || extid == extensionIDPadding {
 						break
 					}
 				} else {
 					extid = buf[n]
 					n++
 
-					if len(buf) <= n {
-						return n, fmt.Errorf("size %d < %d: %w", len(buf), n, errHeaderSizeInsufficientForExtension)
+					if extensionEnd <= n {
+						return n, fmt.Errorf("size %d < %d: %w", extensionEnd, n, errHeaderSizeInsufficientForExtension)
 					}
 
 					payloadLen = int(buf[n])
 					n++
 				}
 
-				if extensionPayloadEnd := n + payloadLen; len(buf) < extensionPayloadEnd {
-					return n, fmt.Errorf("size %d < %d: %w", len(buf), extensionPayloadEnd, errHeaderSizeInsufficientForExtension)
+				if extensionPayloadEnd := n + payloadLen; extensionEnd < extensionPayloadEnd {
+					return n, fmt.Errorf("size %d < %d: %w", extensionEnd, extensionPayloadEnd, errHeaderSizeInsufficientForExtension)
 				}
 
 				extension := Extension{id: extid, payload: buf[n : n+payloadLen]}
@@ -218,11 +222,10 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 			// RFC3550 Extension
 			extension := Extension{id: 0, payload: buf[n:extensionEnd]}
 			h.Extensions = append(h.Extensions, extension)
-			n += len(h.Extensions[0].payload)
 		}
 	}
 
-	return n, nil
+	return headerLength, nil
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the Packet.
