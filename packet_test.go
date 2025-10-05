@@ -573,6 +573,29 @@ func TestRFC8285TwoByteMultipleExtensionsWithPadding(t *testing.T) {
 	ext3 := packet.GetExtension(3)
 	ext3Expect := []byte{0xCC, 0xCC, 0xCC, 0xCC}
 	assert.Equal(t, ext3Expect, ext3, "Extension has incorrect data")
+
+	rawPktReMarshal := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x10, 0x00, 0x00, 0x03, 0x01, 0x00, 0x02, 0x01,
+		0xBB, 0x03, 0x04, 0xCC, 0xCC, 0xCC, 0xCC, 0x00, // padding is moved to the end by re-marshaling
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	dstBuf := map[string][]byte{
+		"CleanBuffer": make([]byte, 1000),
+		"DirtyBuffer": make([]byte, 1000),
+	}
+	for i := range dstBuf["DirtyBuffer"] {
+		dstBuf["DirtyBuffer"][i] = 0xFF
+	}
+	for name, buf := range dstBuf {
+		buf := buf
+		t.Run(name, func(t *testing.T) {
+			n, err := packet.MarshalTo(buf)
+			assert.NoError(t, err)
+			assert.Equal(t, rawPktReMarshal, buf[:n])
+		})
+	}
 }
 
 func TestRFC8285TwoByteMultipleExtensionsWithLargeExtension(t *testing.T) {
@@ -884,7 +907,7 @@ func TestRFC8285OneByteSetExtensionShouldErrorWhenInvalidIDProvided(t *testing.T
 	)
 }
 
-func TestRFC8285OneByteExtensionTermianteProcessingWhenReservedIDEncountered(t *testing.T) {
+func TestRFC8285OneByteExtensionTerminateProcessingWhenReservedIDEncountered(t *testing.T) {
 	packet := &Packet{}
 
 	reservedIDPkt := []byte{
@@ -897,7 +920,24 @@ func TestRFC8285OneByteExtensionTermianteProcessingWhenReservedIDEncountered(t *
 	)
 	assert.Len(t, packet.Extensions, 0, "Extensions should be empty for invalid id")
 
-	payload := reservedIDPkt[17:]
+	payload := reservedIDPkt[20:]
+	assert.Equal(t, payload, packet.Payload)
+}
+
+func TestRFC8285OneByteExtensionTerminateProcessingWhenPaddingWithSizeEncountered(t *testing.T) {
+	packet := &Packet{}
+
+	reservedIDPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01, 0x01, 0xAA, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	assert.NoError(
+		t, packet.Unmarshal(reservedIDPkt),
+		"Unmarshal error on packet with non-zero padding size",
+	)
+	assert.Len(t, packet.Extensions, 0, "Extensions should be empty for non-zero padding size")
+
+	payload := reservedIDPkt[20:]
 	assert.Equal(t, payload, packet.Payload)
 }
 
@@ -1059,26 +1099,26 @@ func TestRFC8285TwoByteSetExtensionShouldErrorWhenPayloadTooLarge(t *testing.T) 
 func TestRFC8285Padding(t *testing.T) {
 	header := &Header{}
 
-	for _, payload := range [][]byte{
+	for n, payload := range [][]byte{
 		{
 			0b00010000,                      // header.Extension = true
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // SequenceNumber, Timestamp, SSRC
 			0xBE, 0xDE, // header.ExtensionProfile = extensionProfileOneByte
 			0, 1, // extensionLength
 			0, 0, 0, // padding
-			1, // extid
+			0x10, // extid and length
 		},
 		{
 			0b00010000,                      // header.Extension = true
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // SequenceNumber, Timestamp, SSRC
-			0x10, 0x00, // header.ExtensionProfile = extensionProfileOneByte
+			0x10, 0x00, // header.ExtensionProfile = extensionProfileTwoByte
 			0, 1, // extensionLength
-			0, 0, 0, // padding
-			1, // extid
+			0, 0, // padding
+			0x01, 0x01, // extid and length
 		},
 	} {
 		_, err := header.Unmarshal(payload)
-		assert.ErrorIs(t, err, errHeaderSizeInsufficientForExtension)
+		assert.ErrorIs(t, err, errHeaderSizeInsufficientForExtension, "case %d", n)
 	}
 }
 
@@ -1198,12 +1238,65 @@ func TestUnmarshal_ErrorHandling(t *testing.T) {
 }
 
 // https://github.com/pion/rtp/issues/275
-func TestUnmarshal_ExtensionWithoutRTPPayload(t *testing.T) {
+func TestUnmarshal_OneByteExtensionWithoutRTPPayload(t *testing.T) {
 	rawPkt := []byte{
 		0x10, 0x64, 0x57, 0x49, 0x00, 0x00, 0x01, 0x90, 0x12, 0x34, 0xAB, 0xCD,
 		0xBE, 0xDE, 0x00, 0x01, // One-Byte extension header, 4 bytes
 		0x02,             // ID=0, Len=2 (3 bytes data)
 		0x01, 0x02, 0x03, // Extension data
+	}
+
+	p := &Packet{}
+	assert.NoError(t, p.Unmarshal(rawPkt))
+}
+
+func TestUnmarshal_TwoByteExtensionWithoutRTPPayload(t *testing.T) {
+	rawPkt := []byte{
+		0x10, 0x64, 0x57, 0x49, 0x00, 0x00, 0x01, 0x90, 0x12, 0x34, 0xAB, 0xCD,
+		0x10, 0x00, 0x00, 0x01, // Two-Byte extension header, 4 bytes
+		0x02, 0x02, // ID=0, Len=2 (2 bytes data)
+		0x02, 0x03, // Extension data
+	}
+
+	p := &Packet{}
+	assert.NoError(t, p.Unmarshal(rawPkt))
+}
+
+func TestUnmarshal_NonStandardExtensionWithoutRTPPayload(t *testing.T) {
+	rawPkt := []byte{
+		0x10, 0x64, 0x57, 0x49, 0x00, 0x00, 0x01, 0x90, 0x12, 0x34, 0xAB, 0xCD,
+		0xAA, 0xAA, 0x00, 0x01, // Non-standard header extension 0xAAAA, 4 bytes
+		0x01, 0x02, 0x03, 0x04, // Extension data
+	}
+
+	p := &Packet{}
+	assert.NoError(t, p.Unmarshal(rawPkt))
+}
+
+func TestUnmarshal_EmptyOneByteExtensionWithoutRTPPayload(t *testing.T) {
+	rawPkt := []byte{
+		0x10, 0x64, 0x57, 0x49, 0x00, 0x00, 0x01, 0x90, 0x12, 0x34, 0xAB, 0xCD,
+		0xBE, 0xDE, 0x00, 0x00, // One-Byte extension header, 0 bytes
+	}
+
+	p := &Packet{}
+	assert.NoError(t, p.Unmarshal(rawPkt))
+}
+
+func TestUnmarshal_EmptyTwoByteExtensionWithoutRTPPayload(t *testing.T) {
+	rawPkt := []byte{
+		0x10, 0x64, 0x57, 0x49, 0x00, 0x00, 0x01, 0x90, 0x12, 0x34, 0xAB, 0xCD,
+		0x10, 0x00, 0x00, 0x00, // Two-Byte extension header, 0 bytes
+	}
+
+	p := &Packet{}
+	assert.NoError(t, p.Unmarshal(rawPkt))
+}
+
+func TestUnmarshal_EmptyNonStandardExtensionWithoutRTPPayload(t *testing.T) {
+	rawPkt := []byte{
+		0x10, 0x64, 0x57, 0x49, 0x00, 0x00, 0x01, 0x90, 0x12, 0x34, 0xAB, 0xCD,
+		0xAA, 0xAA, 0x00, 0x00, // Non-standard header extension 0xAAAA, 0 bytes
 	}
 
 	p := &Packet{}
