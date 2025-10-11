@@ -531,3 +531,30 @@ func TestAV1Depacketizer_aggregationHeader(t *testing.T) {
 		})
 	}
 }
+
+func FuzzAV1DepacketizerUnmarshal(f *testing.F) {
+	f.Add([]byte{0x10, 0x01, 0x00})
+	f.Add([]byte{0x20, 0x01, 0x00, 0x01, 0x00})
+	f.Add([]byte{0x00, 0x01, 0x00})
+	f.Add([]byte{0x80, 0x01, 0x00})
+	f.Add([]byte{0x40, 0x01, 0x00})
+	f.Add([]byte{0x08, 0x01, 0x00})
+	f.Add([]byte{0xC0, 0x01, 0x00})
+	f.Add([]byte{0x30, 0x01, 0x00, 0x01, 0x00, 0x00})
+
+	obuData, _ := createAV1OBU(obu.OBUFrameHeader, []byte{0x01, 0x02, 0x03})
+	packet := append([]byte{0x00}, obu.WriteToLeb128(uint(len(obuData)))...)
+	packet = append(packet, obuData...)
+	f.Add(packet)
+
+	obuData2, _ := createAV1OBU(obu.OBUFrame, []byte{0x04, 0x05})
+	packet2 := append([]byte{0x10}, obuData2...)
+	f.Add(packet2)
+
+	// just check for crashes :)
+	f.Fuzz(func(t *testing.T, data []byte) {
+		depacketizer := &AV1Depacketizer{}
+		_, err := depacketizer.Unmarshal(data)
+		_ = err
+	})
+}

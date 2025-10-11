@@ -2034,3 +2034,69 @@ func TestAV1_Unmarshal(t *testing.T) {
 	}
 	assert.Equal(t, expect, av1Pkt, "AV1 Unmarshal didn't store the expected results in the packet")
 }
+
+func FuzzAV1PacketUnmarshal(f *testing.F) {
+	f.Add([]byte{0x00, 0x00})
+	f.Add([]byte{0x10, 0x00})
+	f.Add([]byte{0x20, 0x00})
+	f.Add([]byte{0x30, 0x00})
+	f.Add([]byte{0x08, 0x00})
+	f.Add([]byte{0x80, 0x00})
+	f.Add([]byte{0x40, 0x00})
+	f.Add([]byte{0xC8, 0x00})
+	f.Add([]byte{0x00, 0x05, 0x01, 0x02, 0x03})
+
+	realPayload := []byte{
+		0x68, 0x0c, 0x08, 0x00, 0x00, 0x00, 0x2c,
+		0xd6, 0xd3, 0x0c, 0xd5, 0x02, 0x00, 0x80,
+	}
+	f.Add(realPayload)
+
+	// look for crashes
+	f.Fuzz(func(t *testing.T, data []byte) {
+		pkt := &AV1Packet{}
+		_, err := pkt.Unmarshal(data)
+		_ = err
+	})
+}
+
+func FuzzAV1PayloaderPayloadMTU(f *testing.F) {
+	sequenceHeader := (&obu.Header{
+		Type:         obu.OBUSequenceHeader,
+		HasSizeField: true,
+	}).Marshal()
+	f.Add(uint16(1500), append(sequenceHeader, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05))
+
+	frameHeader := (&obu.Header{
+		Type:         obu.OBUFrameHeader,
+		HasSizeField: true,
+	}).Marshal()
+	f.Add(uint16(500), append(frameHeader, 0x03, 0x01, 0x02, 0x03))
+
+	f.Add(uint16(1500), []byte{})
+
+	f.Add(uint16(10), append(frameHeader, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05))
+
+	f.Add(uint16(2), append(frameHeader, 0x03, 0x01, 0x02, 0x03))
+
+	largePayload := make([]byte, 0, 5000)
+	largePayload = append(largePayload, frameHeader...)
+	largePayload = append(largePayload, 0xFF, 0x26)
+	for i := 0; i < 5000; i++ {
+		largePayload = append(largePayload, byte(i%256))
+	}
+	f.Add(uint16(1500), largePayload)
+
+	f.Fuzz(func(t *testing.T, mtu uint16, data []byte) {
+		if mtu == 0 {
+			t.Skip()
+		}
+
+		payloader := &AV1Payloader{}
+		payloads := payloader.Payload(mtu, data)
+
+		for _, payload := range payloads {
+			assert.LessOrEqual(t, len(payload), int(mtu), "Payload size should not exceed MTU")
+		}
+	})
+}
