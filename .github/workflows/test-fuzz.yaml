@@ -1,0 +1,52 @@
+name: Test the fuzz workflow
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup latest stable Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Cache Go build/module cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run all fuzz targets (10s each)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pkg in $(go list ./...); do
+            targets=$(go test "$pkg" -list '^Fuzz' | grep '^Fuzz' || true)
+            for t in $targets; do
+              echo "::group::Fuzzing $pkg/$t"
+              go test -run=^$ -fuzz="$t" -fuzztime=10s "$pkg"
+              echo "::endgroup::"
+            done
+          done
+
+      - name: Upload fuzz artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: "**/testdata/fuzz/**"
+          if-no-files-found: ignore
