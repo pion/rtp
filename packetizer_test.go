@@ -183,3 +183,191 @@ func TestNewPacketizerWithOptions_PartialOptions(t *testing.T) {
 	assert.NotZero(t, p.Timestamp)
 	assert.Equal(t, uint32(90000), p.ClockRate)
 }
+
+func FuzzPacketizer_Packetize_G722(f *testing.F) {
+	// mixed seeds.
+	f.Add(uint16(100), uint8(98), uint32(0x1234ABCD), uint32(960), false, []byte{0})
+	f.Add(uint16(100), uint8(98), uint32(0x00000001), uint32(0), false, []byte{})
+	f.Add(uint16(12), uint8(0), uint32(0), uint32(1), true, []byte{1, 2, 3, 4})
+	f.Add(uint16(1500), uint8(120), uint32(0xCAFEBABE), uint32(480), true, make([]byte, 4096))
+	f.Add(uint16(1), uint8(34), uint32(7), uint32(160), false, make([]byte, 32))
+
+	f.Fuzz(func(t *testing.T, mtu uint16, pt uint8, ssrc uint32, samples uint32, enableAST bool, payload []byte) {
+		if len(payload) > 1<<16 {
+			payload = payload[:1<<16]
+		}
+
+		packetizer := NewPacketizerWithOptions(
+			mtu,
+			&codecs.G722Payloader{},
+			NewFixedSequencer(0),
+			90000,
+			WithPayloadType(pt),
+			WithSSRC(ssrc),
+			WithTimestamp(0xAABBCCDD),
+		)
+
+		if enableAST {
+			packetizer.EnableAbsSendTime(1)
+		}
+
+		packets := packetizer.Packetize(payload, samples)
+
+		if len(payload) == 0 {
+			assert.Nil(t, packets)
+
+			return
+		}
+
+		eff := int(mtu - 12)
+		if eff == 0 {
+			assert.Equal(t, 0, len(packets))
+
+			return
+		}
+
+		assert.GreaterOrEqual(t, len(packets), 1)
+
+		for i, packet := range packets {
+			assert.Equal(t, uint8(2), packet.Version)
+			assert.Equal(t, pt, packet.PayloadType)
+			assert.Equal(t, ssrc, packet.SSRC)
+
+			if i == len(packets)-1 {
+				assert.True(t, packet.Marker)
+
+				if enableAST {
+					assert.True(t, packet.Extension)
+					raw, err := packet.Marshal()
+					assert.NoError(t, err)
+
+					var back Packet
+					assert.NoError(t, back.Unmarshal(raw))
+				}
+			} else {
+				assert.False(t, packet.Marker)
+			}
+
+			if mtu >= 12 && !enableAST {
+				raw, err := packet.Marshal()
+				assert.NoError(t, err)
+				assert.LessOrEqual(t, len(raw), int(mtu))
+			} else {
+				raw, err := packet.Marshal()
+				assert.NoError(t, err)
+
+				var back Packet
+				assert.NoError(t, back.Unmarshal(raw))
+			}
+		}
+	})
+}
+
+func FuzzPacketizer_SkipSamples_And_Timestamps(f *testing.F) {
+	// mixed seeds.
+	f.Add(uint16(1200), uint32(0), uint32(480), uint32(960), uint16(100), uint16(200), false)
+	f.Add(uint16(200), uint32(160), uint32(160), uint32(160), uint16(10), uint16(20), true)
+	f.Add(uint16(20), uint32(32000), uint32(0), uint32(1), uint16(0), uint16(1), false)
+
+	f.Fuzz(func(
+		t *testing.T,
+		mtu uint16,
+		skip uint32,
+		samples1 uint32,
+		samples2 uint32,
+		len1 uint16,
+		len2 uint16,
+		enableAST bool,
+	) {
+		p1 := make([]byte, int(len1))
+		for i := range p1 {
+			p1[i] = byte(i)
+		}
+
+		p2 := make([]byte, int(len2))
+		for i := range p2 {
+			p2[i] = byte(255 - i)
+		}
+
+		const startTS = uint32(0x10203040)
+		packetizer := NewPacketizerWithOptions(
+			mtu,
+			&codecs.G722Payloader{},
+			NewFixedSequencer(1000),
+			90000,
+			WithPayloadType(111),
+			WithSSRC(0xFEEDBEEF),
+			WithTimestamp(startTS),
+		)
+
+		if enableAST {
+			packetizer.EnableAbsSendTime(1)
+		}
+
+		packetizer.SkipSamples(skip)
+
+		pkts1 := packetizer.Packetize(p1, samples1)
+		if len(p1) == 0 {
+			assert.Nil(t, pkts1)
+		} else {
+			assert.GreaterOrEqual(t, len(pkts1), 1)
+			assert.Equal(t, startTS+skip, pkts1[0].Timestamp)
+		}
+
+		pkts2 := packetizer.Packetize(p2, samples2)
+		if len(p2) == 0 {
+			assert.Nil(t, pkts2)
+		} else {
+			assert.GreaterOrEqual(t, len(pkts2), 1)
+			expectedTS2 := startTS + skip + samples1
+			assert.Equal(t, expectedTS2, pkts2[0].Timestamp)
+		}
+
+		for _, p := range append(pkts1, pkts2...) {
+			raw, err := p.Marshal()
+			assert.NoError(t, err)
+			var back Packet
+			assert.NoError(t, back.Unmarshal(raw))
+		}
+	})
+}
+
+func FuzzPacketizer_GeneratePadding(f *testing.F) {
+	// mixed seeds.
+	f.Add(uint32(0))
+	f.Add(uint32(1))
+	f.Add(uint32(5))
+	f.Add(uint32(16))
+
+	f.Fuzz(func(t *testing.T, samples uint32) {
+		samples %= 64
+
+		packetizer := NewPacketizerWithOptions(
+			1200,
+			&codecs.G722Payloader{},
+			NewFixedSequencer(0),
+			90000,
+		)
+
+		pads := packetizer.GeneratePadding(samples)
+		if samples == 0 {
+			assert.Nil(t, pads)
+
+			return
+		}
+
+		assert.Len(t, pads, int(samples))
+		for _, p := range pads {
+			assert.True(t, p.Header.Padding)
+			assert.Equal(t, byte(255), p.Header.PaddingSize)
+			assert.Nil(t, p.Payload)
+
+			raw, err := p.Marshal()
+			assert.NoError(t, err)
+
+			var back Packet
+			assert.NoError(t, back.Unmarshal(raw))
+			assert.True(t, back.Padding)
+		}
+	})
+}
