@@ -5,6 +5,7 @@ package codecs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pion/rtp/codecs/av1/obu"
 	"github.com/stretchr/testify/assert"
@@ -551,10 +552,17 @@ func FuzzAV1DepacketizerUnmarshal(f *testing.F) {
 	packet2 := append([]byte{0x10}, obuData2...)
 	f.Add(packet2)
 
+	start := time.Now()
+
 	// just check for crashes :)
 	f.Fuzz(func(t *testing.T, data []byte) {
 		depacketizer := &AV1Depacketizer{}
 		_, err := depacketizer.Unmarshal(data)
+
+		if time.Now().Sub(start) >= time.Second*5 {
+			panic("fail!")
+		}
+
 		_ = err
 	})
 }
