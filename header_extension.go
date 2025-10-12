@@ -4,6 +4,7 @@
 package rtp
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -59,7 +60,7 @@ func (e *OneByteHeaderExtension) Set(id uint8, buf []byte) error {
 		n += payloadLen
 	}
 
-	if len(e.payload) == 0 {
+	if len(e.payload) == 0 && !bytes.HasPrefix(buf, []byte{0xBE, 0xDE}) {
 		e.payload = []byte{0xBE, 0xDE, 0x00, 0x00}
 	}
 
