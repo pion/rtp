@@ -52,12 +52,17 @@ func (e *OneByteHeaderExtension) Set(id uint8, buf []byte) error {
 		n++
 
 		if extid == id {
-			e.payload = append(e.payload[:n+1], append(buf, e.payload[n+1+payloadLen:]...)...)
+			e.payload = append(e.payload[:n], append(buf, e.payload[n+payloadLen:]...)...)
 
 			return nil
 		}
 		n += payloadLen
 	}
+
+	if len(e.payload) == 0 {
+		e.payload = []byte{0xBE, 0xDE, 0x00, 0x00}
+	}
+
 	e.payload = append(e.payload, (id<<4 | uint8(len(buf)-1))) // nolint: gosec // G115
 	e.payload = append(e.payload, buf...)
 	binary.BigEndian.PutUint16(e.payload[2:4], binary.BigEndian.Uint16(e.payload[2:4])+1)
