@@ -224,6 +224,22 @@ func TestHeaderExtension_RFC8285OneByteDelExtension(t *testing.T) {
 	assert.Error(t, ext.Del(1), "Should return error when deleting extension that doesnt exist")
 }
 
+func TestHeaderExtension_GetIds(t *testing.T) {
+	oneByteExt := &OneByteHeaderExtension{}
+
+	assert.NoError(t, oneByteExt.Set(1, []byte{0xBB}))
+	assert.NoError(t, oneByteExt.Set(3, []byte{0xAA}))
+	assert.NoError(t, oneByteExt.Set(5, []byte{0xFF}))
+	assert.Equal(t, oneByteExt.GetIDs(), []uint8{1, 3, 5})
+
+	twoByteExt := &TwoByteHeaderExtension{}
+
+	assert.NoError(t, twoByteExt.Set(1, []byte{0xBB}))
+	assert.NoError(t, twoByteExt.Set(3, []byte{0xAA}))
+	assert.NoError(t, twoByteExt.Set(5, []byte{0xFF}))
+	assert.Equal(t, twoByteExt.GetIDs(), []uint8{1, 3, 5})
+}
+
 func TestHeaderExtension_RFC8285TwoByteDelExtension(t *testing.T) {
 	ext := &TwoByteHeaderExtension{}
 
@@ -258,4 +274,22 @@ func TestHeaderExtension_RFC8285OneByteExtensionRewrite(t *testing.T) {
 	res, err = ext.Marshal()
 	assert.NoError(t, err)
 	assert.Equal(t, res, []byte{0xBE, 0xDE, 0x00, 0x02, 0x12, 0x04, 0x05, 0x06, 0x32, 0x07, 0x08, 0x09})
+}
+
+func TestHeaderExtension_RFC8285TwoByteExtensionRewrite(t *testing.T) {
+	ext := &TwoByteHeaderExtension{}
+	assert.NoError(t, ext.Set(200, []byte{0x01, 0x02, 0x03}))
+	res, err := ext.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, res, []byte{0x10, 0x00, 0x00, 0x01, 0xc8, 0x03, 0x01, 0x02, 0x03})
+
+	assert.NoError(t, ext.Set(200, []byte{0x04, 0x05, 0x06}))
+	res, err = ext.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, res, []byte{0x10, 0x00, 0x00, 0x01, 0xc8, 0x03, 0x04, 0x05, 0x06})
+
+	assert.NoError(t, ext.Set(50, []byte{0x07, 0x08, 0x09}))
+	res, err = ext.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, res, []byte{0x10, 0x00, 0x00, 0x02, 0xc8, 0x03, 0x04, 0x05, 0x06, 0x32, 0x03, 0x07, 0x08, 0x09})
 }
