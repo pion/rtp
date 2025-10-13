@@ -60,7 +60,7 @@ func (e *OneByteHeaderExtension) Set(id uint8, buf []byte) error {
 		n += payloadLen
 	}
 
-	if len(e.payload) == 0 && !bytes.HasPrefix(buf, []byte{0xBE, 0xDE}) {
+	if len(e.payload) == 0 && !bytes.HasPrefix(buf, []byte{0xBE, 0xDE, 0x00, 0x00}) {
 		e.payload = []byte{0xBE, 0xDE, 0x00, 0x00}
 	}
 
@@ -200,12 +200,17 @@ func (e *TwoByteHeaderExtension) Set(id uint8, buf []byte) error {
 		n++
 
 		if extid == id {
-			e.payload = append(e.payload[:n+2], append(buf, e.payload[n+2+payloadLen:]...)...)
+			e.payload = append(e.payload[:n], append(buf, e.payload[n+payloadLen:]...)...)
 
 			return nil
 		}
 		n += payloadLen
 	}
+
+	if len(e.payload) == 0 && !bytes.HasPrefix(buf, []byte{0x10, 0x00, 0x00, 0x00}) {
+		e.payload = []byte{0x10, 0x00, 0x00, 0x00}
+	}
+
 	e.payload = append(e.payload, id, uint8(len(buf))) // nolint: gosec // G115
 	e.payload = append(e.payload, buf...)
 	binary.BigEndian.PutUint16(e.payload[2:4], binary.BigEndian.Uint16(e.payload[2:4])+1)
