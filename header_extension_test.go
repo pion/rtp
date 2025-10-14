@@ -293,3 +293,26 @@ func TestHeaderExtension_RFC8285TwoByteExtensionRewrite(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, res, []byte{0x10, 0x00, 0x00, 0x02, 0xc8, 0x03, 0x04, 0x05, 0x06, 0x32, 0x03, 0x07, 0x08, 0x09})
 }
+
+func TestHeaderExtension_Raw(t *testing.T) {
+	ext := &RawExtension{}
+	expectedPayload := []byte{0xBE, 0xEF}
+
+	assert.Error(t, ext.Set(5, expectedPayload))
+	assert.NoError(t, ext.Set(0, expectedPayload))
+
+	marshaled, err := ext.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, marshaled, expectedPayload)
+
+	_, err = ext.MarshalTo(nil)
+	assert.Error(t, err)
+
+	_, err = ext.MarshalTo(marshaled)
+	assert.NoError(t, err)
+
+	assert.Equal(t, ext.GetIDs(), []uint8{0})
+
+	assert.NoError(t, ext.Del(0))
+	assert.Nil(t, ext.Get(0))
+}
