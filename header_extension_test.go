@@ -114,7 +114,12 @@ func TestHeaderExtension_RFC8285TwoByteExtension(t *testing.T) {
 	_, err := ext.Unmarshal(rawPkt)
 	assert.NoError(t, err, "Unmarshal err for valid extension")
 
-	dstData, _ := ext.Marshal()
+	dstData, err := ext.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, dstData)
+
+	_, err = ext.MarshalTo(dstData)
+	assert.NoError(t, err)
 	assert.Equal(t, rawPkt, dstData)
 }
 
@@ -201,15 +206,18 @@ func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithLargeExtension(t *t
 	assert.Equal(t, rawPkt, dstData)
 }
 
-func TestHeaderExtension_RFC8285OneByteExtensionInvalid(t *testing.T) {
-	p := &OneByteHeaderExtension{}
+func TestHeaderExtension_Invalid(t *testing.T) {
+	oneByteExt := &OneByteHeaderExtension{}
+	twoByteExt := &OneByteHeaderExtension{}
 
 	// Invalid extension IDs
-	assert.Error(t, p.Set(0, nil))
-	assert.Error(t, p.Set(15, nil))
+	assert.Error(t, oneByteExt.Set(0, nil))
+	assert.Error(t, twoByteExt.Set(0, nil))
+	assert.Error(t, oneByteExt.Set(15, nil))
 
 	// Extension too large
-	assert.Error(t, p.Set(10, make([]byte, 255)))
+	assert.Error(t, oneByteExt.Set(10, make([]byte, 255)))
+	assert.Error(t, twoByteExt.Set(10, make([]byte, 255)))
 }
 
 func TestHeaderExtension_RFC8285OneByteDelExtension(t *testing.T) {
@@ -304,6 +312,9 @@ func TestHeaderExtension_Raw(t *testing.T) {
 	marshaled, err := ext.Marshal()
 	assert.NoError(t, err)
 	assert.Equal(t, marshaled, expectedPayload)
+
+	_, err = ext.Unmarshal(marshaled)
+	assert.NoError(t, err)
 
 	_, err = ext.MarshalTo(nil)
 	assert.Error(t, err)
