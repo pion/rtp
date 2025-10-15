@@ -112,10 +112,8 @@ func TestHeaderUnmarshal(t *testing.T) {
 				Profile:   1,
 				ShowFrame: true,
 				ColorConfig: &HeaderColorConfig{
-					BitDepth:     8,
-					ColorSpace:   6,
-					SubsamplingX: false,
-					SubsamplingY: false,
+					BitDepth:   8,
+					ColorSpace: 6,
 				},
 				FrameSize: &HeaderFrameSize{
 					FrameWidthMinus1:  30712,
@@ -124,6 +122,29 @@ func TestHeaderUnmarshal(t *testing.T) {
 			},
 			0x77f9,
 			0x437b,
+		},
+		{
+			"ColorRange = true",
+			[]byte{
+				0b10100010, 0x49, 0x83, 0b1000010, 0b11100000, 0xef, 0xf0, 0x86,
+				0xf4, 0x04, 0x21, 0xa0, 0xe0, 0x00, 0x30, 0x70,
+				0x00, 0x00, 0x00, 0x01,
+			},
+			Header{
+				Profile:   1,
+				ShowFrame: true,
+				ColorConfig: &HeaderColorConfig{
+					BitDepth:   8,
+					ColorSpace: 7,
+					ColorRange: true,
+				},
+				FrameSize: &HeaderFrameSize{
+					FrameWidthMinus1:  3839,
+					FrameHeightMinus1: 2159,
+				},
+			},
+			0xf00,
+			0x870,
 		},
 	}
 
