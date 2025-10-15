@@ -101,6 +101,30 @@ func TestHeaderUnmarshal(t *testing.T) {
 			0x1dff,
 			0x10df,
 		},
+		{
+			"profile 1",
+			[]byte{
+				0b10100010, 0x49, 0x83, 0b1000010, 0b11000000, 0xef, 0xf0, 0x86,
+				0xf4, 0x04, 0x21, 0xa0, 0xe0, 0x00, 0x30, 0x70,
+				0x00, 0x00, 0x00, 0x01,
+			},
+			Header{
+				Profile:   1,
+				ShowFrame: true,
+				ColorConfig: &HeaderColorConfig{
+					BitDepth:     8,
+					ColorSpace:   6,
+					SubsamplingX: false,
+					SubsamplingY: false,
+				},
+				FrameSize: &HeaderFrameSize{
+					FrameWidthMinus1:  30712,
+					FrameHeightMinus1: 17274,
+				},
+			},
+			0x77f9,
+			0x437b,
+		},
 	}
 
 	for _, ca := range cases {
