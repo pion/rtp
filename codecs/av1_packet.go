@@ -248,14 +248,14 @@ func (p *AV1Payloader) appendOBUPayload(
 
 // Measure the maximum write size for a payload with leb128 encoding added.
 func (p *AV1Payloader) computeWriteSize(wantToWrite, canWrite int) int {
-	leb128Size, isAtEge := p.leb128Size(wantToWrite)
+	leb128Size, isAtEdge := p.leb128Size(wantToWrite)
 	if canWrite >= wantToWrite+leb128Size {
 		return wantToWrite
 	}
 
 	// Handle edge case where subtracting one from the leb128 size
 	// results in a smaller leb128 size that can fit in the remaining space.
-	if isAtEge && canWrite >= wantToWrite+leb128Size-1 {
+	if isAtEdge && canWrite >= wantToWrite+leb128Size-1 {
 		return wantToWrite - 1
 	}
 
