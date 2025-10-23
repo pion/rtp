@@ -1414,6 +1414,68 @@ func TestDeprecatedPaddingSizeField(t *testing.T) {
 	assert.EqualValues(t, 0, parsedPacket2.Header.PaddingSize)
 }
 
+func TestSetExtensionWithProfile(t *testing.T) {
+	t.Run("add two-byte extension due to the size > 16", func(t *testing.T) {
+		h := Header{}
+		assert.NoError(t, h.SetExtension(1, make([]byte, 2)))
+		assert.NoError(t, h.SetExtension(2, make([]byte, 3)))
+
+		// Adding another extension that requires two-byte header extension
+		assert.NoError(t, h.SetExtensionWithProfile(3, make([]byte, 20), ExtensionProfileTwoByte))
+		assert.Equal(t, h.ExtensionProfile, uint16(ExtensionProfileTwoByte))
+	})
+
+	t.Run("add two-byte extension due to id > 14", func(t *testing.T) {
+		h := Header{}
+		assert.NoError(t, h.SetExtension(1, make([]byte, 2)))
+		assert.NoError(t, h.SetExtension(2, make([]byte, 3)))
+
+		// Adding another extension that requires two-byte header extension
+		// because the extmap ID is greater than 14.
+		assert.NoError(t, h.SetExtensionWithProfile(16, make([]byte, 4), ExtensionProfileTwoByte))
+		assert.Equal(t, h.ExtensionProfile, uint16(ExtensionProfileTwoByte))
+	})
+
+	t.Run("Downgrade 2 byte header Extension", func(t *testing.T) {
+		pkt := []byte{
+			0x90, 0x60, 0x00, 0x01, // V=2, P=0, X=1, CC=0; M=0, PT=96; sequence=1
+			0x00, 0x00, 0x00, 0x01, // timestamp=1
+			0x12, 0x34, 0x56, 0x78, // SSRC=0x12345678
+			0x10, 0x00, 0x00, 0x01, // profile=0x1000 (two-byte), length=1 (4 bytes)
+			0x01, 0x02, 0x00, 0x01, // id=1, len=2, data=0x00,0x01 (padded to 32-bit)
+		}
+		h := Header{}
+
+		_, err := h.Unmarshal(pkt)
+		assert.NoError(t, err)
+		assert.Equal(t, h.ExtensionProfile, uint16(ExtensionProfileTwoByte))
+
+		assert.NoError(t, h.SetExtensionWithProfile(1, []byte{0x02, 0x03}, ExtensionProfileOneByte))
+		assert.Equal(t, h.ExtensionProfile, uint16(ExtensionProfileOneByte))
+
+		pkt, err = h.Marshal()
+		assert.NoError(t, err)
+
+		assert.Equal(t, pkt, []byte{
+			0x90, 0x60, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x01,
+			0x12, 0x34, 0x56, 0x78,
+			0xbe, 0xde, 0x00, 0x01,
+			0x11, 0x02, 0x03, 0x00,
+		})
+	})
+
+	t.Run("Do not mutate packet for invalid extension", func(t *testing.T) {
+		h := Header{}
+		assert.NoError(t, h.SetExtension(1, make([]byte, 2)))
+
+		assert.Error(t, h.SetExtensionWithProfile(16, make([]byte, 4096), ExtensionProfileTwoByte))
+
+		assert.Equal(t, h.ExtensionProfile, uint16(ExtensionProfileOneByte))
+		assert.Len(t, h.Extensions, 1)
+	})
+}
+
 func BenchmarkMarshal(b *testing.B) {
 	rawPkt := []byte{
 		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
