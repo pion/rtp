@@ -34,11 +34,8 @@ type OneByteHeaderExtension struct {
 
 // Set sets the extension payload for the specified ID.
 func (e *OneByteHeaderExtension) Set(id uint8, buf []byte) error {
-	if id < 1 || id > 14 {
-		return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderIDRange, id)
-	}
-	if len(buf) > 16 {
-		return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderSize, len(buf))
+	if err := headerExtensionCheck(ExtensionProfileOneByte, id, buf); err != nil {
+		return err
 	}
 
 	for n := 4; n < len(e.payload); {
@@ -179,11 +176,8 @@ type TwoByteHeaderExtension struct {
 
 // Set sets the extension payload for the specified ID.
 func (e *TwoByteHeaderExtension) Set(id uint8, buf []byte) error {
-	if id < 1 {
-		return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderIDRange, id)
-	}
-	if len(buf) > 255 {
-		return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderSize, len(buf))
+	if err := headerExtensionCheck(ExtensionProfileTwoByte, id, buf); err != nil {
+		return err
 	}
 
 	for n := 4; n < len(e.payload); {
@@ -327,9 +321,10 @@ type RawExtension struct {
 
 // Set sets the extension payload for the specified ID.
 func (e *RawExtension) Set(id uint8, payload []byte) error {
-	if id != 0 {
-		return fmt.Errorf("%w actual(%d)", errRFC3550HeaderIDRange, id)
+	if err := headerExtensionCheck(0, id, payload); err != nil {
+		return err
 	}
+
 	e.payload = payload
 
 	return nil
@@ -389,4 +384,32 @@ func (e RawExtension) MarshalTo(buf []byte) (int, error) {
 // MarshalSize returns the size of the extension when marshaled.
 func (e RawExtension) MarshalSize() int {
 	return len(e.payload)
+}
+
+// Assert that id + value is valid for give Header Extension Profile.
+func headerExtensionCheck(extensionProfile uint16, id uint8, payload []byte) error {
+	switch extensionProfile {
+	// RFC 8285 RTP One Byte Header Extension
+	case ExtensionProfileOneByte:
+		if id < 1 || id > 14 {
+			return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderIDRange, id)
+		}
+		if len(payload) > 16 {
+			return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderSize, len(payload))
+		}
+	// RFC 8285 RTP Two Byte Header Extension
+	case ExtensionProfileTwoByte:
+		if id < 1 {
+			return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderIDRange, id)
+		}
+		if len(payload) > 255 {
+			return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderSize, len(payload))
+		}
+	default: // RFC3550 Extension
+		if id != 0 {
+			return fmt.Errorf("%w actual(%d)", errRFC3550HeaderIDRange, id)
+		}
+	}
+
+	return nil
 }
