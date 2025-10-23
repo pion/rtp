@@ -208,7 +208,7 @@ func TestHeaderExtension_RFC8285TwoByteMultipleExtensionsWithLargeExtension(t *t
 
 func TestHeaderExtension_Invalid(t *testing.T) {
 	oneByteExt := &OneByteHeaderExtension{}
-	twoByteExt := &OneByteHeaderExtension{}
+	twoByteExt := &TwoByteHeaderExtension{}
 
 	// Invalid extension IDs
 	assert.Error(t, oneByteExt.Set(0, nil))
@@ -217,7 +217,7 @@ func TestHeaderExtension_Invalid(t *testing.T) {
 
 	// Extension too large
 	assert.Error(t, oneByteExt.Set(10, make([]byte, 255)))
-	assert.Error(t, twoByteExt.Set(10, make([]byte, 255)))
+	assert.Error(t, twoByteExt.Set(10, make([]byte, 500)))
 }
 
 func TestHeaderExtension_RFC8285OneByteDelExtension(t *testing.T) {
