@@ -402,27 +402,8 @@ func (h Header) MarshalSize() int {
 // SetExtension sets an RTP header extension.
 func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocognit, cyclop
 	if h.Extension { // nolint: nestif
-		switch h.ExtensionProfile {
-		// RFC 8285 RTP One Byte Header Extension
-		case ExtensionProfileOneByte:
-			if id < 1 || id > 14 {
-				return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderIDRange, id)
-			}
-			if len(payload) > 16 {
-				return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderSize, len(payload))
-			}
-		// RFC 8285 RTP Two Byte Header Extension
-		case ExtensionProfileTwoByte:
-			if id < 1 {
-				return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderIDRange, id)
-			}
-			if len(payload) > 255 {
-				return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderSize, len(payload))
-			}
-		default: // RFC3550 Extension
-			if id != 0 {
-				return fmt.Errorf("%w actual(%d)", errRFC3550HeaderIDRange, id)
-			}
+		if err := headerExtensionCheck(h.ExtensionProfile, id, payload); err != nil {
+			return err
 		}
 
 		// Update existing if it exists else add new extension
