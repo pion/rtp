@@ -435,6 +435,31 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 	return nil
 }
 
+// SetExtensionWithProfile sets an RTP header extension and converts Header Extension Profile if needed.
+func (h *Header) SetExtensionWithProfile(id uint8, payload []byte, intendedProfile uint16) error {
+	if !h.Extension || h.ExtensionProfile == intendedProfile {
+		return h.SetExtension(id, payload)
+	}
+
+	// Don't mutate the packet if Set is going to fail anyway
+	if err := headerExtensionCheck(intendedProfile, id, payload); err != nil {
+		return err
+	}
+
+	// If downgrading assert that existing Extensions will work
+	if intendedProfile == ExtensionProfileOneByte {
+		for i := range h.Extensions {
+			if err := headerExtensionCheck(intendedProfile, h.Extensions[i].id, h.Extensions[i].payload); err != nil {
+				return err
+			}
+		}
+	}
+
+	h.ExtensionProfile = intendedProfile
+
+	return h.SetExtension(id, payload)
+}
+
 // GetExtensionIDs returns an extension id array.
 func (h *Header) GetExtensionIDs() []uint8 {
 	if !h.Extension {
