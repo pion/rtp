@@ -83,4 +83,3 @@ func WriteToLeb128(in uint) []byte {
 
 	return b // unreachable
 }
-
