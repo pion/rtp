@@ -5,6 +5,7 @@ package rtp
 
 import (
 	"encoding/binary"
+	"io"
 )
 
 const (
@@ -24,6 +25,22 @@ const (
 // .
 type TransportCCExtension struct {
 	TransportSequence uint16
+}
+
+// MarshalSize returns the size of the TransportCCExtension once marshaled.
+func (t TransportCCExtension) MarshalSize() int {
+	return transportCCExtensionSize
+}
+
+// MarshalTo marshals the extension to the given buffer.
+// Returns io.ErrShortBuffer if buf is too small.
+func (t TransportCCExtension) MarshalTo(buf []byte) (int, error) {
+	if len(buf) < transportCCExtensionSize {
+		return 0, io.ErrShortBuffer
+	}
+	binary.BigEndian.PutUint16(buf[0:2], t.TransportSequence)
+
+	return transportCCExtensionSize, nil
 }
 
 // Marshal serializes the members to buffer.

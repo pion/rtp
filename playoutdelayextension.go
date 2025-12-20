@@ -6,6 +6,7 @@ package rtp
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 )
 
 const (
@@ -25,6 +26,27 @@ var errPlayoutDelayInvalidValue = errors.New("invalid playout delay value")
 // .
 type PlayoutDelayExtension struct {
 	MinDelay, MaxDelay uint16
+}
+
+// MarshalSize returns the size of the PlayoutDelayExtension once marshaled.
+func (p PlayoutDelayExtension) MarshalSize() int {
+	return playoutDelayExtensionSize
+}
+
+// MarshalTo marshals the extension to the given buffer.
+// Returns io.ErrShortBuffer if buf is too small.
+func (p PlayoutDelayExtension) MarshalTo(buf []byte) (int, error) {
+	if p.MinDelay > playoutDelayMaxValue || p.MaxDelay > playoutDelayMaxValue {
+		return 0, errPlayoutDelayInvalidValue
+	}
+	if len(buf) < playoutDelayExtensionSize {
+		return 0, io.ErrShortBuffer
+	}
+	buf[0] = byte(p.MinDelay >> 4)
+	buf[1] = byte(p.MinDelay<<4) | byte(p.MaxDelay>>8)
+	buf[2] = byte(p.MaxDelay)
+
+	return playoutDelayExtensionSize, nil
 }
 
 // Marshal serializes the members to buffer.

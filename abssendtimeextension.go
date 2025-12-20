@@ -4,6 +4,7 @@
 package rtp
 
 import (
+	"io"
 	"time"
 )
 
@@ -15,6 +16,24 @@ const (
 // http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 type AbsSendTimeExtension struct {
 	Timestamp uint64
+}
+
+// MarshalSize returns the size of the AbsSendTimeExtension once marshaled.
+func (t AbsSendTimeExtension) MarshalSize() int {
+	return absSendTimeExtensionSize
+}
+
+// MarshalTo marshals the extension to the given buffer.
+// Returns io.ErrShortBuffer if buf is too small.
+func (t AbsSendTimeExtension) MarshalTo(buf []byte) (int, error) {
+	if len(buf) < absSendTimeExtensionSize {
+		return 0, io.ErrShortBuffer
+	}
+	buf[0] = byte(t.Timestamp & 0xFF0000 >> 16)
+	buf[1] = byte(t.Timestamp & 0xFF00 >> 8)
+	buf[2] = byte(t.Timestamp & 0xFF)
+
+	return absSendTimeExtensionSize, nil
 }
 
 // Marshal serializes the members to buffer.

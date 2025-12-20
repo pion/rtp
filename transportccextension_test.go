@@ -4,6 +4,7 @@
 package rtp
 
 import (
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,7 +56,27 @@ func TestTransportCCExtensionExtraBytes(t *testing.T) {
 	assert.Equal(t, t1, t2)
 }
 
-var transportCCSink []byte
+func TestTransportCCExtensionMarshalTo(t *testing.T) {
+	ext := TransportCCExtension{TransportSequence: 1234}
+
+	buf := make([]byte, ext.MarshalSize())
+	n, err := ext.MarshalTo(buf)
+	assert.NoError(t, err)
+	assert.Equal(t, ext.MarshalSize(), n)
+
+	expected, _ := ext.Marshal()
+	assert.Equal(t, expected, buf)
+
+	_, err = ext.MarshalTo(nil)
+	assert.ErrorIs(t, err, io.ErrShortBuffer)
+}
+
+//nolint:gochecknoglobals
+var (
+	transportCCSink    []byte
+	transportCCBuf     = make([]byte, transportCCExtensionSize)
+	transportCCSinkInt int
+)
 
 func BenchmarkTransportCCExtension_Marshal(b *testing.B) {
 	ext := TransportCCExtension{TransportSequence: 1234}
@@ -63,5 +84,14 @@ func BenchmarkTransportCCExtension_Marshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		transportCCSink, _ = ext.Marshal()
+	}
+}
+
+func BenchmarkTransportCCExtension_MarshalTo(b *testing.B) {
+	ext := TransportCCExtension{TransportSequence: 1234}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		transportCCSinkInt, _ = ext.MarshalTo(transportCCBuf)
 	}
 }

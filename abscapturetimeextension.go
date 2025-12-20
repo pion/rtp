@@ -5,6 +5,7 @@ package rtp
 
 import (
 	"encoding/binary"
+	"io"
 	"time"
 )
 
@@ -30,16 +31,45 @@ type AbsCaptureTimeExtension struct {
 	EstimatedCaptureClockOffset *int64
 }
 
+// MarshalSize returns the size of the AbsCaptureTimeExtension once marshaled.
+func (t AbsCaptureTimeExtension) MarshalSize() int {
+	if t.EstimatedCaptureClockOffset != nil {
+		return absCaptureTimeExtendedExtensionSize
+	}
+
+	return absCaptureTimeExtensionSize
+}
+
+// MarshalTo marshals the extension to the given buffer.
+// Returns io.ErrShortBuffer if buf is too small.
+func (t AbsCaptureTimeExtension) MarshalTo(buf []byte) (int, error) {
+	if t.EstimatedCaptureClockOffset != nil {
+		if len(buf) < absCaptureTimeExtendedExtensionSize {
+			return 0, io.ErrShortBuffer
+		}
+		binary.BigEndian.PutUint64(buf[0:8], t.Timestamp)
+		binary.BigEndian.PutUint64(buf[8:16], uint64(*t.EstimatedCaptureClockOffset)) // nolint: gosec // G115
+
+		return absCaptureTimeExtendedExtensionSize, nil
+	}
+	if len(buf) < absCaptureTimeExtensionSize {
+		return 0, io.ErrShortBuffer
+	}
+	binary.BigEndian.PutUint64(buf[0:8], t.Timestamp)
+
+	return absCaptureTimeExtensionSize, nil
+}
+
 // Marshal serializes the members to buffer.
 func (t AbsCaptureTimeExtension) Marshal() ([]byte, error) {
 	if t.EstimatedCaptureClockOffset != nil {
-		buf := make([]byte, 16)
+		buf := make([]byte, absCaptureTimeExtendedExtensionSize)
 		binary.BigEndian.PutUint64(buf[0:8], t.Timestamp)
 		binary.BigEndian.PutUint64(buf[8:16], uint64(*t.EstimatedCaptureClockOffset)) // nolint: gosec // G115
 
 		return buf, nil
 	}
-	buf := make([]byte, 8)
+	buf := make([]byte, absCaptureTimeExtensionSize)
 	binary.BigEndian.PutUint64(buf[0:8], t.Timestamp)
 
 	return buf, nil

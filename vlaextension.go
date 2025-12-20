@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/pion/rtp/codecs/av1/obu"
@@ -49,16 +50,22 @@ type VLA struct {
 }
 
 type vlaMarshalingContext struct {
-	slMBs                 [4]uint8
-	sls                   [4][4]*SpatialLayer
-	commonSLBM            uint8
-	encodedTargetBitrates [][]byte
-	requiredLen           int
+	slMBs       [4]uint8
+	slIndices   [4][4]int // index into ActiveSpatialLayer, -1 if not set
+	commonSLBM  uint8
+	requiredLen int
 }
 
-func (v VLA) preprocessForMashaling(ctx *vlaMarshalingContext) error {
-	for i := 0; i < len(v.ActiveSpatialLayer); i++ {
-		sl := v.ActiveSpatialLayer[i]
+func (v VLA) preprocessForMashaling(ctx *vlaMarshalingContext) error { //nolint:cyclop
+	// Initialize indices to -1 (not set)
+	for i := range ctx.slIndices {
+		for j := range ctx.slIndices[i] {
+			ctx.slIndices[i][j] = -1
+		}
+	}
+
+	for i := range v.ActiveSpatialLayer {
+		sl := &v.ActiveSpatialLayer[i]
 		if sl.RTPStreamID < 0 || sl.RTPStreamID >= v.RTPStreamCount {
 			return fmt.Errorf("invalid RTP streamID %d:%w", sl.RTPStreamID, ErrVLAInvalidStreamID)
 		}
@@ -69,43 +76,40 @@ func (v VLA) preprocessForMashaling(ctx *vlaMarshalingContext) error {
 			return fmt.Errorf("invalid temporal layer count %d: %w", len(sl.TargetBitrates), ErrVLAInvalidTemporalLayer)
 		}
 		ctx.slMBs[sl.RTPStreamID] |= 1 << sl.SpatialID
-		if ctx.sls[sl.RTPStreamID][sl.SpatialID] != nil {
+		if ctx.slIndices[sl.RTPStreamID][sl.SpatialID] != -1 {
 			return fmt.Errorf("duplicate spatial layer: %w", ErrVLADuplicateSpatialID)
 		}
-		ctx.sls[sl.RTPStreamID][sl.SpatialID] = &sl
+		ctx.slIndices[sl.RTPStreamID][sl.SpatialID] = i
 	}
 
 	return nil
 }
 
-func (v VLA) encodeTargetBitrates(ctx *vlaMarshalingContext) {
+func (v VLA) calcTargetBitratesSize(ctx *vlaMarshalingContext) {
 	for rtpStreamID := 0; rtpStreamID < v.RTPStreamCount; rtpStreamID++ {
 		for spatialID := 0; spatialID < 4; spatialID++ {
-			if sl := ctx.sls[rtpStreamID][spatialID]; sl != nil {
-				for _, kbps := range sl.TargetBitrates {
-					leb128 := obu.WriteToLeb128(uint(kbps)) // nolint: gosec
-					ctx.encodedTargetBitrates = append(ctx.encodedTargetBitrates, leb128)
-					ctx.requiredLen += len(leb128)
+			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
+				for _, kbps := range v.ActiveSpatialLayer[idx].TargetBitrates {
+					ctx.requiredLen += obu.Leb128Size(uint(kbps)) //nolint:gosec
 				}
 			}
 		}
 	}
 }
 
-func (v VLA) analyzeVLAForMarshaling() (*vlaMarshalingContext, error) {
+func (v VLA) analyzeVLAForMarshaling(ctx *vlaMarshalingContext) error {
 	// Validate RTPStreamCount
 	if v.RTPStreamCount <= 0 || v.RTPStreamCount > 4 {
-		return nil, ErrVLAInvalidStreamCount
+		return ErrVLAInvalidStreamCount
 	}
 	// Validate RTPStreamID
 	if v.RTPStreamID < 0 || v.RTPStreamID >= v.RTPStreamCount {
-		return nil, ErrVLAInvalidStreamID
+		return ErrVLAInvalidStreamID
 	}
 
-	ctx := &vlaMarshalingContext{}
 	err := v.preprocessForMashaling(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	ctx.commonSLBM = commonSLBMValues(ctx.slMBs[:])
@@ -120,35 +124,49 @@ func (v VLA) analyzeVLAForMarshaling() (*vlaMarshalingContext, error) {
 	// #tl fields
 	ctx.requiredLen += (len(v.ActiveSpatialLayer)-1)/4 + 1
 
-	v.encodeTargetBitrates(ctx)
+	v.calcTargetBitratesSize(ctx)
 
 	if v.HasResolutionAndFramerate {
 		ctx.requiredLen += len(v.ActiveSpatialLayer) * 5
 	}
 
-	return ctx, nil
+	return nil
 }
 
-// Marshal encodes VLA into a byte slice.
-func (v VLA) Marshal() ([]byte, error) { // nolint: cyclop
-	ctx, err := v.analyzeVLAForMarshaling()
-	if err != nil {
-		return nil, err
+// MarshalSize returns the size needed to marshal the VLA.
+func (v VLA) MarshalSize() (int, error) {
+	var ctx vlaMarshalingContext
+	if err := v.analyzeVLAForMarshaling(&ctx); err != nil {
+		return 0, err
 	}
 
-	payload := make([]byte, ctx.requiredLen)
+	return ctx.requiredLen, nil
+}
+
+// MarshalTo marshals the VLA to the given buffer.
+// Returns io.ErrShortBuffer if buf is too small.
+func (v VLA) MarshalTo(buf []byte) (int, error) { //nolint:cyclop,gocognit
+	var ctx vlaMarshalingContext
+	if err := v.analyzeVLAForMarshaling(&ctx); err != nil {
+		return 0, err
+	}
+
+	if len(buf) < ctx.requiredLen {
+		return 0, io.ErrShortBuffer
+	}
+
 	offset := 0
 
 	// RID, NS, sl_bm fields
-	payload[offset] = byte(v.RTPStreamID<<6) | byte(v.RTPStreamCount-1)<<4 | ctx.commonSLBM
+	buf[offset] = byte(v.RTPStreamID<<6) | byte(v.RTPStreamCount-1)<<4 | ctx.commonSLBM
 
 	if ctx.commonSLBM == 0 {
 		offset++
 		for streamID := 0; streamID < v.RTPStreamCount; streamID++ {
 			if streamID%2 == 0 {
-				payload[offset+streamID/2] |= ctx.slMBs[streamID] << 4
+				buf[offset+streamID/2] |= ctx.slMBs[streamID] << 4
 			} else {
-				payload[offset+streamID/2] |= ctx.slMBs[streamID]
+				buf[offset+streamID/2] |= ctx.slMBs[streamID]
 			}
 		}
 		offset += (v.RTPStreamCount - 1) / 2
@@ -159,12 +177,12 @@ func (v VLA) Marshal() ([]byte, error) { // nolint: cyclop
 	var temporalLayerIndex int
 	for rtpStreamID := 0; rtpStreamID < v.RTPStreamCount; rtpStreamID++ {
 		for spatialID := 0; spatialID < 4; spatialID++ {
-			if sl := ctx.sls[rtpStreamID][spatialID]; sl != nil {
+			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
 				if temporalLayerIndex >= 4 {
 					temporalLayerIndex = 0
 					offset++
 				}
-				payload[offset] |= byte(len(sl.TargetBitrates)-1) << (2 * (3 - temporalLayerIndex))
+				buf[offset] |= byte(len(v.ActiveSpatialLayer[idx].TargetBitrates)-1) << (2 * (3 - temporalLayerIndex))
 				temporalLayerIndex++
 			}
 		}
@@ -172,23 +190,43 @@ func (v VLA) Marshal() ([]byte, error) { // nolint: cyclop
 
 	// Target bitrate fields
 	offset++
-	for _, encodedKbps := range ctx.encodedTargetBitrates {
-		encodedSize := len(encodedKbps)
-		copy(payload[offset:], encodedKbps)
-		offset += encodedSize
+	for rtpStreamID := 0; rtpStreamID < v.RTPStreamCount; rtpStreamID++ {
+		for spatialID := 0; spatialID < 4; spatialID++ {
+			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
+				for _, kbps := range v.ActiveSpatialLayer[idx].TargetBitrates {
+					offset += obu.WriteLeb128To(buf[offset:], uint(kbps)) //nolint:gosec
+				}
+			}
+		}
 	}
 
 	// Resolution & framerate fields
 	if v.HasResolutionAndFramerate {
 		for _, sl := range v.ActiveSpatialLayer {
-			binary.BigEndian.PutUint16(payload[offset+0:], uint16(sl.Width-1))  // nolint: gosec
-			binary.BigEndian.PutUint16(payload[offset+2:], uint16(sl.Height-1)) // nolint: gosec
-			payload[offset+4] = byte(sl.Framerate)
+			binary.BigEndian.PutUint16(buf[offset+0:], uint16(sl.Width-1))  //nolint:gosec
+			binary.BigEndian.PutUint16(buf[offset+2:], uint16(sl.Height-1)) //nolint:gosec
+			buf[offset+4] = byte(sl.Framerate)
 			offset += 5
 		}
 	}
 
-	return payload, nil
+	return ctx.requiredLen, nil
+}
+
+// Marshal encodes VLA into a byte slice.
+func (v VLA) Marshal() ([]byte, error) {
+	size, err := v.MarshalSize()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, size)
+	_, err = v.MarshalTo(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func commonSLBMValues(slMBs []uint8) uint8 {

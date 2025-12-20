@@ -5,6 +5,7 @@ package rtp
 
 import (
 	"errors"
+	"io"
 )
 
 const (
@@ -38,6 +39,29 @@ var errAudioLevelOverflow = errors.New("audio level overflow")
 type AudioLevelExtension struct {
 	Level uint8
 	Voice bool
+}
+
+// MarshalSize returns the size of the AudioLevelExtension once marshaled.
+func (a AudioLevelExtension) MarshalSize() int {
+	return audioLevelExtensionSize
+}
+
+// MarshalTo marshals the extension to the given buffer.
+// Returns io.ErrShortBuffer if buf is too small.
+func (a AudioLevelExtension) MarshalTo(buf []byte) (int, error) {
+	if a.Level > 127 {
+		return 0, errAudioLevelOverflow
+	}
+	if len(buf) < audioLevelExtensionSize {
+		return 0, io.ErrShortBuffer
+	}
+	voice := uint8(0x00)
+	if a.Voice {
+		voice = 0x80
+	}
+	buf[0] = voice | a.Level
+
+	return audioLevelExtensionSize, nil
 }
 
 // Marshal serializes the members to buffer.

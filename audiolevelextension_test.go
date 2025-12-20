@@ -4,6 +4,7 @@
 package rtp
 
 import (
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,9 +58,32 @@ func TestAudioLevelExtensionLevelOverflow(t *testing.T) {
 
 	_, err := a.Marshal()
 	assert.ErrorIs(t, err, errAudioLevelOverflow)
+
+	_, err = a.MarshalTo(make([]byte, 10))
+	assert.ErrorIs(t, err, errAudioLevelOverflow)
 }
 
-var audioLevelSink []byte
+func TestAudioLevelExtensionMarshalTo(t *testing.T) {
+	a := AudioLevelExtension{Level: 8, Voice: true}
+
+	buf := make([]byte, a.MarshalSize())
+	n, err := a.MarshalTo(buf)
+	assert.NoError(t, err)
+	assert.Equal(t, a.MarshalSize(), n)
+
+	expected, _ := a.Marshal()
+	assert.Equal(t, expected, buf)
+
+	_, err = a.MarshalTo(nil)
+	assert.ErrorIs(t, err, io.ErrShortBuffer)
+}
+
+//nolint:gochecknoglobals
+var (
+	audioLevelSink    []byte
+	audioLevelBuf     = make([]byte, audioLevelExtensionSize)
+	audioLevelSinkInt int
+)
 
 func BenchmarkAudioLevelExtension_Marshal(b *testing.B) {
 	ext := AudioLevelExtension{Level: 8, Voice: true}
@@ -67,5 +91,14 @@ func BenchmarkAudioLevelExtension_Marshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		audioLevelSink, _ = ext.Marshal()
+	}
+}
+
+func BenchmarkAudioLevelExtension_MarshalTo(b *testing.B) {
+	ext := AudioLevelExtension{Level: 8, Voice: true}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		audioLevelSinkInt, _ = ext.MarshalTo(audioLevelBuf)
 	}
 }

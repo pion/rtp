@@ -4,6 +4,7 @@
 package rtp
 
 import (
+	"io"
 	"testing"
 	"time"
 
@@ -60,7 +61,45 @@ func TestAbsCaptureTimeExtension_Roundtrip(t *testing.T) { //nolint:cyclop
 	})
 }
 
-var absCaptureTimeSink []byte
+func TestAbsCaptureTimeExtensionMarshalTo(t *testing.T) {
+	t.Run("without offset", func(t *testing.T) {
+		ext := NewAbsCaptureTimeExtension(time.Now())
+
+		buf := make([]byte, ext.MarshalSize())
+		n, err := ext.MarshalTo(buf)
+		assert.NoError(t, err)
+		assert.Equal(t, ext.MarshalSize(), n)
+
+		expected, _ := ext.Marshal()
+		assert.Equal(t, expected, buf)
+
+		_, err = ext.MarshalTo(nil)
+		assert.ErrorIs(t, err, io.ErrShortBuffer)
+	})
+
+	t.Run("with offset", func(t *testing.T) {
+		ext := NewAbsCaptureTimeExtensionWithCaptureClockOffset(time.Now(), 100*time.Millisecond)
+
+		buf := make([]byte, ext.MarshalSize())
+		n, err := ext.MarshalTo(buf)
+		assert.NoError(t, err)
+		assert.Equal(t, ext.MarshalSize(), n)
+
+		expected, _ := ext.Marshal()
+		assert.Equal(t, expected, buf)
+
+		_, err = ext.MarshalTo(nil)
+		assert.ErrorIs(t, err, io.ErrShortBuffer)
+	})
+}
+
+//nolint:gochecknoglobals
+var (
+	absCaptureTimeSink        []byte
+	absCaptureTimeBuf         = make([]byte, absCaptureTimeExtensionSize)
+	absCaptureTimeExtendedBuf = make([]byte, absCaptureTimeExtendedExtensionSize)
+	absCaptureTimeSinkInt     int
+)
 
 func BenchmarkAbsCaptureTimeExtension_Marshal(b *testing.B) {
 	ext := NewAbsCaptureTimeExtension(time.Now())
@@ -71,11 +110,29 @@ func BenchmarkAbsCaptureTimeExtension_Marshal(b *testing.B) {
 	}
 }
 
+func BenchmarkAbsCaptureTimeExtension_MarshalTo(b *testing.B) {
+	ext := NewAbsCaptureTimeExtension(time.Now())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		absCaptureTimeSinkInt, _ = ext.MarshalTo(absCaptureTimeBuf)
+	}
+}
+
 func BenchmarkAbsCaptureTimeExtensionWithOffset_Marshal(b *testing.B) {
 	ext := NewAbsCaptureTimeExtensionWithCaptureClockOffset(time.Now(), 100*time.Millisecond)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		absCaptureTimeSink, _ = ext.Marshal()
+	}
+}
+
+func BenchmarkAbsCaptureTimeExtensionWithOffset_MarshalTo(b *testing.B) {
+	ext := NewAbsCaptureTimeExtensionWithCaptureClockOffset(time.Now(), 100*time.Millisecond)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		absCaptureTimeSinkInt, _ = ext.MarshalTo(absCaptureTimeExtendedBuf)
 	}
 }
