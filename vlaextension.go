@@ -90,7 +90,7 @@ func (v VLA) calcTargetBitratesSize(ctx *vlaMarshalingContext) {
 		for spatialID := 0; spatialID < 4; spatialID++ {
 			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
 				for _, kbps := range v.ActiveSpatialLayer[idx].TargetBitrates {
-					ctx.requiredLen += obu.Leb128Size(uint(kbps)) //nolint:gosec
+					ctx.requiredLen += leb128Size(uint(kbps)) //nolint:gosec
 				}
 			}
 		}
@@ -194,7 +194,7 @@ func (v VLA) MarshalTo(buf []byte) (int, error) { //nolint:cyclop,gocognit
 		for spatialID := 0; spatialID < 4; spatialID++ {
 			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
 				for _, kbps := range v.ActiveSpatialLayer[idx].TargetBitrates {
-					offset += obu.WriteLeb128To(buf[offset:], uint(kbps)) //nolint:gosec
+					offset += writeLeb128To(buf[offset:], uint(kbps)) //nolint:gosec
 				}
 			}
 		}
@@ -408,4 +408,28 @@ func (v VLA) String() string {
 	out += fmt.Sprintf(",ActiveSpatialLayers:{%s}", strings.Join(slOut, ","))
 
 	return out
+}
+
+// leb128Size returns the number of bytes needed to encode a value as LEB128.
+func leb128Size(in uint) int {
+	size := 1
+	for in >>= 7; in != 0; in >>= 7 {
+		size++
+	}
+
+	return size
+}
+
+// writeLeb128To writes a LEB128 encoded value to buf and returns bytes written.
+func writeLeb128To(buf []byte, in uint) int {
+	for i := range buf {
+		buf[i] = byte(in & 0x7f)
+		in >>= 7
+		if in == 0 {
+			return i + 1
+		}
+		buf[i] |= 0x80
+	}
+
+	return 0
 }

@@ -84,26 +84,3 @@ func WriteToLeb128(in uint) []byte {
 	return b // unreachable
 }
 
-// Leb128Size returns the number of bytes needed to encode a value as LEB128.
-func Leb128Size(in uint) int {
-	size := 1
-	for in >>= 7; in != 0; in >>= 7 {
-		size++
-	}
-
-	return size
-}
-
-// WriteLeb128To writes a LEB128 encoded value to buf and returns bytes written.
-func WriteLeb128To(buf []byte, in uint) int {
-	for i := range buf {
-		buf[i] = byte(in & 0x7f)
-		in >>= 7
-		if in == 0 {
-			return i + 1
-		}
-		buf[i] |= 0x80
-	}
-
-	return 0
-}
