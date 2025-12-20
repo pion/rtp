@@ -58,3 +58,14 @@ func TestAudioLevelExtensionLevelOverflow(t *testing.T) {
 	_, err := a.Marshal()
 	assert.ErrorIs(t, err, errAudioLevelOverflow)
 }
+
+var audioLevelSink []byte
+
+func BenchmarkAudioLevelExtension_Marshal(b *testing.B) {
+	ext := AudioLevelExtension{Level: 8, Voice: true}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		audioLevelSink, _ = ext.Marshal()
+	}
+}

@@ -59,3 +59,23 @@ func TestAbsCaptureTimeExtension_Roundtrip(t *testing.T) { //nolint:cyclop
 		assert.Equal(t, -250*time.Millisecond, *o2.EstimatedCaptureClockOffsetDuration())
 	})
 }
+
+var absCaptureTimeSink []byte
+
+func BenchmarkAbsCaptureTimeExtension_Marshal(b *testing.B) {
+	ext := NewAbsCaptureTimeExtension(time.Now())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		absCaptureTimeSink, _ = ext.Marshal()
+	}
+}
+
+func BenchmarkAbsCaptureTimeExtensionWithOffset_Marshal(b *testing.B) {
+	ext := NewAbsCaptureTimeExtensionWithCaptureClockOffset(time.Now(), 100*time.Millisecond)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		absCaptureTimeSink, _ = ext.Marshal()
+	}
+}

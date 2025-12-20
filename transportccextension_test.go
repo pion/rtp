@@ -54,3 +54,14 @@ func TestTransportCCExtensionExtraBytes(t *testing.T) {
 
 	assert.Equal(t, t1, t2)
 }
+
+var transportCCSink []byte
+
+func BenchmarkTransportCCExtension_Marshal(b *testing.B) {
+	ext := TransportCCExtension{TransportSequence: 1234}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		transportCCSink, _ = ext.Marshal()
+	}
+}

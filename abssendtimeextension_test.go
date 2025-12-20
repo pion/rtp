@@ -97,3 +97,14 @@ func TestAbsSendTimeExtension_Estimate(t *testing.T) {
 		)
 	}
 }
+
+var absSendTimeSink []byte
+
+func BenchmarkAbsSendTimeExtension_Marshal(b *testing.B) {
+	ext := AbsSendTimeExtension{Timestamp: 123456}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		absSendTimeSink, _ = ext.Marshal()
+	}
+}

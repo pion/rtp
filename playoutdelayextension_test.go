@@ -61,3 +61,14 @@ func TestPlayoutDelayExtensionExtraBytes(t *testing.T) {
 
 	assert.Equal(t, t1, t2)
 }
+
+var playoutDelaySink []byte
+
+func BenchmarkPlayoutDelayExtension_Marshal(b *testing.B) {
+	ext := PlayoutDelayExtension{MinDelay: 100, MaxDelay: 200}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		playoutDelaySink, _ = ext.Marshal()
+	}
+}

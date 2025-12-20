@@ -457,3 +457,22 @@ func FuzzVLAUnmarshal(f *testing.F) {
 		}
 	})
 }
+
+var vlaSink []byte
+
+func BenchmarkVLA_Marshal(b *testing.B) {
+	vla := &VLA{
+		RTPStreamID:    0,
+		RTPStreamCount: 3,
+		ActiveSpatialLayer: []SpatialLayer{
+			{RTPStreamID: 0, SpatialID: 0, TargetBitrates: []int{150}},
+			{RTPStreamID: 1, SpatialID: 0, TargetBitrates: []int{240, 400}},
+			{RTPStreamID: 2, SpatialID: 0, TargetBitrates: []int{720, 1200}},
+		},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		vlaSink, _ = vla.Marshal()
+	}
+}
