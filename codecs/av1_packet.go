@@ -285,6 +285,7 @@ func (p *AV1Payloader) leb128Size(leb128 int) (size int, isAtEge bool) {
 * +-+-+-+-+-+-+-+-+
 **/
 // https://aomediacodec.github.io/av1-rtp-spec/#44-av1-aggregation-header
+//
 // Deprecated: Use AV1Depacketizer instead.
 type AV1Packet struct {
 	// Z: MUST be set to 1 if the first OBU element is an

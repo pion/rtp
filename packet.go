@@ -188,8 +188,8 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 				}
 
 				if h.ExtensionProfile == ExtensionProfileOneByte {
-					extid = buf[n] >> 4
-					payloadLen = int(buf[n]&^0xF0 + 1)
+					extid = buf[n] >> 4                // nolint:gosec // n is defined to be in bounds
+					payloadLen = int(buf[n]&^0xF0 + 1) //nolint:gosec // n is defined to be in bounds
 					n++
 
 					// Stop parsing extensions if we reach the reserved ID or padding with non-zero length
@@ -197,7 +197,7 @@ func (h *Header) Unmarshal(buf []byte) (n int, err error) { //nolint:gocognit,cy
 						break
 					}
 				} else {
-					extid = buf[n]
+					extid = buf[n] // nolint:gosec // n is defined to be in bounds
 					n++
 
 					if extensionEnd <= n {

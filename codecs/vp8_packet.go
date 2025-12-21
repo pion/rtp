@@ -192,14 +192,14 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) { //nolint:gocogni
 			return nil, errShortPacket
 		}
 		if p.T == 1 {
-			p.TID = payload[payloadIndex] >> 6
-			p.Y = (payload[payloadIndex] >> 5) & 0x1
+			p.TID = payload[payloadIndex] >> 6       //nolint:gosec // guarded by first if
+			p.Y = (payload[payloadIndex] >> 5) & 0x1 //nolint:gosec // guarded by first if
 		} else {
 			p.TID = 0
 			p.Y = 0
 		}
 		if p.K == 1 {
-			p.KEYIDX = payload[payloadIndex] & 0x1F
+			p.KEYIDX = payload[payloadIndex] & 0x1F //nolint:gosec // guarded by first if
 		} else {
 			p.KEYIDX = 0
 		}

@@ -31,7 +31,7 @@ func (f *AV1) pushOBUElement(isFirstOBUFragment *bool, obuElement []byte, obuLis
 }
 
 // ReadFrames processes the codecs.AV1Packet and returns fully constructed frames.
-func (f *AV1) ReadFrames(pkt *codecs.AV1Packet) ([][]byte, error) {
+func (f *AV1) ReadFrames(pkt *codecs.AV1Packet) ([][]byte, error) { // nolint:staticcheck
 	OBUs := [][]byte{}
 	isFirstOBUFragment := pkt.Z
 

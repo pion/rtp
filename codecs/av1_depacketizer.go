@@ -63,9 +63,9 @@ func (d *AV1Depacketizer) Unmarshal(payload []byte) (buff []byte, err error) {
 		// (i.e., W = 1, 2 or 3) the last OBU element MUST NOT be preceded by a length field.
 		var lengthField, n int
 		if obuCount == 0 || !isLast {
-			obuSizeVal, nVal, err := obu.ReadLeb128(payload[offset:])
-			lengthField = int(obuSizeVal) //nolint:gosec // G115 false positive
-			n = int(nVal)                 //nolint:gosec // G115 false positive
+			obuSizeVal, nVal, err := obu.ReadLeb128(payload[offset:]) //nolint:gosec //guard from loop
+			lengthField = int(obuSizeVal)                             //nolint:gosec // G115 false positive
+			n = int(nVal)                                             //nolint:gosec // G115 false positive
 			if err != nil {
 				return nil, err
 			}
