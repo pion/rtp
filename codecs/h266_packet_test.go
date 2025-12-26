@@ -160,7 +160,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 	tooShortPacket := H266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
-		[]byte{0x00, 0xff, 0x00, 0x00, 0x42},
+		[]byte{0x00, 0xff, 0x00, 0x00, 0xff},
 	}
 	_, err = splitH266AggregationPacket(tooShortPacket)
 	assert.ErrorIs(t, err, errShortPacket)
@@ -169,7 +169,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 	containsAggregation := H266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
-		[]byte{0x00, 0x03, 0x00, 0xe0, 0x42},
+		[]byte{0x00, 0x03, 0x00, 0xe0, 0xff},
 	}
 	_, err = splitH266AggregationPacket(containsAggregation)
 	assert.ErrorIs(t, err, errInvalidNalType)
@@ -178,7 +178,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 	containsFragmentation := H266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
-		[]byte{0x00, 0x03, 0x00, 0xe8, 0x42},
+		[]byte{0x00, 0x04, 0x00, 0xe8, 0xff, 0xff, 0xff},
 	}
 	_, err = splitH266AggregationPacket(containsFragmentation)
 	assert.ErrorIs(t, err, errInvalidNalType)
@@ -200,24 +200,50 @@ func TestH266_AggregationDONL(t *testing.T) {
 }
 
 func TestH266_FragmentationRoundtrip(t *testing.T) {
+	testFragmentation := func(packet H266SingleNALUnitPacket) {
+		fragments, err := newH266FragmentationPackets(100, &packet)
+		assert.Nil(t, err)
+
+		rebuilt, err := rebuildH266FragmentationPackets(fragments)
+		assert.Nil(t, err)
+
+		assert.Equal(
+			t,
+			packet.packetize(make([]byte, 0)),
+			rebuilt.packetize(make([]byte, 0)),
+			"Expected packets to match after fragmentation",
+		)
+	}
+
+	payload := make([]byte, 0)
+	testDonl := uint16(100)
+
+	for i := 0; i < 200; i++ {
+		payload = append(payload, uint8(i)) //nolint: gosec // idc
+	}
+
 	simplePacket := H266SingleNALUnitPacket{
-		createTestH266Header(0, 0, 1, false, false),
+		createTestH266Header(0, 0, 0, false, false),
 		nil,
-		make([]byte, 0),
+		payload,
 	}
 
-	for i := 0; i < 1000; i++ {
-		simplePacket.payload = append(simplePacket.payload, uint8(i)) //nolint: gosec // idc
+	testFragmentation(simplePacket)
+
+	packetWithDonl := H266SingleNALUnitPacket{
+		createTestH266Header(0, 0, 0, false, false),
+		&testDonl,
+		payload,
+	}
+	testFragmentation(packetWithDonl)
+
+	everyFlagSet := H266SingleNALUnitPacket{
+		createTestH266Header(1, 1, 1, true, true),
+		&testDonl,
+		payload,
 	}
 
-	fragments, err := newH266FragmentationPackets(100, &simplePacket)
-	assert.Nil(t, err)
-
-	gathered := make([]byte, 0)
-	for _, fragment := range fragments {
-		gathered = append(gathered, fragment.payload...)
-	}
-	assert.Equal(t, simplePacket.packetize(make([]byte, 0)), gathered)
+	testFragmentation(everyFlagSet)
 }
 
 func TestH266_FragmentationHeader(t *testing.T) {
@@ -245,6 +271,38 @@ func TestH266_FragmentationHeader(t *testing.T) {
 			"Expected each fragment to have the same type as contained packet",
 		)
 	}
+}
+
+func TestH266_FragmentationEdgeCase(t *testing.T) {
+	// Exacly large enough to fill two full FUs
+	simplePacket := H266SingleNALUnitPacket{
+		createTestH266Header(1, 1, 1, false, false),
+		nil,
+		make([]byte, 0),
+	}
+
+	for i := 0; i < 200; i++ {
+		simplePacket.payload = append(simplePacket.payload, uint8(i)) //nolint: gosec // idc
+	}
+
+	// (payload length / 2) + payloadHeader length + fuHeader length
+	fragments, err := newH266FragmentationPackets(103, &simplePacket)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(fragments), "Expected exactly two, completely full packets")
+
+	// Exactly large enough to fill one FU
+
+	simplePacket.payload = make([]byte, 0)
+	for i := 0; i < 100; i++ {
+		simplePacket.payload = append(simplePacket.payload, uint8(i)) //nolint: gosec // idc
+	}
+
+	// payload length + payloadHeader length + fuHeader length
+	fragments, err = newH266FragmentationPackets(103, &simplePacket)
+	assert.NotNil(t, err)
+
+	assert.Equal(t, 0, len(fragments), "Expected exactly one, completely full packets")
 }
 
 func TestH266_PacketParsing(t *testing.T) {
@@ -468,8 +526,10 @@ func TestH266Packetizer_Fragmented(t *testing.T) {
 }
 
 func TestH266Depacketizer_Roundtrip(t *testing.T) {
-	testDepacketizer := func(packets [][]byte, expected []isH266Packet) {
-		depacketizer := H266Depacketizer{}
+	testDepacketizer := func(packets [][]byte, expected []isH266Packet, withDonl bool) {
+		depacketizer := H266Depacketizer{
+			hasDonl: withDonl,
+		}
 		output := make([]isH266Packet, 0)
 		for _, packet := range packets {
 			p, err := depacketizer.Unmarshal(packet)
@@ -480,13 +540,19 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 			}
 
 			emitH266Nalus(p, func(b []byte) {
-				parsed, err := parseH266Packet(b, false)
+				parsed, err := parseH266Packet(b, withDonl)
 				assert.Nil(t, err)
+				if err != nil {
+					return
+				}
 				output = append(output, parsed)
 			})
 		}
 		assert.Equal(t, expected, output)
 	}
+
+	testDonl := uint16(100)
+	testDonl2 := uint16(101)
 
 	// Single NAL
 
@@ -496,25 +562,54 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 		[]byte{0xff, 0xff, 0xff},
 	}
 
-	testDepacketizer([][]byte{basicPacket.packetize(make([]byte, 0))}, []isH266Packet{basicPacket})
+	testDepacketizer([][]byte{basicPacket.packetize(make([]byte, 0))}, []isH266Packet{basicPacket}, false)
+
+	// with DONL
+
+	basicPacket.donl = &testDonl
+
+	testDepacketizer([][]byte{basicPacket.packetize(make([]byte, 0))}, []isH266Packet{basicPacket}, true)
 
 	// Multiple NALs aggregated
 
-	aggregation, err := newH266AggregationPacket([]H266SingleNALUnitPacket{*basicPacket, *basicPacket})
+	firstPacket := &H266SingleNALUnitPacket{
+		createTestH266Header(0, 0, 0, false, false),
+		nil,
+		[]byte{0xff, 0xff, 0xff},
+	}
+
+	secondPacket := &H266SingleNALUnitPacket{
+		createTestH266Header(1, 2, 3, true, true),
+		nil,
+		[]byte{0x67, 0x67, 0x67},
+	}
+
+	aggregation, err := newH266AggregationPacket([]H266SingleNALUnitPacket{*firstPacket, *secondPacket})
 	assert.Nil(t, err)
 	aggregationPacketized := aggregation.packetize(make([]byte, 0))
 
-	testDepacketizer([][]byte{aggregationPacketized}, []isH266Packet{basicPacket, basicPacket})
+	testDepacketizer([][]byte{aggregationPacketized}, []isH266Packet{firstPacket, secondPacket}, false)
+
+	// with DONL
+
+	firstPacket.donl = &testDonl
+	secondPacket.donl = &testDonl2
+
+	donlAggregation, err := newH266AggregationPacket([]H266SingleNALUnitPacket{*firstPacket, *secondPacket})
+	assert.Nil(t, err)
+	donlAggregationPacketized := donlAggregation.packetize(make([]byte, 0))
+
+	testDepacketizer([][]byte{donlAggregationPacketized}, []isH266Packet{firstPacket, secondPacket}, true)
 
 	// Large NAL that gets fragmented
 
 	largePacket := &H266SingleNALUnitPacket{
-		createTestH266Header(0, 0, 0, false, false),
+		createTestH266Header(1, 1, 1, false, false),
 		nil,
 		make([]byte, 0),
 	}
 	for i := 0; i < 512; i++ {
-		largePacket.payload = append(largePacket.payload, 0xff)
+		largePacket.payload = append(largePacket.payload, uint8(i)) // nolint:gosec
 	}
 
 	fragments, err := newH266FragmentationPackets(100, largePacket)
@@ -526,5 +621,20 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 		fragmentsPacketized = append(fragmentsPacketized, f.packetize(make([]byte, 0)))
 	}
 
-	testDepacketizer(fragmentsPacketized, []isH266Packet{largePacket})
+	testDepacketizer(fragmentsPacketized, []isH266Packet{largePacket}, false)
+
+	// with DONL
+
+	largePacket.donl = &testDonl
+
+	donlFragments, err := newH266FragmentationPackets(100, largePacket)
+	assert.Nil(t, err)
+
+	donlFragmentsPacketized := make([][]byte, 0)
+
+	for _, f := range donlFragments {
+		donlFragmentsPacketized = append(donlFragmentsPacketized, f.packetize(make([]byte, 0)))
+	}
+
+	testDepacketizer(donlFragmentsPacketized, []isH266Packet{largePacket}, true)
 }
