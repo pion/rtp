@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestH266Header(pType, layerID, tid uint8, f, z bool) H266NALUHeader {
+func createTestH266Header(pType, layerID, tid uint8, f, z bool) h266NALUHeader {
 	var fVal, zVal uint16
 	if f {
 		fVal = 1 << 15
@@ -20,127 +20,127 @@ func createTestH266Header(pType, layerID, tid uint8, f, z bool) H266NALUHeader {
 		zVal = 1 << 14
 	}
 
-	return H266NALUHeader(uint16(tid) | (uint16(pType) << 3) | (uint16(layerID) << 8) | fVal | zVal)
+	return h266NALUHeader(uint16(tid) | (uint16(pType) << 3) | (uint16(layerID) << 8) | fVal | zVal)
 }
 
 func TestH266_AggregationRoundtrip(t *testing.T) {
-	simplePacket := H266SingleNALUnitPacket{
+	simplePacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 1, false, false),
 		nil,
 		[]byte{0x00, 0x01, 0x02, 0x03},
 	}
-	diffPacket := H266SingleNALUnitPacket{
+	diffPacket := h266SingleNALUnitPacket{
 		newH266NALUHeader(0b1000000, 0b00010000),
 		nil,
 		[]byte{0x03, 0x02, 0x01, 0x00, 0x12},
 	}
-	testAggregation := func(expected []H266SingleNALUnitPacket) {
+	testAggregation := func(expected []h266SingleNALUnitPacket) {
 		created, err := newH266AggregationPacket(expected)
 		assert.Nil(t, err)
 		packet := created.packetize(make([]byte, 0))
 		parsed, err := parseH266Packet(packet, false)
 		assert.Nil(t, err)
-		aggr, ok := parsed.(*H266AggregationPacket)
+		aggr, ok := parsed.(*h266AggregationPacket)
 		assert.True(t, ok)
 		split, err := splitH266AggregationPacket(*aggr)
 		assert.Equal(t, len(expected), len(split))
 		assert.Nil(t, err)
 
-		assert.True(t, slices.EqualFunc(split, expected, func(a, b H266SingleNALUnitPacket) bool {
+		assert.True(t, slices.EqualFunc(split, expected, func(a, b h266SingleNALUnitPacket) bool {
 			return slices.Equal(a.payload, b.payload) && a.payloadHeader == b.payloadHeader
 		}))
 	}
-	testAggregation([]H266SingleNALUnitPacket{simplePacket, simplePacket, simplePacket})
-	testAggregation([]H266SingleNALUnitPacket{diffPacket, simplePacket, simplePacket})
-	testAggregation([]H266SingleNALUnitPacket{diffPacket, diffPacket, simplePacket})
+	testAggregation([]h266SingleNALUnitPacket{simplePacket, simplePacket, simplePacket})
+	testAggregation([]h266SingleNALUnitPacket{diffPacket, simplePacket, simplePacket})
+	testAggregation([]h266SingleNALUnitPacket{diffPacket, diffPacket, simplePacket})
 }
 
 func TestH266_AggregationHeader(t *testing.T) {
-	simplePacket := H266SingleNALUnitPacket{
+	simplePacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 0, false, false),
 		nil,
 		[]byte{0x00, 0x01, 0x02, 0x03},
 	}
 	// packet with F bit set
-	fPacket := H266SingleNALUnitPacket{
+	fPacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 0, true, false),
 		nil,
 		[]byte{0x03, 0x02, 0x01, 0x00, 0x12},
 	}
 	// packet with Z bit set
-	zPacket := H266SingleNALUnitPacket{
+	zPacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 0, false, true),
 		nil,
 		[]byte{0x03, 0x02, 0x01, 0x00, 0x12},
 	}
 	// packet with layer ID 1
-	layerOnePacket := H266SingleNALUnitPacket{
+	layerOnePacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 1, 0, false, false),
 		nil,
 		[]byte{0x03, 0x02, 0x01, 0x00, 0x12},
 	}
 	// packet with TID 1
-	tidOnePacket := H266SingleNALUnitPacket{
+	tidOnePacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 1, false, false),
 		nil,
 		[]byte{0x03, 0x02, 0x01, 0x00, 0x12},
 	}
 
-	testAggregation := func(toAggregate []H266SingleNALUnitPacket, expectedHeader H266NALUHeader, message string) {
+	testAggregation := func(toAggregate []h266SingleNALUnitPacket, expectedHeader h266NALUHeader, message string) {
 		created, err := newH266AggregationPacket(toAggregate)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedHeader, created.payloadHeader, message)
 	}
 
 	testAggregation(
-		[]H266SingleNALUnitPacket{simplePacket, simplePacket, simplePacket},
+		[]h266SingleNALUnitPacket{simplePacket, simplePacket, simplePacket},
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		"Expected all fields to match",
 	)
 
 	testAggregation(
-		[]H266SingleNALUnitPacket{simplePacket, simplePacket, fPacket},
+		[]h266SingleNALUnitPacket{simplePacket, simplePacket, fPacket},
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, true, false),
 		"Expected F bit to be set if any of the packets has it",
 	)
 
 	testAggregation(
-		[]H266SingleNALUnitPacket{simplePacket, simplePacket, zPacket},
+		[]h266SingleNALUnitPacket{simplePacket, simplePacket, zPacket},
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		"Expected Z bit to be ignored",
 	)
 	testAggregation(
-		[]H266SingleNALUnitPacket{zPacket, zPacket, zPacket},
+		[]h266SingleNALUnitPacket{zPacket, zPacket, zPacket},
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		"Expected Z bit to be ignored",
 	)
 
 	testAggregation(
-		[]H266SingleNALUnitPacket{layerOnePacket, layerOnePacket, layerOnePacket},
+		[]h266SingleNALUnitPacket{layerOnePacket, layerOnePacket, layerOnePacket},
 		createTestH266Header(h266NaluAggregationPacketType, 1, 0, false, false),
 		"Expected layer ID to be equal to 1",
 	)
 
 	testAggregation(
-		[]H266SingleNALUnitPacket{layerOnePacket, simplePacket, layerOnePacket},
+		[]h266SingleNALUnitPacket{layerOnePacket, simplePacket, layerOnePacket},
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		"Expected layer ID to be equal to the lowest of aggregated packets",
 	)
 	testAggregation(
-		[]H266SingleNALUnitPacket{tidOnePacket, tidOnePacket, tidOnePacket},
+		[]h266SingleNALUnitPacket{tidOnePacket, tidOnePacket, tidOnePacket},
 		createTestH266Header(h266NaluAggregationPacketType, 0, 1, false, false),
 		"Expected TID to be equal to 1",
 	)
 
 	testAggregation(
-		[]H266SingleNALUnitPacket{tidOnePacket, tidOnePacket, simplePacket},
+		[]h266SingleNALUnitPacket{tidOnePacket, tidOnePacket, simplePacket},
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		"Expected TID to be equal to the lowest of aggregated packets",
 	)
 }
 
 func TestH266_AggregationMalformed(t *testing.T) {
-	noPackets := H266AggregationPacket{
+	noPackets := h266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
 		[]byte{},
@@ -148,7 +148,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 	_, err := splitH266AggregationPacket(noPackets)
 	assert.ErrorIs(t, err, errNotEnoughPackets)
 
-	onlyOnePacket := H266AggregationPacket{
+	onlyOnePacket := h266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
 		[]byte{0x00, 0x03, 0x00, 0x00, 0x01},
@@ -157,7 +157,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 	assert.ErrorIs(t, err, errNotEnoughPackets)
 
 	// length field (0x00ff) too large for payload size
-	tooShortPacket := H266AggregationPacket{
+	tooShortPacket := h266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
 		[]byte{0x00, 0xff, 0x00, 0x00, 0xff},
@@ -166,7 +166,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 	assert.ErrorIs(t, err, errShortPacket)
 
 	// contains an aggregation packet
-	containsAggregation := H266AggregationPacket{
+	containsAggregation := h266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
 		[]byte{0x00, 0x03, 0x00, 0xe0, 0xff},
@@ -175,7 +175,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 	assert.ErrorIs(t, err, errInvalidNalType)
 
 	// contains a fragmentation packet
-	containsFragmentation := H266AggregationPacket{
+	containsFragmentation := h266AggregationPacket{
 		createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		nil,
 		[]byte{0x00, 0x04, 0x00, 0xe8, 0xff, 0xff, 0xff},
@@ -187,7 +187,7 @@ func TestH266_AggregationMalformed(t *testing.T) {
 func TestH266_AggregationDONL(t *testing.T) {
 	initialDonl := uint16(100)
 	// packet with 3 inner packets
-	testPacket := H266AggregationPacket{
+	testPacket := h266AggregationPacket{
 		payloadHeader: createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 		donl:          &initialDonl,
 		payload:       []byte{0x00, 0x03, 0xff, 0xff, 0xff, 0x00, 0x03, 0xff, 0xff, 0xff, 0x00, 0x03, 0xff, 0xff, 0xff},
@@ -200,7 +200,7 @@ func TestH266_AggregationDONL(t *testing.T) {
 }
 
 func TestH266_FragmentationRoundtrip(t *testing.T) {
-	testFragmentation := func(packet H266SingleNALUnitPacket) {
+	testFragmentation := func(packet h266SingleNALUnitPacket) {
 		fragments, err := newH266FragmentationPackets(100, &packet)
 		assert.Nil(t, err)
 
@@ -222,7 +222,7 @@ func TestH266_FragmentationRoundtrip(t *testing.T) {
 		payload = append(payload, uint8(i)) //nolint: gosec // idc
 	}
 
-	simplePacket := H266SingleNALUnitPacket{
+	simplePacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 0, false, false),
 		nil,
 		payload,
@@ -230,14 +230,14 @@ func TestH266_FragmentationRoundtrip(t *testing.T) {
 
 	testFragmentation(simplePacket)
 
-	packetWithDonl := H266SingleNALUnitPacket{
+	packetWithDonl := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 0, false, false),
 		&testDonl,
 		payload,
 	}
 	testFragmentation(packetWithDonl)
 
-	everyFlagSet := H266SingleNALUnitPacket{
+	everyFlagSet := h266SingleNALUnitPacket{
 		createTestH266Header(1, 1, 1, true, true),
 		&testDonl,
 		payload,
@@ -247,7 +247,7 @@ func TestH266_FragmentationRoundtrip(t *testing.T) {
 }
 
 func TestH266_FragmentationHeader(t *testing.T) {
-	simplePacket := H266SingleNALUnitPacket{
+	simplePacket := h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 1, false, false),
 		nil,
 		make([]byte, 0),
@@ -275,7 +275,7 @@ func TestH266_FragmentationHeader(t *testing.T) {
 
 func TestH266_FragmentationEdgeCase(t *testing.T) {
 	// Exacly large enough to fill two full FUs
-	simplePacket := H266SingleNALUnitPacket{
+	simplePacket := h266SingleNALUnitPacket{
 		createTestH266Header(1, 1, 1, false, false),
 		nil,
 		make([]byte, 0),
@@ -316,7 +316,7 @@ func TestH266_PacketParsing(t *testing.T) {
 	testParser(
 		[]byte{0x00, 0x00, 1, 2, 3},
 		false,
-		&H266SingleNALUnitPacket{
+		&h266SingleNALUnitPacket{
 			createTestH266Header(0, 0, 0, false, false),
 			nil,
 			[]byte{1, 2, 3},
@@ -328,7 +328,7 @@ func TestH266_PacketParsing(t *testing.T) {
 	testParser(
 		[]byte{0x00, 0x00, 0, 123, 1, 2, 3},
 		true,
-		&H266SingleNALUnitPacket{
+		&h266SingleNALUnitPacket{
 			createTestH266Header(0, 0, 0, false, false),
 			&testDONL,
 			[]byte{1, 2, 3},
@@ -339,7 +339,7 @@ func TestH266_PacketParsing(t *testing.T) {
 	testParser(
 		[]byte{0x00, 0xe0, 0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
 		false,
-		&H266AggregationPacket{
+		&h266AggregationPacket{
 			createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 			nil,
 			[]byte{0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
@@ -350,7 +350,7 @@ func TestH266_PacketParsing(t *testing.T) {
 	testParser(
 		[]byte{0x00, 0xe0, 0x00, 123, 0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
 		true,
-		&H266AggregationPacket{
+		&h266AggregationPacket{
 			createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 			&testDONL,
 			[]byte{0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
@@ -361,7 +361,7 @@ func TestH266_PacketParsing(t *testing.T) {
 	testParser(
 		[]byte{0x00, 0xe8, 0x00, 0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
 		false,
-		&H266FragmentationPacket{
+		&h266FragmentationPacket{
 			createTestH266Header(h266NaluFragmentationUnitType, 0, 0, false, false),
 			newH266FragmentationUnitHeader(newH266NALUHeader(0x00, 0x01), false, false, false),
 			nil,
@@ -380,7 +380,7 @@ func TestH266_PacketRoundtrip(t *testing.T) {
 
 	// nothingburger packet
 	testRoundtrip(
-		&H266SingleNALUnitPacket{
+		&h266SingleNALUnitPacket{
 			createTestH266Header(0, 0, 0, false, false),
 			nil,
 			[]byte{1, 2, 3},
@@ -391,7 +391,7 @@ func TestH266_PacketRoundtrip(t *testing.T) {
 	// nothingburger packet with DONL
 	testDONL := uint16(123)
 	testRoundtrip(
-		&H266SingleNALUnitPacket{
+		&h266SingleNALUnitPacket{
 			createTestH266Header(0, 0, 0, false, false),
 			&testDONL,
 			[]byte{1, 2, 3},
@@ -401,7 +401,7 @@ func TestH266_PacketRoundtrip(t *testing.T) {
 
 	// aggregation packet, with 2 1 byte long packets
 	testRoundtrip(
-		&H266AggregationPacket{
+		&h266AggregationPacket{
 			createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 			nil,
 			[]byte{0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
@@ -411,7 +411,7 @@ func TestH266_PacketRoundtrip(t *testing.T) {
 
 	// aggregation packet, with 2 1 byte long packets, with DONL
 	testRoundtrip(
-		&H266AggregationPacket{
+		&h266AggregationPacket{
 			createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 			&testDONL,
 			[]byte{0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
@@ -421,7 +421,7 @@ func TestH266_PacketRoundtrip(t *testing.T) {
 
 	// fragmentation packet, with 2 1 byte long packets
 	testRoundtrip(
-		&H266AggregationPacket{
+		&h266AggregationPacket{
 			createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 			nil,
 			[]byte{0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
@@ -431,7 +431,7 @@ func TestH266_PacketRoundtrip(t *testing.T) {
 
 	// fragmentation packet, with 2 1 byte long packets, with DONL
 	testRoundtrip(
-		&H266AggregationPacket{
+		&h266AggregationPacket{
 			createTestH266Header(h266NaluAggregationPacketType, 0, 0, false, false),
 			&testDONL,
 			[]byte{0x00, 0x01, 0x42, 0x00, 0x01, 0x42},
@@ -475,7 +475,7 @@ func TestH266Packetizer_Aggregated(t *testing.T) {
 
 	assert.Equal(t, 1, len(packets), "Expected only 1 NALU to be generated")
 	aggregated := packets[0]
-	parsedHeader := H266NALUHeader(binary.BigEndian.Uint16(aggregated[0:2]))
+	parsedHeader := h266NALUHeader(binary.BigEndian.Uint16(aggregated[0:2]))
 
 	assert.Equal(t, h266NaluAggregationPacketType, int(parsedHeader.Type()), "NALU header should be type 28")
 
@@ -518,7 +518,7 @@ func TestH266Packetizer_Fragmented(t *testing.T) {
 	packets := packetizer.Payload(50, bigPacket)
 
 	assert.Equal(t, 2, len(packets), "Expected 2 NALUs to be generated")
-	parsedHeader := H266NALUHeader(binary.BigEndian.Uint16(packets[0][0:2]))
+	parsedHeader := h266NALUHeader(binary.BigEndian.Uint16(packets[0][0:2]))
 
 	assert.Equal(t, h266NaluFragmentationUnitType, int(parsedHeader.Type()), "NALU header should be type 28")
 	assert.True(t, H265FragmentationUnitHeader(packets[0][2]).S(), "First FU header should be S")
@@ -556,7 +556,7 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 
 	// Single NAL
 
-	basicPacket := &H266SingleNALUnitPacket{
+	basicPacket := &h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 0, false, false),
 		nil,
 		[]byte{0xff, 0xff, 0xff},
@@ -572,19 +572,19 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 
 	// Multiple NALs aggregated
 
-	firstPacket := &H266SingleNALUnitPacket{
+	firstPacket := &h266SingleNALUnitPacket{
 		createTestH266Header(0, 0, 0, false, false),
 		nil,
 		[]byte{0xff, 0xff, 0xff},
 	}
 
-	secondPacket := &H266SingleNALUnitPacket{
+	secondPacket := &h266SingleNALUnitPacket{
 		createTestH266Header(1, 2, 3, true, true),
 		nil,
 		[]byte{0x67, 0x67, 0x67},
 	}
 
-	aggregation, err := newH266AggregationPacket([]H266SingleNALUnitPacket{*firstPacket, *secondPacket})
+	aggregation, err := newH266AggregationPacket([]h266SingleNALUnitPacket{*firstPacket, *secondPacket})
 	assert.Nil(t, err)
 	aggregationPacketized := aggregation.packetize(make([]byte, 0))
 
@@ -595,7 +595,7 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 	firstPacket.donl = &testDonl
 	secondPacket.donl = &testDonl2
 
-	donlAggregation, err := newH266AggregationPacket([]H266SingleNALUnitPacket{*firstPacket, *secondPacket})
+	donlAggregation, err := newH266AggregationPacket([]h266SingleNALUnitPacket{*firstPacket, *secondPacket})
 	assert.Nil(t, err)
 	donlAggregationPacketized := donlAggregation.packetize(make([]byte, 0))
 
@@ -603,7 +603,7 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 
 	// Large NAL that gets fragmented
 
-	largePacket := &H266SingleNALUnitPacket{
+	largePacket := &h266SingleNALUnitPacket{
 		createTestH266Header(1, 1, 1, false, false),
 		nil,
 		make([]byte, 0),

@@ -82,7 +82,7 @@ type isH266Packet interface {
 	packetize([]byte) []byte
 }
 
-// H266NALUHeader is an H266 NAL Unit Header.
+// h266NALUHeader is an H266 NAL Unit Header.
 // https://datatracker.ietf.org/doc/html/rfc9328#section-1.1.4
 //
 //	+---------------+---------------+
@@ -90,61 +90,61 @@ type isH266Packet interface {
 //	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //	|F|Z| LayerID   |  Type   | TID |
 //	+---------------+---------------+
-type H266NALUHeader uint16
+type h266NALUHeader uint16
 
-func newH266NALUHeader(highByte, lowByte uint8) H266NALUHeader {
-	return H266NALUHeader((uint16(highByte) << 8) | uint16(lowByte))
+func newH266NALUHeader(highByte, lowByte uint8) h266NALUHeader {
+	return h266NALUHeader((uint16(highByte) << 8) | uint16(lowByte))
 }
 
 // F is the forbidden bit, should always be 0.
-func (h H266NALUHeader) F() bool {
+func (h h266NALUHeader) F() bool {
 	return (uint16(h) >> 15) != 0
 }
 
 // Z is a reserved bit, should always be 0.
-func (h H266NALUHeader) Z() bool {
+func (h h266NALUHeader) Z() bool {
 	const mask = 0b01000000 << 8
 
 	return (uint16(h) & mask) != 0
 }
 
 // Type of NAL Unit.
-func (h H266NALUHeader) Type() uint8 {
+func (h h266NALUHeader) Type() uint8 {
 	const mask = 0b11111000
 
 	return uint8((h & mask) >> 3) // nolint: gosec // G115 false positive
 }
 
 // IsTypeVCLUnit returns whether or not the NAL Unit type is a VCL NAL unit.
-func (h H266NALUHeader) IsTypeVCLUnit() bool {
+func (h h266NALUHeader) IsTypeVCLUnit() bool {
 	// Section 7.4.2.2 http://www.itu.int/rec/T-REC-H.266
 	return (h.Type() <= 11)
 }
 
-func (h H266NALUHeader) LayerID() uint8 {
+func (h h266NALUHeader) LayerID() uint8 {
 	// 00111111 00000000
 	const mask = 0b00111111 << 8
 
 	return uint8((uint16(h) & mask) >> 8) // nolint: gosec // G115 false positive
 }
 
-func (h H266NALUHeader) TID() uint8 {
+func (h h266NALUHeader) TID() uint8 {
 	const mask = 0b00000111
 
 	return uint8(uint16(h) & mask) // nolint: gosec // G115 false positive
 }
 
 // IsAggregationPacket returns whether or not the packet is an Aggregation packet.
-func (h H266NALUHeader) IsAggregationPacket() bool {
+func (h h266NALUHeader) IsAggregationPacket() bool {
 	return h.Type() == h266NaluAggregationPacketType
 }
 
 // IsFragmentationUnit returns whether or not the packet is a Fragmentation Unit packet.
-func (h H266NALUHeader) IsFragmentationUnit() bool {
+func (h h266NALUHeader) IsFragmentationUnit() bool {
 	return h.Type() == h266NaluFragmentationUnitType
 }
 
-// H266SingleNALUnitPacket represents a NALU packet, containing exactly one NAL unit.
+// h266SingleNALUnitPacket represents a NALU packet, containing exactly one NAL unit.
 //
 //	 0                   1                   2                   3
 //	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -159,16 +159,16 @@ func (h H266NALUHeader) IsFragmentationUnit() bool {
 //	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 // Reference: https://datatracker.ietf.org/doc/html/rfc7798#section-4.4.1
-type H266SingleNALUnitPacket struct {
+type h266SingleNALUnitPacket struct {
 	// payloadHeader is the header of the H266 packet.
-	payloadHeader H266NALUHeader
+	payloadHeader h266NALUHeader
 	// donl is a 16-bit field, that may or may not be present.
 	donl *uint16
 	// payload of the NAL unit.
 	payload []byte
 }
 
-func (p *H266SingleNALUnitPacket) wireSize() int {
+func (p *h266SingleNALUnitPacket) wireSize() int {
 	donlSize := 0
 	if p.donl != nil {
 		donlSize = 2
@@ -177,9 +177,9 @@ func (p *H266SingleNALUnitPacket) wireSize() int {
 	return h266NaluHeaderSize + donlSize + len(p.payload)
 }
 
-func (p H266SingleNALUnitPacket) isH266Packet() {}
+func (p h266SingleNALUnitPacket) isH266Packet() {}
 
-func (p *H266SingleNALUnitPacket) packetize(buf []byte) []byte {
+func (p *h266SingleNALUnitPacket) packetize(buf []byte) []byte {
 	buf = binary.BigEndian.AppendUint16(buf, uint16(p.payloadHeader))
 
 	if p.donl != nil {
@@ -193,7 +193,7 @@ func (p *H266SingleNALUnitPacket) packetize(buf []byte) []byte {
 
 // Aggregation Packet implementation
 
-// H266AggregationPacket is a single H266 aggregation packet.
+// h266AggregationPacket is a single H266 aggregation packet.
 //
 //	 0                   1                   2                   3
 //	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -208,20 +208,20 @@ func (p *H266SingleNALUnitPacket) packetize(buf []byte) []byte {
 //	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 // Reference: https://datatracker.ietf.org/doc/html/rfc9328#section-4.3.2
-type H266AggregationPacket struct {
-	payloadHeader H266NALUHeader
+type h266AggregationPacket struct {
+	payloadHeader h266NALUHeader
 	donl          *uint16
 	payload       []byte
 }
 
 // returns whether this NALU can even fit inside an AP with another NALU.
-func canAggregate(mtu uint16, packet *H266SingleNALUnitPacket) bool {
+func canAggregate(mtu uint16, packet *h266SingleNALUnitPacket) bool {
 	// must leave enough space for the AP header, optionally its DONL field, 2 length headers and a 2nd AU's header
 	return packet.wireSize()+(h266AggregatedPacketLengthSize*2)+h266NaluHeaderSize <= int(mtu)
 }
 
 // returns whether inserting a new packet will make this list of packets too big to aggregate within the MTU.
-func shouldAggregateNow(mtu uint16, packets []H266SingleNALUnitPacket, newPacket H266SingleNALUnitPacket) bool {
+func shouldAggregateNow(mtu uint16, packets []h266SingleNALUnitPacket, newPacket h266SingleNALUnitPacket) bool {
 	if len(packets) < 1 {
 		return false
 	}
@@ -248,7 +248,7 @@ func shouldAggregateNow(mtu uint16, packets []H266SingleNALUnitPacket, newPacket
 }
 
 // Reference: https://datatracker.ietf.org/doc/html/rfc9328#section-4.3.2
-func newH266AggregationPacket(packets []H266SingleNALUnitPacket) (*H266AggregationPacket, error) {
+func newH266AggregationPacket(packets []h266SingleNALUnitPacket) (*h266AggregationPacket, error) {
 	if packets == nil {
 		return nil, errNilPacket
 	}
@@ -304,8 +304,8 @@ func newH266AggregationPacket(packets []H266SingleNALUnitPacket) (*H266Aggregati
 		header |= uint16(0b1) << 15
 	}
 
-	packet := H266AggregationPacket{
-		H266NALUHeader(header),
+	packet := h266AggregationPacket{
+		h266NALUHeader(header),
 		firstPacket.donl,
 		payload,
 	}
@@ -313,9 +313,9 @@ func newH266AggregationPacket(packets []H266SingleNALUnitPacket) (*H266Aggregati
 	return &packet, nil
 }
 
-func splitH266AggregationPacket(packet H266AggregationPacket) ([]H266SingleNALUnitPacket, error) {
+func splitH266AggregationPacket(packet h266AggregationPacket) ([]h266SingleNALUnitPacket, error) {
 	curDonl := packet.donl
-	packets := make([]H266SingleNALUnitPacket, 0)
+	packets := make([]h266SingleNALUnitPacket, 0)
 	payload := packet.payload
 	for len(payload) > 0 {
 		if len(payload) < 2 {
@@ -330,7 +330,7 @@ func splitH266AggregationPacket(packet H266AggregationPacket) ([]H266SingleNALUn
 		if err != nil {
 			return nil, err
 		}
-		p, ok := parsed.(*H266SingleNALUnitPacket)
+		p, ok := parsed.(*h266SingleNALUnitPacket)
 		if !ok {
 			return nil, errInvalidNalType
 		}
@@ -349,9 +349,9 @@ func splitH266AggregationPacket(packet H266AggregationPacket) ([]H266SingleNALUn
 	return packets, nil
 }
 
-func (p *H266AggregationPacket) isH266Packet() {}
+func (p *h266AggregationPacket) isH266Packet() {}
 
-func (p *H266AggregationPacket) packetize(buf []byte) []byte {
+func (p *h266AggregationPacket) packetize(buf []byte) []byte {
 	buf = binary.BigEndian.AppendUint16(buf, uint16(p.payloadHeader))
 
 	if p.donl != nil {
@@ -365,19 +365,19 @@ func (p *H266AggregationPacket) packetize(buf []byte) []byte {
 
 // Fragmentation Unit implementation
 
-// H266FragmentationUnitHeader is the header for each H266FragmentationPacket.
+// h266FragmentationUnitHeader is the header for each H266FragmentationPacket.
 //
 //	+---------------+
 //	|0|1|2|3|4|5|6|7|
 //	+-+-+-+-+-+-+-+-+
 //	|S|E|P|  FuType |
 //	+---------------+
-type H266FragmentationUnitHeader uint8
+type h266FragmentationUnitHeader uint8
 
 func newH266FragmentationUnitHeader(
-	payloadHeader H266NALUHeader,
+	payloadHeader h266NALUHeader,
 	s, e, p bool, //nolint:unparam
-) H266FragmentationUnitHeader {
+) h266FragmentationUnitHeader {
 	header := payloadHeader.Type()
 	if s {
 		header |= 0b1 << 7
@@ -389,38 +389,38 @@ func newH266FragmentationUnitHeader(
 		header |= 0b1 << 5
 	}
 
-	return H266FragmentationUnitHeader(header)
+	return h266FragmentationUnitHeader(header)
 }
 
 // S represents the start of a fragmented NAL unit.
-func (h H266FragmentationUnitHeader) S() bool {
+func (h h266FragmentationUnitHeader) S() bool {
 	const mask = 0b10000000
 
 	return (h & mask) != 0
 }
 
 // E represents the end of a fragmented NAL unit.
-func (h H266FragmentationUnitHeader) E() bool {
+func (h h266FragmentationUnitHeader) E() bool {
 	const mask = 0b01000000
 
 	return (h & mask) != 0
 }
 
 // P indicates the last FU of the last VCL NAL unit of a coded picture.
-func (h H266FragmentationUnitHeader) P() bool {
+func (h h266FragmentationUnitHeader) P() bool {
 	const mask = 0b00100000
 
 	return (h & mask) != 0
 }
 
 // FuType MUST be equal to the field Type of the fragmented NAL unit.
-func (h H266FragmentationUnitHeader) FuType() uint8 {
+func (h h266FragmentationUnitHeader) FuType() uint8 {
 	const mask = 0b00011111
 
 	return uint8(h) & mask
 }
 
-// H266FragmentationPacket is a single H266 Fragmentation Unit.
+// h266FragmentationPacket is a single H266 Fragmentation Unit.
 //
 //	 0                   1                   2                   3
 //	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -436,29 +436,29 @@ func (h H266FragmentationUnitHeader) FuType() uint8 {
 //	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 // Reference: https://datatracker.ietf.org/doc/html/rfc9328#section-4.3.3
-type H266FragmentationPacket struct {
-	payloadHeader H266NALUHeader
-	fuHeader      H266FragmentationUnitHeader
+type h266FragmentationPacket struct {
+	payloadHeader h266NALUHeader
+	fuHeader      h266FragmentationUnitHeader
 	donl          *uint16
 	payload       []byte
 }
 
 // Replaces the original header's type with 29, while keeping other fields.
-func newH266FragmentationPacketHeader(payloadHeader H266NALUHeader) H266NALUHeader {
+func newH266FragmentationPacketHeader(payloadHeader h266NALUHeader) h266NALUHeader {
 	typeMask := ^uint16(0b11111000)
 
-	return H266NALUHeader((uint16(payloadHeader) & typeMask) | (h266NaluFragmentationUnitType << 3))
+	return h266NALUHeader((uint16(payloadHeader) & typeMask) | (h266NaluFragmentationUnitType << 3))
 }
 
 // Replaces the FU's payload header's type with the FU Header's type, while keeping other fields.
 func rebuildH266FragmentationPacketHeader(
-	payloadHeader H266NALUHeader,
-	fuHeader H266FragmentationUnitHeader,
-) H266NALUHeader {
+	payloadHeader h266NALUHeader,
+	fuHeader h266FragmentationUnitHeader,
+) h266NALUHeader {
 	typeMask := ^uint16(0b11111000)
 	origType := uint8(fuHeader) & 0b00011111
 
-	return H266NALUHeader((uint16(payloadHeader) & typeMask) | (uint16(origType) << 3))
+	return h266NALUHeader((uint16(payloadHeader) & typeMask) | (uint16(origType) << 3))
 }
 
 // Splits a H266SingleNALUnitPacket into many FU packets.
@@ -466,7 +466,7 @@ func rebuildH266FragmentationPacketHeader(
 // Errors if the packet would result in a single FU packet.
 //
 // The P bit is not set in any case.
-func newH266FragmentationPackets(mtu uint16, packet *H266SingleNALUnitPacket) ([]H266FragmentationPacket, error) {
+func newH266FragmentationPackets(mtu uint16, packet *h266SingleNALUnitPacket) ([]h266FragmentationPacket, error) {
 	if packet == nil {
 		return nil, errNilPacket
 	}
@@ -483,12 +483,12 @@ func newH266FragmentationPackets(mtu uint16, packet *H266SingleNALUnitPacket) ([
 		return nil, errShortPacket
 	}
 
-	packets := make([]H266FragmentationPacket, 0)
+	packets := make([]h266FragmentationPacket, 0)
 	header := newH266FragmentationPacketHeader(packet.payloadHeader)
 
 	fuPayload := packet.payload
 
-	firstPacket := H266FragmentationPacket{
+	firstPacket := h266FragmentationPacket{
 		payloadHeader: header,
 		fuHeader:      newH266FragmentationUnitHeader(packet.payloadHeader, true, false, false),
 		donl:          packet.donl,
@@ -498,7 +498,7 @@ func newH266FragmentationPackets(mtu uint16, packet *H266SingleNALUnitPacket) ([
 	fuPayload = fuPayload[sliceSize:]
 
 	for len(fuPayload) > sliceSize {
-		p := H266FragmentationPacket{
+		p := h266FragmentationPacket{
 			payloadHeader: header,
 			fuHeader:      newH266FragmentationUnitHeader(packet.payloadHeader, false, false, false),
 			donl:          nil,
@@ -509,7 +509,7 @@ func newH266FragmentationPackets(mtu uint16, packet *H266SingleNALUnitPacket) ([
 		fuPayload = fuPayload[sliceSize:]
 	}
 
-	lastPacket := H266FragmentationPacket{
+	lastPacket := h266FragmentationPacket{
 		payloadHeader: header,
 		fuHeader:      newH266FragmentationUnitHeader(packet.payloadHeader, false, true, false),
 		donl:          nil,
@@ -520,7 +520,7 @@ func newH266FragmentationPackets(mtu uint16, packet *H266SingleNALUnitPacket) ([
 	return packets, nil
 }
 
-func rebuildH266FragmentationPackets(packets []H266FragmentationPacket) (*H266SingleNALUnitPacket, error) {
+func rebuildH266FragmentationPackets(packets []h266FragmentationPacket) (*h266SingleNALUnitPacket, error) {
 	if len(packets) < 2 {
 		return nil, errNotEnoughPackets
 	}
@@ -537,7 +537,7 @@ func rebuildH266FragmentationPackets(packets []H266FragmentationPacket) (*H266Si
 		payload = append(payload, fu.payload...)
 	}
 
-	rebuilt := H266SingleNALUnitPacket{
+	rebuilt := h266SingleNALUnitPacket{
 		payloadHeader: rebuildH266FragmentationPacketHeader(packets[0].payloadHeader, packets[0].fuHeader),
 		donl:          packets[0].donl,
 		payload:       payload,
@@ -546,9 +546,9 @@ func rebuildH266FragmentationPackets(packets []H266FragmentationPacket) (*H266Si
 	return &rebuilt, nil
 }
 
-func (p *H266FragmentationPacket) isH266Packet() {}
+func (p *h266FragmentationPacket) isH266Packet() {}
 
-func (p *H266FragmentationPacket) packetize(buf []byte) []byte {
+func (p *h266FragmentationPacket) packetize(buf []byte) []byte {
 	buf = binary.BigEndian.AppendUint16(buf, uint16(p.payloadHeader))
 	buf = append(buf, uint8(p.fuHeader))
 
@@ -599,7 +599,7 @@ func parseH266Packet(buf []byte, hasDonl bool) (isH266Packet, error) { // nolint
 
 	switch {
 	case header.IsAggregationPacket():
-		packet := &H266AggregationPacket{
+		packet := &h266AggregationPacket{
 			payloadHeader: header,
 			donl:          donl,
 			payload:       buf[payloadStart:],
@@ -607,16 +607,16 @@ func parseH266Packet(buf []byte, hasDonl bool) (isH266Packet, error) { // nolint
 
 		return packet, nil
 	case header.IsFragmentationUnit():
-		packet := &H266FragmentationPacket{
+		packet := &h266FragmentationPacket{
 			payloadHeader: header,
-			fuHeader:      H266FragmentationUnitHeader(buf[2]),
+			fuHeader:      h266FragmentationUnitHeader(buf[2]),
 			donl:          donl,
 			payload:       buf[payloadStart:],
 		}
 
 		return packet, nil
 	default:
-		packet := &H266SingleNALUnitPacket{
+		packet := &h266SingleNALUnitPacket{
 			payloadHeader: header,
 			donl:          donl,
 			payload:       buf[payloadStart:],
@@ -628,7 +628,7 @@ func parseH266Packet(buf []byte, hasDonl bool) (isH266Packet, error) { // nolint
 
 type H266Depacketizer struct {
 	hasDonl  bool
-	partials []H266FragmentationPacket
+	partials []h266FragmentationPacket
 }
 
 func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: cyclop
@@ -651,7 +651,7 @@ func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: 
 	}
 	output := make([]byte, 0)
 
-	fragment, ok := parsed.(*H266FragmentationPacket)
+	fragment, ok := parsed.(*h266FragmentationPacket)
 
 	if ok { // nolint:nestif
 		if fragment.fuHeader.E() {
@@ -682,7 +682,7 @@ func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: 
 
 	d.partials = d.partials[:0]
 
-	aggregation, ok := parsed.(*H266AggregationPacket)
+	aggregation, ok := parsed.(*h266AggregationPacket)
 	if ok {
 		aggregated, err := splitH266AggregationPacket(*aggregation)
 		if err != nil {
@@ -697,7 +697,7 @@ func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: 
 	}
 
 	output = append(output, annexbNALUStartCode...)
-	single, ok := parsed.(*H266SingleNALUnitPacket)
+	single, ok := parsed.(*h266SingleNALUnitPacket)
 	if !ok {
 		return nil, errNalCorrupted
 	}
@@ -708,7 +708,7 @@ func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: 
 }
 
 type H266Packetizer struct {
-	naluBuffer []H266SingleNALUnitPacket
+	naluBuffer []h266SingleNALUnitPacket
 }
 
 func (p *H266Packetizer) Payload(mtu uint16, payload []byte) [][]byte { //nolint: cyclop
@@ -744,7 +744,7 @@ func (p *H266Packetizer) Payload(mtu uint16, payload []byte) [][]byte { //nolint
 		}
 
 		// ignores RFC9328 packets
-		packet, ok := parsedPacket.(*H266SingleNALUnitPacket)
+		packet, ok := parsedPacket.(*h266SingleNALUnitPacket)
 		if !ok {
 			return
 		}
