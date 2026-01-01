@@ -540,7 +540,7 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 			}
 
 			emitH266Nalus(p, func(b []byte) {
-				parsed, err := parseH266Packet(b, withDonl)
+				parsed, err := parseH266Packet(b, false)
 				assert.Nil(t, err)
 				if err != nil {
 					return
@@ -567,8 +567,10 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 	// with DONL
 
 	basicPacket.donl = &testDonl
+	packetized := basicPacket.packetize(make([]byte, 0))
+	basicPacket.donl = nil
 
-	testDepacketizer([][]byte{basicPacket.packetize(make([]byte, 0))}, []isH266Packet{basicPacket}, true)
+	testDepacketizer([][]byte{packetized}, []isH266Packet{basicPacket}, true)
 
 	// Multiple NALs aggregated
 
@@ -598,6 +600,9 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 	donlAggregation, err := newH266AggregationPacket([]h266SingleNALUnitPacket{*firstPacket, *secondPacket})
 	assert.Nil(t, err)
 	donlAggregationPacketized := donlAggregation.packetize(make([]byte, 0))
+
+	firstPacket.donl = nil
+	secondPacket.donl = nil
 
 	testDepacketizer([][]byte{donlAggregationPacketized}, []isH266Packet{firstPacket, secondPacket}, true)
 
@@ -635,6 +640,8 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 	for _, f := range donlFragments {
 		donlFragmentsPacketized = append(donlFragmentsPacketized, f.packetize(make([]byte, 0)))
 	}
+
+	largePacket.donl = nil
 
 	testDepacketizer(donlFragmentsPacketized, []isH266Packet{largePacket}, true)
 }

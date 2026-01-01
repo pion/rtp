@@ -662,6 +662,7 @@ func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: 
 			if err != nil {
 				return nil, err
 			}
+			rebuilt.donl = nil
 			output = append(output, rebuilt.packetize(make([]byte, 0))...)
 			d.partials = d.partials[:0]
 
@@ -690,6 +691,7 @@ func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: 
 		}
 		for _, p := range aggregated {
 			output = append(output, annexbNALUStartCode...)
+			p.donl = nil
 			output = p.packetize(output)
 		}
 
@@ -702,6 +704,7 @@ func (d *H266Depacketizer) Unmarshal(packet []byte) ([]byte, error) { //nolint: 
 		return nil, errNalCorrupted
 	}
 
+	single.donl = nil
 	output = single.packetize(output)
 
 	return output, nil
