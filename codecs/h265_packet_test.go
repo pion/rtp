@@ -4,11 +4,22 @@
 package codecs
 
 import (
+	"encoding/binary"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func createTestH265Header(pType, layerID, tid uint8, f bool) H265NALUHeader {
+	var fVal, zVal uint16
+	if f {
+		fVal = 1 << 15
+	}
+
+	return H265NALUHeader(uint16(tid) | (uint16(pType) << 9) | (uint16(layerID) << 3) | fVal | zVal)
+}
 
 func TestH265_NALU_Header(t *testing.T) {
 	tt := [...]struct {
@@ -147,7 +158,7 @@ func TestH265_SingleNALUnitPacket(t *testing.T) {
 	tt := [...]struct {
 		Raw            []byte
 		WithDONL       bool
-		ExpectedPacket *H265SingleNALUnitPacket
+		ExpectedPacket *h265SingleNALUnitPacket
 		ExpectedErr    error
 	}{
 		{
@@ -183,7 +194,7 @@ func TestH265_SingleNALUnitPacket(t *testing.T) {
 		},
 		{
 			Raw: []byte{0x01, 0x01, 0xab, 0xcd, 0xef},
-			ExpectedPacket: &H265SingleNALUnitPacket{
+			ExpectedPacket: &h265SingleNALUnitPacket{
 				payloadHeader: newH265NALUHeader(0x01, 0x01),
 				payload:       []byte{0xab, 0xcd, 0xef},
 			},
@@ -196,7 +207,7 @@ func TestH265_SingleNALUnitPacket(t *testing.T) {
 		},
 		{
 			Raw: []byte{0x01, 0x01, 0xaa, 0xbb, 0xcc},
-			ExpectedPacket: &H265SingleNALUnitPacket{
+			ExpectedPacket: &h265SingleNALUnitPacket{
 				payloadHeader: newH265NALUHeader(0x01, 0x01),
 				donl:          uint16ptr((uint16(0xaa) << 8) | uint16(0xbb)),
 				payload:       []byte{0xcc},
@@ -206,15 +217,10 @@ func TestH265_SingleNALUnitPacket(t *testing.T) {
 	}
 
 	for _, cur := range tt {
-		parsed := &H265SingleNALUnitPacket{}
-		if cur.WithDONL {
-			parsed.WithDONL(cur.WithDONL)
-		}
+		parsed, err := parseH265SingleNalUnitPacket(cur.Raw, cur.WithDONL)
 
 		// Just for code coverage sake
 		parsed.isH265Packet()
-
-		_, err := parsed.Unmarshal(cur.Raw)
 
 		if cur.ExpectedErr == nil {
 			assert.NoError(t, err)
@@ -235,262 +241,6 @@ func TestH265_SingleNALUnitPacket(t *testing.T) {
 		}
 
 		assert.Equal(t, cur.ExpectedPacket.Payload(), parsed.Payload())
-	}
-}
-
-func TestH265_AggregationPacket(t *testing.T) {
-	tt := [...]struct {
-		Raw            []byte
-		WithDONL       bool
-		ExpectedPacket *H265AggregationPacket
-		ExpectedErr    error
-	}{
-		{
-			Raw:         nil,
-			ExpectedErr: errNilPacket,
-		},
-		{
-			Raw:         []byte{},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x62},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x62, 0x01, 0x93},
-			ExpectedErr: errInvalidH265PacketType,
-		},
-		// FBit enabled in H265NALUHeader
-		{
-			Raw:         []byte{0x80, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errH265CorruptedPacket,
-		},
-		// Type '48' in H265NALUHeader
-		{
-			Raw:         []byte{0xE0, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errH265CorruptedPacket,
-		},
-		// Small payload
-		{
-			Raw:         []byte{0x60, 0x01, 0x00, 0x1},
-			ExpectedErr: errShortPacket,
-		},
-		// Small payload
-		{
-			Raw:         []byte{0x60, 0x01, 0x00},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-		// Small payload
-		{
-			Raw:         []byte{0x60, 0x01, 0x00, 0x1},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-		// Small payload
-		{
-			Raw:         []byte{0x60, 0x01, 0x00, 0x01, 0x02},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-		// Single Aggregation Unit
-		{
-			Raw:         []byte{0x60, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-		// Incomplete second Aggregation Unit
-		{
-			Raw: []byte{
-				0x60, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00,
-				// DONL
-				0x00,
-			},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-		// Incomplete second Aggregation Unit
-		{
-			Raw: []byte{
-				0x60, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00,
-				// DONL, NAL Unit size (2 bytes)
-				0x00, 0x55, 0x55,
-			},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-		// Valid Second Aggregation Unit
-		{
-			Raw: []byte{
-				0x60, 0x01, 0xcc, 0xdd, 0x00, 0x02, 0xff, 0xee,
-				// DONL, NAL Unit size (2 bytes), Payload
-				0x77, 0x00, 0x01, 0xaa,
-			},
-			WithDONL: true,
-			ExpectedPacket: &H265AggregationPacket{
-				firstUnit: &H265AggregationUnitFirst{
-					donl:        uint16ptr(0xccdd),
-					nalUnitSize: 2,
-					nalUnit:     []byte{0xff, 0xee},
-				},
-				otherUnits: []H265AggregationUnit{
-					{
-						dond:        uint8ptr(0x77),
-						nalUnitSize: 1,
-						nalUnit:     []byte{0xaa},
-					},
-				},
-			},
-		},
-	}
-
-	for _, cur := range tt {
-		parsed := &H265AggregationPacket{}
-		if cur.WithDONL {
-			parsed.WithDONL(cur.WithDONL)
-		}
-
-		// Just for code coverage sake
-		parsed.isH265Packet()
-
-		_, err := parsed.Unmarshal(cur.Raw)
-
-		if cur.ExpectedErr == nil {
-			assert.NoError(t, err)
-		} else {
-			assert.ErrorIs(t, err, cur.ExpectedErr)
-		}
-
-		if cur.ExpectedPacket == nil {
-			continue
-		}
-
-		if cur.ExpectedPacket.FirstUnit() != nil {
-			assert.Equal(t, cur.ExpectedPacket.FirstUnit().NALUSize(), parsed.FirstUnit().NALUSize())
-
-			if cur.ExpectedPacket.FirstUnit().DONL() != nil {
-				assert.Equal(t, *cur.ExpectedPacket.FirstUnit().DONL(), *parsed.FirstUnit().DONL())
-			} else {
-				assert.Nil(t, parsed.FirstUnit().DONL())
-			}
-
-			assert.Equal(
-				t, cur.ExpectedPacket.FirstUnit().NalUnit(), parsed.FirstUnit().NalUnit(),
-			)
-		}
-
-		assert.Len(t, cur.ExpectedPacket.OtherUnits(), len(parsed.OtherUnits()))
-
-		for ndx, unit := range cur.ExpectedPacket.OtherUnits() {
-			assert.Equal(t, unit.NALUSize(), parsed.OtherUnits()[ndx].NALUSize())
-
-			if unit.DOND() != nil {
-				assert.Equal(t, *unit.DOND(), *parsed.OtherUnits()[ndx].DOND())
-			} else {
-				assert.Nil(t, parsed.OtherUnits()[ndx].DOND())
-			}
-
-			assert.Equal(t, unit.NalUnit(), parsed.OtherUnits()[ndx].NalUnit())
-		}
-
-		assert.Equal(t, cur.ExpectedPacket.OtherUnits(), parsed.OtherUnits())
-	}
-}
-
-func TestH265_FragmentationUnitPacket(t *testing.T) {
-	tt := [...]struct {
-		Raw         []byte
-		WithDONL    bool
-		ExpectedFU  *H265FragmentationUnitPacket
-		ExpectedErr error
-	}{
-		{
-			Raw:         nil,
-			ExpectedErr: errNilPacket,
-		},
-		{
-			Raw:         []byte{},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x62},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x62, 0x01},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x62, 0x01, 0x93},
-			ExpectedErr: errShortPacket,
-		},
-		// FBit enabled in H265NALUHeader
-		{
-			Raw:         []byte{0x80, 0x01, 0x93, 0xaf},
-			ExpectedErr: errH265CorruptedPacket,
-		},
-		// Type not '49' in H265NALUHeader
-		{
-			Raw:         []byte{0x40, 0x01, 0x93, 0xaf},
-			ExpectedErr: errInvalidH265PacketType,
-		},
-		{
-			Raw: []byte{0x62, 0x01, 0x93, 0xaf},
-			ExpectedFU: &H265FragmentationUnitPacket{
-				payloadHeader: newH265NALUHeader(0x62, 0x01),
-				fuHeader:      H265FragmentationUnitHeader(0x93),
-				donl:          nil,
-				payload:       []byte{0xaf},
-			},
-		},
-		{
-			Raw:         []byte{0x62, 0x01, 0x93, 0xcc},
-			WithDONL:    true,
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:      []byte{0x62, 0x01, 0x93, 0xcc, 0xdd, 0xaf, 0x0d, 0x5a},
-			WithDONL: true,
-			ExpectedFU: &H265FragmentationUnitPacket{
-				payloadHeader: newH265NALUHeader(0x62, 0x01),
-				fuHeader:      H265FragmentationUnitHeader(0x93),
-				donl:          uint16ptr((uint16(0xcc) << 8) | uint16(0xdd)),
-				payload:       []byte{0xaf, 0x0d, 0x5a},
-			},
-		},
-	}
-
-	for _, cur := range tt {
-		parsed := &H265FragmentationUnitPacket{}
-		if cur.WithDONL {
-			parsed.WithDONL(cur.WithDONL)
-		}
-
-		// Just for code coverage sake
-		parsed.isH265Packet()
-
-		_, err := parsed.Unmarshal(cur.Raw)
-		if cur.ExpectedErr != nil {
-			assert.ErrorIs(t, err, cur.ExpectedErr)
-		} else {
-			assert.NoError(t, err)
-		}
-
-		if cur.ExpectedFU == nil {
-			continue
-		}
-
-		assert.Equal(t, cur.ExpectedFU.PayloadHeader(), parsed.PayloadHeader())
-		assert.Equal(t, cur.ExpectedFU.FuHeader(), parsed.FuHeader())
-
-		if cur.ExpectedFU.DONL() != nil {
-			assert.Equal(t, *cur.ExpectedFU.DONL(), *parsed.DONL())
-		} else {
-			assert.Nil(t, parsed.DONL())
-		}
-
-		assert.Equal(t, cur.ExpectedFU.Payload(), parsed.Payload())
 	}
 }
 
@@ -537,198 +287,8 @@ func TestH265_TemporalScalabilityControlInformation(t *testing.T) {
 	}
 }
 
-func TestH265_PACI_Packet(t *testing.T) {
-	tt := [...]struct {
-		Raw         []byte
-		ExpectedFU  *H265PACIPacket
-		ExpectedErr error
-	}{
-		{
-			Raw:         nil,
-			ExpectedErr: errNilPacket,
-		},
-		{
-			Raw:         []byte{},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x62, 0x01, 0x93},
-			ExpectedErr: errShortPacket,
-		},
-		// FBit enabled in H265NALUHeader
-		{
-			Raw:         []byte{0x80, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errH265CorruptedPacket,
-		},
-		// Type not '50' in H265NALUHeader
-		{
-			Raw:         []byte{0x40, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errInvalidH265PacketType,
-		},
-		// Invalid header extension size
-		{
-			Raw:         []byte{0x64, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errShortPacket,
-		},
-		// No Header Extension
-		{
-			Raw: []byte{0x64, 0x01, 0x64, 0x00, 0xab, 0xcd, 0xef},
-			ExpectedFU: &H265PACIPacket{
-				payloadHeader:    newH265NALUHeader(0x64, 0x01),
-				paciHeaderFields: (uint16(0x64) << 8) | uint16(0x00),
-				phes:             nil,
-				payload:          []byte{0xab, 0xcd, 0xef},
-			},
-		},
-		// Header Extension 1 byte
-		{
-			Raw: []byte{0x64, 0x01, 0x64, 0x10, 0xff, 0xab, 0xcd, 0xef},
-			ExpectedFU: &H265PACIPacket{
-				payloadHeader:    newH265NALUHeader(0x64, 0x01),
-				paciHeaderFields: (uint16(0x64) << 8) | uint16(0x10),
-				phes:             []byte{0xff},
-				payload:          []byte{0xab, 0xcd, 0xef},
-			},
-		},
-		// Header Extension TSCI
-		{
-			Raw: []byte{0x64, 0x01, 0x64, 0b00111000, 0xaa, 0xbb, 0x80, 0xab, 0xcd, 0xef},
-			ExpectedFU: &H265PACIPacket{
-				payloadHeader:    newH265NALUHeader(0x64, 0x01),
-				paciHeaderFields: (uint16(0x64) << 8) | uint16(0b00111000),
-				phes:             []byte{0xaa, 0xbb, 0x80},
-				payload:          []byte{0xab, 0xcd, 0xef},
-			},
-		},
-	}
-
-	for _, cur := range tt {
-		parsed := &H265PACIPacket{}
-		_, err := parsed.Unmarshal(cur.Raw)
-
-		// Just for code coverage sake
-		parsed.isH265Packet()
-
-		if cur.ExpectedErr != nil {
-			assert.ErrorIs(t, err, cur.ExpectedErr)
-		} else {
-			assert.NoError(t, err)
-		}
-
-		if cur.ExpectedFU == nil {
-			continue
-		}
-
-		assert.Equal(t, cur.ExpectedFU.PayloadHeader(), parsed.PayloadHeader())
-		assert.Equal(t, cur.ExpectedFU.A(), parsed.A())
-		assert.Equal(t, cur.ExpectedFU.CType(), parsed.CType())
-		assert.Equal(t, cur.ExpectedFU.PHSsize(), parsed.PHSsize())
-		assert.Equal(t, cur.ExpectedFU.F0(), parsed.F0())
-		assert.Equal(t, cur.ExpectedFU.F1(), parsed.F1())
-		assert.Equal(t, cur.ExpectedFU.F2(), parsed.F2())
-		assert.Equal(t, cur.ExpectedFU.Y(), parsed.Y())
-		assert.Equal(t, cur.ExpectedFU.PHES(), parsed.PHES())
-		assert.Equal(t, cur.ExpectedFU.Payload(), parsed.Payload())
-		if cur.ExpectedFU.TSCI() != nil {
-			assert.Equal(t, cur.ExpectedFU.TSCI(), parsed.TSCI())
-		} else {
-			assert.Nil(t, parsed.TSCI())
-		}
-	}
-}
-
-func TestH265_Packet(t *testing.T) {
-	tt := [...]struct {
-		Raw                []byte
-		WithDONL           bool
-		ExpectedPacketType any
-		ExpectedErr        error
-	}{
-		{
-			Raw:         nil,
-			ExpectedErr: errNilPacket,
-		},
-		{
-			Raw:         []byte{},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x62, 0x01, 0x93},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x64, 0x01, 0x93, 0xaf},
-			ExpectedErr: errShortPacket,
-		},
-		{
-			Raw:         []byte{0x01, 0x01},
-			WithDONL:    true,
-			ExpectedErr: errShortPacket,
-		},
-		// FBit enabled in H265NALUHeader
-		{
-			Raw:         []byte{0x80, 0x01, 0x93, 0xaf, 0xaf, 0xaf, 0xaf},
-			ExpectedErr: errH265CorruptedPacket,
-		},
-		// Valid H265SingleNALUnitPacket
-		{
-			Raw:                []byte{0x01, 0x01, 0xab, 0xcd, 0xef},
-			ExpectedPacketType: &H265SingleNALUnitPacket{},
-		},
-		// Invalid H265SingleNALUnitPacket
-		{
-			Raw:         []byte{0x01, 0x01, 0x93, 0xaf},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-		// Valid H265PACIPacket
-		{
-			Raw:                []byte{0x64, 0x01, 0x64, 0b00111000, 0xaa, 0xbb, 0x80, 0xab, 0xcd, 0xef},
-			ExpectedPacketType: &H265PACIPacket{},
-		},
-		// Valid H265FragmentationUnitPacket
-		{
-			Raw:                []byte{0x62, 0x01, 0x93, 0xcc, 0xdd, 0xaf, 0x0d, 0x5a},
-			ExpectedPacketType: &H265FragmentationPacket{},
-			WithDONL:           true,
-		},
-		// Valid H265AggregationPacket
-		{
-			Raw:                []byte{0x60, 0x01, 0xcc, 0xdd, 0x00, 0x02, 0xff, 0xee, 0x77, 0x00, 0x01, 0xaa},
-			ExpectedPacketType: &H265AggregationPacket{},
-			WithDONL:           true,
-		},
-		// Invalid H265AggregationPacket
-		{
-			Raw:         []byte{0x60, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00},
-			ExpectedErr: errShortPacket,
-			WithDONL:    true,
-		},
-	}
-
-	for _, cur := range tt {
-		pck := &H265Packet{}
-		if cur.WithDONL {
-			pck.WithDONL(true)
-		}
-
-		_, err := pck.Unmarshal(cur.Raw)
-		if cur.ExpectedErr == nil {
-			assert.NoError(t, err)
-		} else {
-			assert.ErrorIs(t, err, cur.ExpectedErr)
-		}
-
-		if cur.ExpectedErr != nil {
-			continue
-		}
-
-		assert.IsType(t, cur.ExpectedPacketType, pck.Packet())
-	}
-}
-
 func TestH265IsPartitionHead(t *testing.T) {
-	h265 := H265Packet{}
+	h265 := H265Depacketizer{}
 
 	assert.False(t, h265.IsPartitionHead(nil), "nil must not be a partition head")
 	assert.False(t, h265.IsPartitionHead([]byte{}), "empty nalu must not be a partition head")
@@ -744,6 +304,25 @@ func TestH265IsPartitionHead(t *testing.T) {
 
 	fuEndNalu := []byte{0x62, 0x01, 0x53}
 	assert.False(t, h265.IsPartitionHead(fuEndNalu), "fu end nalu must not be a partition head")
+}
+
+func TestH265IsPartitionTail(t *testing.T) {
+	h265 := H265Depacketizer{}
+
+	assert.False(t, h265.IsPartitionTail(false, nil), "nil must not be a partition tail")
+	assert.False(t, h265.IsPartitionTail(false, []byte{}), "empty nalu must not be a partition tail")
+
+	singleNalu := []byte{0x01, 0x01, 0xab, 0xcd, 0xef}
+	assert.False(t, h265.IsPartitionTail(false, singleNalu), "single nalu must not be a partition tail")
+
+	fbitNalu := []byte{0x80, 0x00, 0x00}
+	assert.False(t, h265.IsPartitionTail(false, fbitNalu), "fbit nalu must not be a partition tail")
+
+	fuStartNalu := []byte{0x62, 0x01, 0x93}
+	assert.False(t, h265.IsPartitionTail(false, fuStartNalu), "fu start nalu must not be a partition tail")
+
+	fuEndNalu := []byte{0x62, 0x01, 0x53}
+	assert.True(t, h265.IsPartitionTail(false, fuEndNalu), "fu end nalu mustw be a partition tail")
 }
 
 func TestH265_Packet_Real(t *testing.T) {
@@ -764,267 +343,7 @@ func TestH265_Packet_Real(t *testing.T) {
 	for _, cur := range tt {
 		pck := &H265Packet{}
 		_, err := pck.Unmarshal([]byte(cur))
-		assert.True(t, err == nil || errors.Is(err, errExpectFragmentationStartUnit))
-	}
-}
-
-func TestH265Payloader_Payload(t *testing.T) {
-	tt := []struct {
-		Name            string
-		Data            []byte
-		MTU             uint16
-		AddDONL         bool
-		SkipAggregation bool
-		ExpectedLen     int
-		ExpectedData    *[][]byte
-		Msg             string
-	}{
-		{
-			Name:        "Positive MTU, nil payload",
-			MTU:         1,
-			Data:        nil,
-			ExpectedLen: 0,
-			Msg:         "Generated payload must be empty",
-		},
-		{
-			Name:        "Positive MTU, empty NAL",
-			MTU:         1,
-			Data:        []byte{},
-			ExpectedLen: 0,
-			Msg:         "Generated payload should be empty",
-		},
-		{
-			Name:        "Zero MTU, start code",
-			MTU:         0,
-			Data:        []byte{0x00, 0x00, 0x01},
-			ExpectedLen: 0,
-			Msg:         "Generated payload should be empty",
-		},
-		{
-			Name:        "Positive MTU, 1 byte payload",
-			MTU:         1,
-			Data:        []byte{0x90},
-			ExpectedLen: 0,
-			Msg:         "Generated payload should be empty. H.265 nal unit too small",
-		},
-		{
-			Name:        "MTU:1, 2 byte payload",
-			MTU:         1,
-			Data:        []byte{0x46, 0x01},
-			ExpectedLen: 0,
-			Msg:         "Generated payload should be empty. H.265 nal unit too small",
-		},
-		{
-			Name:        "MTU:2, 2 byte payload.",
-			MTU:         2,
-			Data:        []byte{0x46, 0x01},
-			ExpectedLen: 0,
-			Msg:         "Generated payload should be empty. min MTU is 4",
-		},
-		{
-			Name:         "MTU:4, 2 byte payload.",
-			MTU:          4,
-			Data:         []byte{0x46, 0x01},
-			ExpectedData: &[][]byte{{0x46, 0x01}},
-			Msg:          "AUD packetization failed",
-		},
-		{
-			Name:        "Negative MTU, small payload",
-			MTU:         0,
-			Data:        []byte{0x90, 0x90, 0x90},
-			ExpectedLen: 0,
-		},
-		{
-			Name:        "Negative MTU, small payload",
-			MTU:         0,
-			Data:        []byte{0x90, 0x90, 0x90},
-			ExpectedLen: 0,
-		},
-		{
-			Name:        "Negative MTU, small payload",
-			MTU:         1,
-			Data:        []byte{0x90, 0x90, 0x90},
-			ExpectedLen: 0,
-		},
-		{
-			Name:         "Negative MTU, small payload",
-			MTU:          5,
-			Data:         []byte{0x90, 0x90, 0x90},
-			ExpectedData: &[][]byte{{0x90, 0x90, 0x90}},
-		},
-		{
-			Name: "Large payload",
-			MTU:  5,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00,
-				0x01, 0x02, 0x03, 0x04,
-				0x05, 0x06, 0x07, 0x08,
-				0x09, 0x10, 0x11, 0x12,
-				0x13, 0x14, 0x15,
-			},
-			ExpectedData: &[][]byte{
-				{0x62, 0x01, 0x80, 0x02, 0x03},
-				{0x62, 0x01, 0x00, 0x04, 0x05},
-				{0x62, 0x01, 0x00, 0x06, 0x07},
-				{0x62, 0x01, 0x00, 0x08, 0x09},
-				{0x62, 0x01, 0x00, 0x10, 0x11},
-				{0x62, 0x01, 0x00, 0x12, 0x13},
-				{0x62, 0x01, 0x40, 0x14, 0x15},
-			},
-			Msg: "Large payload split across fragmentation Packets",
-		},
-		{
-			Name: "Short MTU, multiple NALUs flushed in single packet",
-			MTU:  5,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00, 0x01,
-				0x00, 0x00, 0x01, 0x02, 0x03,
-			},
-			ExpectedData: &[][]byte{{0x00, 0x01}, {0x02, 0x03}},
-			Msg:          "multiple Single NALUs packetization should succeed",
-		},
-		{
-			Name: "Enough MUT, multiple NALUs create Signle Packet",
-			MTU:  10,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00, 0x01,
-				0x00, 0x00, 0x01, 0x02, 0x03,
-			},
-			ExpectedData: &[][]byte{{0x60, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02, 0x02, 0x03}},
-			Msg:          "Aggregation packetization should succeed",
-		},
-		{
-			Name: "Enough MUT, multiple NALUs flushed two Packets, don't aggregate",
-			MTU:  5,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00, 0x01,
-				0x00, 0x00, 0x01, 0x02, 0x03,
-				0x00, 0x00, 0x01, 0x04, 0x05,
-			},
-			ExpectedData: &[][]byte{{0x00, 0x01}, {0x02, 0x03}, {0x04, 0x05}},
-			Msg:          "multiple Single NALUs packetization should succeed",
-		},
-		{
-			Name: "Enough MUT, multiple NALUs flushed two Packets, aggregate",
-			MTU:  15,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00, 0x01,
-				0x00, 0x00, 0x01, 0x02, 0x03,
-				0x00, 0x00, 0x01, 0x04, 0x05,
-			},
-			ExpectedData: &[][]byte{{0x60, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02, 0x02, 0x03, 0x00, 0x02, 0x04, 0x05}},
-			Msg:          "Aggregation packetization should succeed",
-		},
-		// Add DONL = true
-		{
-			Name:        "DONL, invalid MTU:1",
-			MTU:         1,
-			Data:        []byte{0x01},
-			AddDONL:     true,
-			ExpectedLen: 0,
-			Msg:         "Generated payload must be empty",
-		},
-		{
-			Name:        "DONL MTU:4, 2 byte payload.",
-			MTU:         4,
-			Data:        []byte{0x00, 0x01},
-			AddDONL:     true,
-			ExpectedLen: 0,
-			Msg:         "Generated payload must be empty",
-		},
-		{
-			Name:         "DONL single NALU minimum payload",
-			MTU:          6,
-			Data:         []byte{0x00, 0x01},
-			AddDONL:      true,
-			ExpectedData: &[][]byte{{0x00, 0x01, 0x00, 0x00}},
-			Msg:          "single NALU should be packetized",
-		},
-		{
-			Name: "DONL multiple NALU",
-			MTU:  6,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00, 0x01,
-				0x00, 0x00, 0x01, 0x02, 0x03,
-				0x00, 0x00, 0x01, 0x04, 0x05,
-			},
-			AddDONL: true,
-			ExpectedData: &[][]byte{
-				{0x00, 0x01, 0x00, 0x00},
-				{0x02, 0x03, 0x00, 0x01},
-				{0x04, 0x05, 0x00, 0x02},
-			},
-			Msg: "DONL should be incremented",
-		},
-		{
-			Name: "DONL aggregation minimum payload",
-			MTU:  18,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00, 0x01,
-				0x00, 0x00, 0x01, 0x02, 0x03,
-				0x00, 0x00, 0x01, 0x04, 0x05,
-			},
-			AddDONL: true,
-			ExpectedData: &[][]byte{
-				{
-					0x60, 0x01, // NALU Header + Layer ID + TID
-					0x00, 0x00, // DONL
-					0x00, 0x02, 0x00, 0x01,
-					0x00, // DONL
-					0x00, 0x02, 0x02, 0x03,
-					0x01, // DONL
-					0x00, 0x02, 0x04, 0x05,
-				},
-			},
-			Msg: "DONL Aggregation packetization should succeed",
-		},
-		{
-			Name: "DONL Large payload",
-			MTU:  7,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00,
-				0x01, 0x02, 0x03, 0x04,
-				0x05, 0x06, 0x07, 0x08,
-				0x09, 0x10, 0x11, 0x12,
-				0x13, 0x14, 0x15,
-			},
-			AddDONL: true,
-			ExpectedData: &[][]byte{
-				{0x62, 0x01, 0x80, 0x00, 0x00, 0x02, 0x03},
-				{0x62, 0x01, 0x00, 0x00, 0x01, 0x04, 0x05},
-				{0x62, 0x01, 0x00, 0x00, 0x02, 0x06, 0x07},
-				{0x62, 0x01, 0x00, 0x00, 0x03, 0x08, 0x09},
-				{0x62, 0x01, 0x00, 0x00, 0x04, 0x10, 0x11},
-				{0x62, 0x01, 0x00, 0x00, 0x05, 0x12, 0x13},
-				{0x62, 0x01, 0x40, 0x00, 0x06, 0x14, 0x15},
-			},
-			Msg: "DONL Large payload split across fragmentation Packets",
-		},
-		// SkipAggregation = true
-		{
-			Name: "SkipAggregation Enough MUT, multiple NALUs",
-			MTU:  4,
-			Data: []byte{
-				0x00, 0x00, 0x01, 0x00, 0x01,
-				0x00, 0x00, 0x01, 0x02, 0x03,
-				0x00, 0x00, 0x01, 0x04, 0x05,
-			},
-			SkipAggregation: true,
-			ExpectedData:    &[][]byte{{0x00, 0x01}, {0x02, 0x03}, {0x04, 0x05}},
-			Msg:             "Aggregation packetization should be skipped",
-		},
-	}
-
-	for _, cur := range tt {
-		t.Run(cur.Name, func(t *testing.T) {
-			pck := H265Payloader{AddDONL: cur.AddDONL, SkipAggregation: cur.SkipAggregation}
-			res := pck.Payload(cur.MTU, cur.Data)
-			if cur.ExpectedData != nil {
-				assert.Equal(t, *cur.ExpectedData, res)
-			} else {
-				assert.Len(t, res, cur.ExpectedLen)
-			}
-		})
+		assert.True(t, err == nil || errors.Is(err, errNotEnoughPackets))
 	}
 }
 
@@ -1048,8 +367,480 @@ func TestH265Payloader_Real(t *testing.T) {
 	assert.Len(t, res, 3, "Generated payload should be 3")
 }
 
-func uint8ptr(v uint8) *uint8 {
-	return &v
+func TestH265_FragmentationMtu(t *testing.T) {
+	payload := make([]byte, 2000)
+
+	for i := 0; i < 2000; i++ {
+		payload[i] = uint8(i) //nolint: gosec // idc
+	}
+
+	simplePacket := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 0, false),
+		nil,
+		payload,
+	}
+
+	serializeBuf := make([]byte, 0, 4096)
+
+	for mtu := uint16(800); mtu <= 1500; mtu++ {
+		fragments, err := newH265FragmentationPackets(mtu, &simplePacket)
+
+		assert.Nil(t, err)
+
+		for _, f := range fragments {
+			assert.LessOrEqual(t, len(f.serialize(serializeBuf)), int(mtu))
+			serializeBuf = serializeBuf[0:]
+		}
+	}
+
+	testDonl := uint16(100)
+	simplePacket.donl = &testDonl
+
+	for mtu := uint16(800); mtu <= 1500; mtu++ {
+		fragments, err := newH265FragmentationPackets(mtu, &simplePacket)
+
+		assert.Nil(t, err)
+
+		for _, f := range fragments {
+			assert.LessOrEqual(t, len(f.serialize(serializeBuf)), int(mtu))
+			serializeBuf = serializeBuf[0:]
+		}
+	}
+}
+
+func TestH265_FragmentationRoundtrip(t *testing.T) {
+	testFragmentation := func(packet h265SingleNALUnitPacket) {
+		for mtu := uint16(100); mtu < 1500; mtu++ {
+			fragments, err := newH265FragmentationPackets(100, &packet)
+			assert.Nil(t, err)
+
+			rebuilt, err := rebuildH265FragmentationPackets(fragments)
+			assert.Nil(t, err)
+
+			assert.Equal(
+				t,
+				packet,
+				*rebuilt,
+				"Expected packets to match after fragmentation",
+			)
+		}
+	}
+
+	payload := make([]byte, 0)
+	testDonl := uint16(100)
+
+	for i := 0; i < 200; i++ {
+		payload = append(payload, uint8(i)) //nolint: gosec // idc
+	}
+
+	simplePacket := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 0, false),
+		nil,
+		payload,
+	}
+
+	testFragmentation(simplePacket)
+
+	packetWithDonl := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 0, false),
+		&testDonl,
+		payload,
+	}
+	testFragmentation(packetWithDonl)
+
+	everyFlagSet := h265SingleNALUnitPacket{
+		createTestH265Header(1, 1, 1, true),
+		&testDonl,
+		payload,
+	}
+
+	testFragmentation(everyFlagSet)
+}
+
+func TestH265_AggregationRoundtrip(t *testing.T) {
+	testAggregation := func(expected []h265SingleNALUnitPacket, withDonl bool) {
+		created, err := newH265AggregationPacket(expected)
+		assert.Nil(t, err)
+		packet := created.serialize(make([]byte, 0))
+		aggr, err := parseH265AggregationPacket(packet, withDonl)
+		assert.Nil(t, err)
+		split, err := splitH265AggregationPacket(*aggr)
+		assert.Equal(t, len(expected), len(split))
+		assert.Nil(t, err)
+
+		assert.True(t, slices.EqualFunc(split, expected, func(a, b h265SingleNALUnitPacket) bool {
+			donlMatch := true
+			if a.donl != nil && b.donl != nil {
+				donlMatch = *a.donl == *b.donl
+			} else if b.donl != nil {
+				donlMatch = false
+			}
+
+			return slices.Equal(a.payload, b.payload) && a.payloadHeader == b.payloadHeader && donlMatch
+		}))
+	}
+
+	simplePacket := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 1, false),
+		nil,
+		[]byte{0x00, 0x01, 0x02, 0x03},
+	}
+	diffPacket := h265SingleNALUnitPacket{
+		newH265NALUHeader(0b1000000, 0b00010000),
+		nil,
+		[]byte{0x03, 0x02, 0x01, 0x00, 0x12},
+	}
+
+	testAggregation([]h265SingleNALUnitPacket{simplePacket, simplePacket, simplePacket}, false)
+	testAggregation([]h265SingleNALUnitPacket{diffPacket, simplePacket, simplePacket}, false)
+	testAggregation([]h265SingleNALUnitPacket{diffPacket, diffPacket, simplePacket}, false)
+
+	withDonlCount := uint16(4)
+	withDonl := make([]h265SingleNALUnitPacket, withDonlCount)
+	for i := uint16(0); i < withDonlCount; i++ {
+		donlVal := i
+		withDonl[i] = h265SingleNALUnitPacket{
+			createTestH265Header(0, 0, 1, false),
+			&donlVal,
+			[]byte{0x00, 0x01, 0x02, 0x03},
+		}
+	}
+
+	// With contiguous DONL values
+	testAggregation([]h265SingleNALUnitPacket{withDonl[0], withDonl[1], withDonl[2]}, true)
+	// With a gap in DONL values
+	testAggregation([]h265SingleNALUnitPacket{withDonl[0], withDonl[2], withDonl[3]}, true)
+}
+
+func TestH265_PACIRoundtrip(t *testing.T) {
+	testPACI := func(expected isH265Packet, withDonl bool) {
+		created, err := newH265PACIPacket(expected)
+		assert.Nil(t, err)
+		packet := created.serialize(make([]byte, 0))
+		paci, err := parseH265PACIPacket(packet, withDonl)
+		assert.Nil(t, err)
+
+		assert.Equal(t, expected, paci.payload)
+	}
+
+	testDONL := uint16(100)
+	testDONL2 := uint16(101)
+
+	simplePacket := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 1, false),
+		nil,
+		[]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
+	}
+
+	testPACI(&simplePacket, false)
+
+	// With DONL
+	simplePacket.donl = &testDONL
+
+	testPACI(&simplePacket, true)
+
+	simplePacket.donl = nil
+
+	// fragmentation packets
+
+	fragments, err := newH265FragmentationPackets(10, &simplePacket)
+	assert.Nil(t, err)
+
+	for i := range fragments {
+		testPACI(&fragments[i], false)
+	}
+
+	// With DONL
+
+	simplePacket.donl = &testDONL
+
+	fragmentsWithDONL, err := newH265FragmentationPackets(10, &simplePacket)
+	assert.Nil(t, err)
+
+	for i := range fragmentsWithDONL {
+		testPACI(&fragmentsWithDONL[i], fragmentsWithDONL[i].donl != nil)
+	}
+
+	simplePacket.donl = nil
+
+	// aggregation packet
+
+	diffPacket := h265SingleNALUnitPacket{
+		simplePacket.payloadHeader,
+		nil,
+		simplePacket.payload,
+	}
+
+	aggregation, err := newH265AggregationPacket([]h265SingleNALUnitPacket{simplePacket, diffPacket})
+	assert.Nil(t, err)
+
+	testPACI(aggregation, false)
+
+	simplePacket.donl = &testDONL
+	diffPacket.donl = &testDONL2
+
+	aggregationWithDONL, err := newH265AggregationPacket([]h265SingleNALUnitPacket{simplePacket, diffPacket})
+	assert.Nil(t, err)
+
+	testPACI(aggregationWithDONL, true)
+}
+
+func TestH265_SingleRoundtrip(t *testing.T) {
+	testSingle := func(expected h265SingleNALUnitPacket) {
+		packet := expected.serialize(make([]byte, 0))
+		parsed, err := parseH265SingleNalUnitPacket(packet, expected.donl != nil)
+		assert.Nil(t, err)
+
+		assert.Equal(t, expected, *parsed)
+	}
+
+	simplePacket := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 1, false),
+		nil,
+		[]byte{0x00, 0x01, 0x02, 0x03},
+	}
+	diffPacket := h265SingleNALUnitPacket{
+		newH265NALUHeader(0b1000000, 0b00010000),
+		nil,
+		[]byte{0x03, 0x02, 0x01, 0x00, 0x12},
+	}
+
+	testSingle(simplePacket)
+	testSingle(diffPacket)
+
+	withDonlCount := uint16(4)
+	withDonl := make([]h265SingleNALUnitPacket, withDonlCount)
+	for i := uint16(0); i < withDonlCount; i++ {
+		donlVal := i
+		withDonl[i] = h265SingleNALUnitPacket{
+			createTestH265Header(0, 0, 1, false),
+			&donlVal,
+			[]byte{0x00, 0x01, 0x02, 0x03},
+		}
+		testSingle(withDonl[i])
+	}
+}
+
+func TestH265Packetizer_Single(t *testing.T) {
+	packetizer := h265Packetizer{}
+
+	// type 1, 8 payload length NALU
+	basicPacket := make([]byte, 0)
+	basicPacket = append(basicPacket, annexbNALUStartCode...)
+	header := createTestH265Header(1, 0, 0, false)
+	basicPacket = binary.BigEndian.AppendUint16(basicPacket, uint16(header))
+	payload := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	basicPacket = append(basicPacket, payload...)
+
+	packets := packetizer.Payload(100, basicPacket)
+	assert.Equal(t, 1, len(packets), "Expected only 1 NALU to be generated")
+	assert.Equal(t, uint16(header), binary.BigEndian.Uint16(packets[0][0:2]), "Expected headers to match")
+	assert.Equal(t, payload, packets[0][2:], "Expected payloads to match")
+}
+
+func TestH265Packetizer_Aggregated(t *testing.T) {
+	packetizer := h265Packetizer{}
+	// type 0, 8 payload length
+	basicPacket := make([]byte, 0)
+	basicPacket = append(basicPacket, annexbNALUStartCode...)
+	header := createTestH265Header(1, 0, 0, false)
+	basicPacket = binary.BigEndian.AppendUint16(basicPacket, uint16(header))
+	payload := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	basicPacket = append(basicPacket, payload...)
+
+	two := make([]byte, len(basicPacket)*2)
+	copy(two, basicPacket)
+	copy(two[len(basicPacket):], basicPacket)
+
+	packets := packetizer.Payload(100, two)
+
+	assert.Equal(t, 1, len(packets), "Expected only 1 NALU to be generated")
+	aggregated := packets[0]
+	parsedHeader := H265NALUHeader(binary.BigEndian.Uint16(aggregated[0:2]))
+
+	assert.Equal(t, h265NaluAggregationPacketType, int(parsedHeader.Type()), "NALU header should be type 28")
+
+	assert.Equal(
+		t,
+		h265NaluHeaderSize+len(payload),
+		int(binary.BigEndian.Uint16(aggregated[2:4])),
+		"Expected length to match",
+	)
+	assert.Equal(t, uint16(header), binary.BigEndian.Uint16(aggregated[4:6]), "Expected headers to match")
+	assert.Equal(t, payload, aggregated[6:14], "Expected payloads to match")
+
+	assert.Equal(
+		t,
+		h265NaluHeaderSize+len(payload),
+		int(binary.BigEndian.Uint16(aggregated[14:16])),
+		"Expected length to match",
+	)
+	assert.Equal(t, uint16(header), binary.BigEndian.Uint16(aggregated[16:18]), "Expected headers to match")
+	assert.Equal(t, payload, aggregated[18:], "Expected payloads to match")
+}
+
+func TestH265Packetizer_Fragmented(t *testing.T) {
+	initSequence := []byte{0x00, 0x00, 0x00, 0x01, 0x00}
+
+	packetizer := h265Packetizer{}
+	// type 0, 50 payload length
+	bigPacket := make([]byte, 0)
+	bigPacket = append(bigPacket, initSequence...)
+	header := createTestH265Header(1, 0, 0, false)
+
+	bigPacket = binary.BigEndian.AppendUint16(bigPacket, uint16(header))
+
+	payload := make([]byte, 0)
+	for i := 0; i < 50; i++ {
+		payload = append(payload, 0xff)
+	}
+	bigPacket = append(bigPacket, payload...)
+
+	packets := packetizer.Payload(50, bigPacket)
+
+	assert.Equal(t, 2, len(packets), "Expected 2 NALUs to be generated")
+	parsedHeader := H265NALUHeader(binary.BigEndian.Uint16(packets[0][0:2]))
+
+	assert.Equal(t, h265NaluFragmentationUnitType, int(parsedHeader.Type()), "NALU header should be type 28")
+	assert.True(t, H265FragmentationUnitHeader(packets[0][2]).S(), "First FU header should be S")
+	assert.True(t, H265FragmentationUnitHeader(packets[1][2]).E(), "Second FU header should be E")
+}
+
+func TestH265Depacketizer_Roundtrip(t *testing.T) {
+	testDepacketizer := func(packets [][]byte, expected []h265SingleNALUnitPacket, withDonl bool) {
+		depacketizer := H265Depacketizer{
+			hasDonl: withDonl,
+		}
+		output := make([]h265SingleNALUnitPacket, 0)
+		for _, packet := range packets {
+			p, err := depacketizer.Unmarshal(packet)
+			assert.Nil(t, err)
+
+			if p == nil {
+				continue
+			}
+
+			emitNalus(p, func(b []byte) {
+				parsed, err := parseH265SingleNalUnitPacket(b, false)
+				assert.Nil(t, err)
+				if err != nil {
+					return
+				}
+				output = append(output, *parsed)
+			})
+		}
+		same := slices.EqualFunc(expected, output, func(a h265SingleNALUnitPacket, b h265SingleNALUnitPacket) bool {
+			return slices.Equal(a.payload, b.payload) &&
+				a.payloadHeader == b.payloadHeader
+		})
+		assert.True(t, same)
+	}
+
+	testDonl := uint16(100)
+	testDonl2 := uint16(101)
+
+	// Single NAL
+
+	basicPacket := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 0, false),
+		nil,
+		[]byte{0xff, 0xff, 0xff},
+	}
+
+	testDepacketizer([][]byte{basicPacket.serialize(make([]byte, 0))}, []h265SingleNALUnitPacket{basicPacket}, false)
+
+	// with DONL
+
+	basicPacket.donl = &testDonl
+
+	testDepacketizer([][]byte{basicPacket.serialize(make([]byte, 0))}, []h265SingleNALUnitPacket{basicPacket}, true)
+
+	// Multiple NALs aggregated
+
+	firstPacket := h265SingleNALUnitPacket{
+		createTestH265Header(0, 0, 0, false),
+		nil,
+		[]byte{0xff, 0xff, 0xff},
+	}
+
+	secondPacket := h265SingleNALUnitPacket{
+		createTestH265Header(1, 2, 3, false),
+		nil,
+		[]byte{0x67, 0x67, 0x67},
+	}
+
+	aggregation, err := newH265AggregationPacket([]h265SingleNALUnitPacket{firstPacket, secondPacket})
+	assert.Nil(t, err)
+	aggregationPacketized := aggregation.serialize(make([]byte, 0))
+
+	testDepacketizer([][]byte{aggregationPacketized}, []h265SingleNALUnitPacket{firstPacket, secondPacket}, false)
+
+	// with DONL
+
+	firstPacket.donl = &testDonl
+	secondPacket.donl = &testDonl2
+
+	donlAggregation, err := newH265AggregationPacket([]h265SingleNALUnitPacket{firstPacket, secondPacket})
+	assert.Nil(t, err)
+	donlAggregationPacketized := donlAggregation.serialize(make([]byte, 0))
+
+	testDepacketizer([][]byte{donlAggregationPacketized}, []h265SingleNALUnitPacket{firstPacket, secondPacket}, true)
+
+	// Large NAL that gets fragmented
+
+	largePacket := &h265SingleNALUnitPacket{
+		createTestH265Header(1, 1, 1, false),
+		nil,
+		make([]byte, 0),
+	}
+	for i := 0; i < 512; i++ {
+		largePacket.payload = append(largePacket.payload, uint8(i)) // nolint:gosec
+	}
+
+	fragments, err := newH265FragmentationPackets(100, largePacket)
+	assert.Nil(t, err)
+
+	fragmentsPacketized := make([][]byte, 0)
+
+	for _, f := range fragments {
+		fragmentsPacketized = append(fragmentsPacketized, f.serialize(make([]byte, 0)))
+	}
+
+	testDepacketizer(fragmentsPacketized, []h265SingleNALUnitPacket{*largePacket}, false)
+
+	// with DONL
+
+	largePacket.donl = &testDonl
+
+	donlFragments, err := newH265FragmentationPackets(100, largePacket)
+	assert.Nil(t, err)
+
+	donlFragmentsPacketized := make([][]byte, 0)
+
+	for _, f := range donlFragments {
+		donlFragmentsPacketized = append(donlFragmentsPacketized, f.serialize(make([]byte, 0)))
+	}
+
+	testDepacketizer(donlFragmentsPacketized, []h265SingleNALUnitPacket{*largePacket}, true)
+
+	testPACIPayload := h265SingleNALUnitPacket{
+		createTestH265Header(16, 1, 1, false),
+		nil,
+		[]byte{0xff, 0xff, 0xff},
+	}
+
+	paci := &H265PACIPacket{
+		payloadHeader:    createTestH265Header(h265NaluPACIPacketType, 1, 1, false),
+		paciHeaderFields: paciHeaderFields(uint16(16) << 9),
+		phes:             []byte{},
+		payload:          &testPACIPayload,
+	}
+
+	testDepacketizer([][]byte{paci.serialize(make([]byte, 0))}, []h265SingleNALUnitPacket{testPACIPayload}, false)
+
+	testPACIPayload.donl = &testDonl
+
+	testDepacketizer([][]byte{paci.serialize(make([]byte, 0))}, []h265SingleNALUnitPacket{testPACIPayload}, true)
 }
 
 func uint16ptr(v uint16) *uint16 {
