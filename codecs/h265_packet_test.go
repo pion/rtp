@@ -622,7 +622,7 @@ func TestH265_SingleRoundtrip(t *testing.T) {
 }
 
 func TestH265Packetizer_Single(t *testing.T) {
-	packetizer := h265Packetizer{}
+	packetizer := H265Payloader{}
 
 	// type 1, 8 payload length NALU
 	basicPacket := make([]byte, 0)
@@ -639,7 +639,7 @@ func TestH265Packetizer_Single(t *testing.T) {
 }
 
 func TestH265Packetizer_Aggregated(t *testing.T) {
-	packetizer := h265Packetizer{}
+	packetizer := H265Payloader{}
 	// type 0, 8 payload length
 	basicPacket := make([]byte, 0)
 	basicPacket = append(basicPacket, annexbNALUStartCode...)
@@ -682,7 +682,7 @@ func TestH265Packetizer_Aggregated(t *testing.T) {
 func TestH265Packetizer_Fragmented(t *testing.T) {
 	initSequence := []byte{0x00, 0x00, 0x00, 0x01, 0x00}
 
-	packetizer := h265Packetizer{}
+	packetizer := H265Payloader{}
 	// type 0, 50 payload length
 	bigPacket := make([]byte, 0)
 	bigPacket = append(bigPacket, initSequence...)
