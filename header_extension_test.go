@@ -92,7 +92,6 @@ func TestHeaderExtension_RFC8285OneByteMultipleExtensionsWithPadding(t *testing.
 		dstBuf["DirtyBuffer"][i] = 0xFF
 	}
 	for name, buf := range dstBuf {
-		buf := buf
 		t.Run(name, func(t *testing.T) {
 			n, err := ext.MarshalTo(buf)
 			assert.NoError(t, err)

@@ -87,7 +87,7 @@ func (v VLA) preprocessForMashaling(ctx *vlaMarshalingContext) error { //nolint:
 
 func (v VLA) calcTargetBitratesSize(ctx *vlaMarshalingContext) {
 	for rtpStreamID := 0; rtpStreamID < v.RTPStreamCount; rtpStreamID++ {
-		for spatialID := 0; spatialID < 4; spatialID++ {
+		for spatialID := range 4 {
 			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
 				for _, kbps := range v.ActiveSpatialLayer[idx].TargetBitrates {
 					ctx.requiredLen += leb128Size(uint(kbps)) //nolint:gosec
@@ -176,7 +176,7 @@ func (v VLA) MarshalTo(buf []byte) (int, error) { //nolint:cyclop,gocognit
 	offset++
 	var temporalLayerIndex int
 	for rtpStreamID := 0; rtpStreamID < v.RTPStreamCount; rtpStreamID++ {
-		for spatialID := 0; spatialID < 4; spatialID++ {
+		for spatialID := range 4 {
 			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
 				if temporalLayerIndex >= 4 {
 					temporalLayerIndex = 0
@@ -191,7 +191,7 @@ func (v VLA) MarshalTo(buf []byte) (int, error) { //nolint:cyclop,gocognit
 	// Target bitrate fields
 	offset++
 	for rtpStreamID := 0; rtpStreamID < v.RTPStreamCount; rtpStreamID++ {
-		for spatialID := 0; spatialID < 4; spatialID++ {
+		for spatialID := range 4 {
 			if idx := ctx.slIndices[rtpStreamID][spatialID]; idx >= 0 {
 				for _, kbps := range v.ActiveSpatialLayer[idx].TargetBitrates {
 					offset += writeLeb128To(buf[offset:], uint(kbps)) //nolint:gosec
@@ -231,7 +231,7 @@ func (v VLA) Marshal() ([]byte, error) {
 
 func commonSLBMValues(slMBs []uint8) uint8 {
 	var common uint8
-	for i := 0; i < len(slMBs); i++ {
+	for i := range slMBs {
 		if slMBs[i] == 0 {
 			continue
 		}
@@ -301,7 +301,7 @@ func (v *VLA) unmarshalTemporalLayers(ctx *vlaUnmarshalingContext) error { // no
 
 	var temporalLayerIndex int
 	for streamID := 0; streamID < v.RTPStreamCount; streamID++ {
-		for spatialID := 0; spatialID < 4; spatialID++ {
+		for spatialID := range 4 {
 			if ctx.slBMs[streamID]&(1<<spatialID) == 0 {
 				continue
 			}
