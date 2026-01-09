@@ -5,6 +5,7 @@ package rtp
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,13 +21,13 @@ func TestPacketizer(t *testing.T) {
 
 	expectedLen := 2
 	if len(packets) != expectedLen {
-		packetlengths := ""
-		for i := 0; i < len(packets); i++ {
-			packetlengths += fmt.Sprintf("Packet %d length %d\n", i, len(packets[i].Payload))
+		var packetlengths strings.Builder
+		for i := range packets {
+			packetlengths.WriteString(fmt.Sprintf("Packet %d length %d\n", i, len(packets[i].Payload)))
 		}
 		assert.Failf(
 			t, "Packetize failed", "Generated %d packets instead of %d\n%s",
-			len(packets), expectedLen, packetlengths,
+			len(packets), expectedLen, packetlengths.String(),
 		)
 	}
 }
@@ -188,7 +189,7 @@ func TestPacketizer_Empty_Payload(t *testing.T) {
 	const expectedSamples = uint32(4000)
 
 	prevTimestamp := uint32(0)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		payload := []byte{0x11, 0x12, 0x13, 0x14}
 		isEmptyPayload := i%2 == 0
 		if isEmptyPayload {

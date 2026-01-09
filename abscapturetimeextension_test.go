@@ -104,8 +104,8 @@ var (
 func BenchmarkAbsCaptureTimeExtension_Marshal(b *testing.B) {
 	ext := NewAbsCaptureTimeExtension(time.Now())
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		absCaptureTimeSink, _ = ext.Marshal()
 	}
 }
@@ -113,8 +113,8 @@ func BenchmarkAbsCaptureTimeExtension_Marshal(b *testing.B) {
 func BenchmarkAbsCaptureTimeExtension_MarshalTo(b *testing.B) {
 	ext := NewAbsCaptureTimeExtension(time.Now())
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		absCaptureTimeSinkInt, _ = ext.MarshalTo(absCaptureTimeBuf)
 	}
 }
@@ -122,8 +122,8 @@ func BenchmarkAbsCaptureTimeExtension_MarshalTo(b *testing.B) {
 func BenchmarkAbsCaptureTimeExtensionWithOffset_Marshal(b *testing.B) {
 	ext := NewAbsCaptureTimeExtensionWithCaptureClockOffset(time.Now(), 100*time.Millisecond)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		absCaptureTimeSink, _ = ext.Marshal()
 	}
 }
@@ -131,8 +131,8 @@ func BenchmarkAbsCaptureTimeExtensionWithOffset_Marshal(b *testing.B) {
 func BenchmarkAbsCaptureTimeExtensionWithOffset_MarshalTo(b *testing.B) {
 	ext := NewAbsCaptureTimeExtensionWithCaptureClockOffset(time.Now(), 100*time.Millisecond)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		absCaptureTimeSinkInt, _ = ext.MarshalTo(absCaptureTimeExtendedBuf)
 	}
 }

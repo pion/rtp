@@ -378,8 +378,8 @@ func TestVLAUnmarshal(t *testing.T) {
 func TestVLAMarshalThenUnmarshal(t *testing.T) {
 	t.Run("multiple spatial layers", func(t *testing.T) {
 		var spatialLayers []SpatialLayer
-		for streamID := 0; streamID < 3; streamID++ {
-			for spatialID := 0; spatialID < 4; spatialID++ {
+		for streamID := range 3 {
+			for spatialID := range 4 {
 				spatialLayers = append(spatialLayers, SpatialLayer{
 					RTPStreamID:    streamID,
 					SpatialID:      spatialID,
@@ -410,7 +410,7 @@ func TestVLAMarshalThenUnmarshal(t *testing.T) {
 
 	t.Run("different spatial layer bitmasks", func(t *testing.T) {
 		var spatialLayers []SpatialLayer
-		for streamID := 0; streamID < 4; streamID++ {
+		for streamID := range 4 {
 			for spatialID := 0; spatialID < streamID+1; spatialID++ {
 				spatialLayers = append(spatialLayers, SpatialLayer{
 					RTPStreamID:    streamID,
@@ -503,8 +503,8 @@ func BenchmarkVLA_Marshal(b *testing.B) {
 		},
 	}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		vlaSink, _ = vla.Marshal()
 	}
 }
@@ -520,8 +520,8 @@ func BenchmarkVLA_MarshalTo(b *testing.B) {
 		},
 	}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		vlaSinkInt, _ = vla.MarshalTo(vlaBuf)
 	}
 }

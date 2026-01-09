@@ -42,7 +42,7 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 	}
 
 	// Unmarshal to the used Packet should work as well.
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		t.Run(fmt.Sprintf("Run%d", i+1), func(t *testing.T) {
 			assert.NoError(t, packet.Unmarshal(rawPkt))
 			assert.Equal(t, packet, parsedPacket)
@@ -433,7 +433,6 @@ func TestRFC8285OneByteMultipleExtensionsWithPadding(t *testing.T) {
 		dstBuf["DirtyBuffer"][i] = 0xFF
 	}
 	for name, buf := range dstBuf {
-		buf := buf
 		t.Run(name, func(t *testing.T) {
 			n, err := packet.MarshalTo(buf)
 			assert.NoError(t, err)
@@ -577,7 +576,6 @@ func TestRFC8285TwoByteMultipleExtensionsWithPadding(t *testing.T) {
 		dstBuf["DirtyBuffer"][i] = 0xFF
 	}
 	for name, buf := range dstBuf {
-		buf := buf
 		t.Run(name, func(t *testing.T) {
 			n, err := packet.MarshalTo(buf)
 			assert.NoError(t, err)
@@ -1200,7 +1198,6 @@ func TestUnmarshal_ErrorHandling(t *testing.T) {
 	}
 
 	for name, testCase := range cases {
-		testCase := testCase
 		t.Run(name, func(t *testing.T) {
 			h := &Header{}
 			_, err := h.Unmarshal(testCase.input)
@@ -1488,9 +1485,7 @@ func BenchmarkMarshal(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err = packet.Marshal()
 		if err != nil {
 			b.Fatal(err)
@@ -1513,9 +1508,7 @@ func BenchmarkMarshalTo(b *testing.B) {
 
 	buf := [100]byte{}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err = packet.MarshalTo(buf[:])
 		if err != nil {
 			b.Fatal(err)

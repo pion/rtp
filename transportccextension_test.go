@@ -81,8 +81,8 @@ var (
 func BenchmarkTransportCCExtension_Marshal(b *testing.B) {
 	ext := TransportCCExtension{TransportSequence: 1234}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		transportCCSink, _ = ext.Marshal()
 	}
 }
@@ -90,8 +90,8 @@ func BenchmarkTransportCCExtension_Marshal(b *testing.B) {
 func BenchmarkTransportCCExtension_MarshalTo(b *testing.B) {
 	ext := TransportCCExtension{TransportSequence: 1234}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		transportCCSinkInt, _ = ext.MarshalTo(transportCCBuf)
 	}
 }
