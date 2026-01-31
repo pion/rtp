@@ -114,6 +114,7 @@ func TestAV1Depacketizer_validateOBUSize(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload []byte
+		expect  []byte
 		err     error
 	}{
 		{
@@ -135,7 +136,11 @@ func TestAV1Depacketizer_validateOBUSize(t *testing.T) {
 				0x04,             // LEB128 size
 				0x03, 0x01, 0x02, // OBU data
 			},
-			err: errShortPacket,
+			expect: []byte{
+				0x22,             // OBU header
+				0x03,             // Corrected size
+				0x03, 0x01, 0x02, // OBU data
+			},
 		},
 		{
 			name: "OBU size smaller than length field",
@@ -146,15 +151,26 @@ func TestAV1Depacketizer_validateOBUSize(t *testing.T) {
 				0x02,             // LEB128 size
 				0x03, 0x01, 0x02, // OBU data
 			},
-			err: errShortPacket,
+			expect: []byte{
+				0x22,             // OBU header
+				0x03,             // Corrected size
+				0x03, 0x01, 0x02, // OBU data
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := AV1Depacketizer{}
-			_, err := d.Unmarshal(tt.payload)
-			assert.ErrorIs(t, err, tt.err)
+			obu, err := d.Unmarshal(tt.payload)
+			if tt.err != nil {
+				assert.ErrorIs(t, err, tt.err)
+
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expect, obu)
 		})
 	}
 }
