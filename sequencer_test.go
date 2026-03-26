@@ -30,7 +30,7 @@ func TestSequencerMultipleRollovers(t *testing.T) {
 	sequencer.NextSequenceNumber()
 	assert.Equal(t, uint64(1), sequencer.RollOverCount())
 
-	for i := 0; i < 65536; i++ {
+	for range 65536 {
 		sequencer.NextSequenceNumber()
 	}
 
@@ -55,11 +55,11 @@ func TestSequencerConcurrent(t *testing.T) {
 	wg.Add(numGoroutines)
 
 	results := make([][]uint16, numGoroutines)
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 			results[idx] = make([]uint16, numIterations)
-			for j := 0; j < numIterations; j++ {
+			for j := range numIterations {
 				results[idx][j] = sequencer.NextSequenceNumber()
 			}
 		}(i)
@@ -68,8 +68,8 @@ func TestSequencerConcurrent(t *testing.T) {
 	wg.Wait()
 
 	seen := make(map[uint16]int)
-	for i := 0; i < numGoroutines; i++ {
-		for j := 0; j < numIterations; j++ {
+	for i := range numGoroutines {
+		for j := range numIterations {
 			seen[results[i][j]]++
 		}
 	}

@@ -91,8 +91,8 @@ var (
 func BenchmarkPlayoutDelayExtension_Marshal(b *testing.B) {
 	ext := PlayoutDelayExtension{MinDelay: 100, MaxDelay: 200}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		playoutDelaySink, _ = ext.Marshal()
 	}
 }
@@ -100,8 +100,8 @@ func BenchmarkPlayoutDelayExtension_Marshal(b *testing.B) {
 func BenchmarkPlayoutDelayExtension_MarshalTo(b *testing.B) {
 	ext := PlayoutDelayExtension{MinDelay: 100, MaxDelay: 200}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		playoutDelaySinkInt, _ = ext.MarshalTo(playoutDelayBuf)
 	}
 }

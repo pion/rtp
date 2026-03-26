@@ -88,8 +88,8 @@ var (
 func BenchmarkAudioLevelExtension_Marshal(b *testing.B) {
 	ext := AudioLevelExtension{Level: 8, Voice: true}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		audioLevelSink, _ = ext.Marshal()
 	}
 }
@@ -97,8 +97,8 @@ func BenchmarkAudioLevelExtension_Marshal(b *testing.B) {
 func BenchmarkAudioLevelExtension_MarshalTo(b *testing.B) {
 	ext := AudioLevelExtension{Level: 8, Voice: true}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		audioLevelSinkInt, _ = ext.MarshalTo(audioLevelBuf)
 	}
 }

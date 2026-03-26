@@ -124,8 +124,8 @@ var (
 func BenchmarkAbsSendTimeExtension_Marshal(b *testing.B) {
 	ext := AbsSendTimeExtension{Timestamp: 123456}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		absSendTimeSink, _ = ext.Marshal()
 	}
 }
@@ -133,8 +133,8 @@ func BenchmarkAbsSendTimeExtension_Marshal(b *testing.B) {
 func BenchmarkAbsSendTimeExtension_MarshalTo(b *testing.B) {
 	ext := AbsSendTimeExtension{Timestamp: 123456}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		absSendTimeSinkInt, _ = ext.MarshalTo(absSendTimeBuf)
 	}
 }
