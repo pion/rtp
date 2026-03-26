@@ -98,7 +98,7 @@ func (p *VP9Payloader) payloadFlexible(mtu uint16, payload []byte) [][]byte {
 		}
 
 		out[1] = byte(p.pictureID>>8) | 0x80
-		out[2] = byte(p.pictureID)
+		out[2] = byte(p.pictureID) //nolint:gosec
 
 		copy(out[headerSize:], payload[payloadDataIndex:payloadDataIndex+currentFragmentSize])
 		payloads = append(payloads, out)
@@ -169,7 +169,7 @@ func (p *VP9Payloader) payloadNonFlexible(mtu uint16, payload []byte) [][]byte {
 		}
 
 		out[1] = byte(p.pictureID>>8) | 0x80
-		out[2] = byte(p.pictureID)
+		out[2] = byte(p.pictureID) //nolint:gosec
 		off := 3
 
 		if !header.NonKeyFrame && payloadDataIndex == 0 {

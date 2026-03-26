@@ -43,8 +43,8 @@ func (p PlayoutDelayExtension) MarshalTo(buf []byte) (int, error) {
 		return 0, io.ErrShortBuffer
 	}
 	buf[0] = byte(p.MinDelay >> 4)
-	buf[1] = byte(p.MinDelay<<4) | byte(p.MaxDelay>>8)
-	buf[2] = byte(p.MaxDelay)
+	buf[1] = byte(p.MinDelay<<4) | byte(p.MaxDelay>>8) //nolint:gosec
+	buf[2] = byte(p.MaxDelay)                          //nolint:gosec
 
 	return playoutDelayExtensionSize, nil
 }
@@ -57,8 +57,8 @@ func (p PlayoutDelayExtension) Marshal() ([]byte, error) {
 
 	return []byte{
 		byte(p.MinDelay >> 4),
-		byte(p.MinDelay<<4) | byte(p.MaxDelay>>8),
-		byte(p.MaxDelay),
+		byte(p.MinDelay<<4) | byte(p.MaxDelay>>8), //nolint:gosec
+		byte(p.MaxDelay),                          //nolint:gosec
 	}, nil
 }
 

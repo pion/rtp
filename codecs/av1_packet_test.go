@@ -1564,7 +1564,7 @@ func TestAV1Payloader_SequenceHeader(t *testing.T) {
 func TestAv1Payloader_FragmentedEdgeLeb128Size(t *testing.T) {
 	size := uint16(128)
 	payload := make([]byte, 0, size)
-	for i := uint16(0); i < size; i++ {
+	for i := range size {
 		payload = append(payload, byte(i))
 	}
 
@@ -1836,7 +1836,6 @@ func TestAV1_Unmarshal_Error(t *testing.T) {
 		{obu.ErrFailedToReadLEB128, []byte{byte(0b10000000), 0xFF, 0xFF}},
 		{errShortPacket, []byte{byte(0b10000000), 0xFF, 0x0F, 0x00, 0x00}},
 	} {
-		test := test
 		av1Pkt := &AV1Packet{}
 
 		_, err := av1Pkt.Unmarshal(test.input)
@@ -2082,7 +2081,7 @@ func FuzzAV1PayloaderPayloadMTU(f *testing.F) {
 	largePayload := make([]byte, 0, 5000)
 	largePayload = append(largePayload, frameHeader...)
 	largePayload = append(largePayload, 0xFF, 0x26)
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		largePayload = append(largePayload, byte(i%256))
 	}
 	f.Add(uint16(1500), largePayload)
