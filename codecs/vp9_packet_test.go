@@ -227,7 +227,7 @@ func TestVP9Payloader_Payload(t *testing.T) {
 	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 	var rands [][2]byte
 	for i := 0; i < 10; i++ {
-		rands = append(rands, [2]byte{byte(r0>>8) | 0x80, byte(r0 & 0xFF)})
+		rands = append(rands, [2]byte{byte(r0>>8) | 0x80, byte(r0 & 0xFF)}) //nolint:gosec // r0 is bounded to 0x7FFF
 		r0++
 	}
 
