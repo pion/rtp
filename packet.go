@@ -239,6 +239,9 @@ func (p *Packet) Unmarshal(buf []byte) error {
 			return errTooSmall
 		}
 		p.Header.PaddingSize = buf[end-1]
+		if p.Header.PaddingSize == 0 {
+			return errInvalidRTPPadding
+		}
 		end -= int(p.Header.PaddingSize)
 	} else {
 		p.Header.PaddingSize = 0
