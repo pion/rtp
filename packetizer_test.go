@@ -23,7 +23,7 @@ func TestPacketizer(t *testing.T) {
 	if len(packets) != expectedLen {
 		var packetlengths strings.Builder
 		for i := range packets {
-			packetlengths.WriteString(fmt.Sprintf("Packet %d length %d\n", i, len(packets[i].Payload)))
+			fmt.Fprintf(&packetlengths, "Packet %d length %d\n", i, len(packets[i].Payload))
 		}
 		assert.Failf(
 			t, "Packetize failed", "Generated %d packets instead of %d\n%s",

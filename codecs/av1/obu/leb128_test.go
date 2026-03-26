@@ -21,8 +21,6 @@ func TestLEB128(t *testing.T) {
 		{5, 5},
 		{999999, 0xBF843D},
 	} {
-		test := test
-
 		encoded := EncodeLEB128(test.Value)
 		assert.Equal(t, test.Encoded, encoded)
 

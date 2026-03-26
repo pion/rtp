@@ -158,7 +158,7 @@ func (v VLA) MarshalTo(buf []byte) (int, error) { //nolint:cyclop,gocognit
 	offset := 0
 
 	// RID, NS, sl_bm fields
-	buf[offset] = byte(v.RTPStreamID<<6) | byte(v.RTPStreamCount-1)<<4 | ctx.commonSLBM
+	buf[offset] = byte(v.RTPStreamID<<6) | byte(v.RTPStreamCount-1)<<4 | ctx.commonSLBM //nolint:gosec // values are small
 
 	if ctx.commonSLBM == 0 {
 		offset++
@@ -182,6 +182,7 @@ func (v VLA) MarshalTo(buf []byte) (int, error) { //nolint:cyclop,gocognit
 					temporalLayerIndex = 0
 					offset++
 				}
+				//nolint:gosec // values are small
 				buf[offset] |= byte(len(v.ActiveSpatialLayer[idx].TargetBitrates)-1) << (2 * (3 - temporalLayerIndex))
 				temporalLayerIndex++
 			}
@@ -205,7 +206,7 @@ func (v VLA) MarshalTo(buf []byte) (int, error) { //nolint:cyclop,gocognit
 		for _, sl := range v.ActiveSpatialLayer {
 			binary.BigEndian.PutUint16(buf[offset+0:], uint16(sl.Width-1))  //nolint:gosec
 			binary.BigEndian.PutUint16(buf[offset+2:], uint16(sl.Height-1)) //nolint:gosec
-			buf[offset+4] = byte(sl.Framerate)
+			buf[offset+4] = byte(sl.Framerate)                              //nolint:gosec
 			offset += 5
 		}
 	}

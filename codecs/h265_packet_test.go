@@ -370,7 +370,7 @@ func TestH265Payloader_Real(t *testing.T) {
 func TestH265_FragmentationMtu(t *testing.T) {
 	payload := make([]byte, 2000)
 
-	for i := 0; i < 2000; i++ {
+	for i := range 2000 {
 		payload[i] = uint8(i) //nolint: gosec // idc
 	}
 
@@ -429,7 +429,7 @@ func TestH265_FragmentationRoundtrip(t *testing.T) {
 	payload := make([]byte, 0)
 	testDonl := uint16(100)
 
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		payload = append(payload, uint8(i)) //nolint: gosec // idc
 	}
 
@@ -497,7 +497,7 @@ func TestH265_AggregationRoundtrip(t *testing.T) {
 
 	withDonlCount := uint16(4)
 	withDonl := make([]h265SingleNALUnitPacket, withDonlCount)
-	for i := uint16(0); i < withDonlCount; i++ {
+	for i := range withDonlCount {
 		donlVal := i
 		withDonl[i] = h265SingleNALUnitPacket{
 			createTestH265Header(0, 0, 1, false),
@@ -610,7 +610,7 @@ func TestH265_SingleRoundtrip(t *testing.T) {
 
 	withDonlCount := uint16(4)
 	withDonl := make([]h265SingleNALUnitPacket, withDonlCount)
-	for i := uint16(0); i < withDonlCount; i++ {
+	for i := range withDonlCount {
 		donlVal := i
 		withDonl[i] = h265SingleNALUnitPacket{
 			createTestH265Header(0, 0, 1, false),
@@ -691,7 +691,7 @@ func TestH265Packetizer_Fragmented(t *testing.T) {
 	bigPacket = binary.BigEndian.AppendUint16(bigPacket, uint16(header))
 
 	payload := make([]byte, 0)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		payload = append(payload, 0xff)
 	}
 	bigPacket = append(bigPacket, payload...)
@@ -793,7 +793,7 @@ func TestH265Depacketizer_Roundtrip(t *testing.T) {
 		nil,
 		make([]byte, 0),
 	}
-	for i := 0; i < 512; i++ {
+	for i := range 512 {
 		largePacket.payload = append(largePacket.payload, uint8(i)) // nolint:gosec
 	}
 

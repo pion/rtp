@@ -27,7 +27,6 @@ func TestOBUType(t *testing.T) {
 		{Type(0), 0, "OBU_RESERVED"},
 		{Type(9), 9, "OBU_RESERVED"},
 	} {
-		test := test
 		assert.Equal(t, test.Str, test.Type.String())
 		assert.Equal(t, test.TypeValue, uint8(test.Type))
 	}
@@ -55,8 +54,6 @@ func TestOBUHeader_NoExtension(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
-
 		buff := []byte{test.Value}
 		header, err := ParseOBUHeader(buff)
 		assert.NoError(t, err)
@@ -115,8 +112,6 @@ func TestOBUHeader_Extension(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
-
 		buff := []byte{test.HeaderValue, test.ExtensionHeaderValue}
 		header, err := ParseOBUHeader(buff)
 		assert.NoError(t, err)
@@ -213,7 +208,7 @@ func TestOBUMarshal_HasOBUSize(t *testing.T) {
 	const payloadSize = 128
 	payload := make([]byte, payloadSize)
 
-	for i := 0; i < payloadSize; i++ {
+	for i := range payloadSize {
 		payload[i] = byte(i)
 	}
 

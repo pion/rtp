@@ -218,7 +218,7 @@ func TestH266_FragmentationRoundtrip(t *testing.T) {
 	payload := make([]byte, 0)
 	testDonl := uint16(100)
 
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		payload = append(payload, uint8(i)) //nolint: gosec // idc
 	}
 
@@ -253,7 +253,7 @@ func TestH266_FragmentationHeader(t *testing.T) {
 		make([]byte, 0),
 	}
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		simplePacket.payload = append(simplePacket.payload, uint8(i)) //nolint: gosec // idc
 	}
 
@@ -281,7 +281,7 @@ func TestH266_FragmentationEdgeCase(t *testing.T) {
 		make([]byte, 0),
 	}
 
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		simplePacket.payload = append(simplePacket.payload, uint8(i)) //nolint: gosec // idc
 	}
 
@@ -294,7 +294,7 @@ func TestH266_FragmentationEdgeCase(t *testing.T) {
 	// Exactly large enough to fill one FU
 
 	simplePacket.payload = make([]byte, 0)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		simplePacket.payload = append(simplePacket.payload, uint8(i)) //nolint: gosec // idc
 	}
 
@@ -510,7 +510,7 @@ func TestH266Packetizer_Fragmented(t *testing.T) {
 	bigPacket = binary.BigEndian.AppendUint16(bigPacket, uint16(header))
 
 	payload := make([]byte, 0)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		payload = append(payload, 0xff)
 	}
 	bigPacket = append(bigPacket, payload...)
@@ -613,7 +613,7 @@ func TestH266Depacketizer_Roundtrip(t *testing.T) {
 		nil,
 		make([]byte, 0),
 	}
-	for i := 0; i < 512; i++ {
+	for i := range 512 {
 		largePacket.payload = append(largePacket.payload, uint8(i)) // nolint:gosec
 	}
 

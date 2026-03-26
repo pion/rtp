@@ -163,14 +163,17 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) { //nolint:gocogni
 		if payloadIndex >= payloadLen {
 			return nil, errShortPacket
 		}
+		//nolint:gosec // G602: payloadIndex bounds checked above
 		if payload[payloadIndex]&0x80 > 0 { // M == 1, PID is 16bit
 			if payloadIndex+1 >= payloadLen {
 				return nil, errShortPacket
 			}
-			p.PictureID = (uint16(payload[payloadIndex]&0x7F) << 8) | uint16(payload[payloadIndex+1])
+			//nolint:gosec // G602: payloadIndex bounds checked above
+			p.PictureID = (uint16(payload[payloadIndex]&0x7F) << 8) |
+				uint16(payload[payloadIndex+1])
 			payloadIndex += 2
 		} else {
-			p.PictureID = uint16(payload[payloadIndex])
+			p.PictureID = uint16(payload[payloadIndex]) //nolint:gosec
 			payloadIndex++
 		}
 	} else {

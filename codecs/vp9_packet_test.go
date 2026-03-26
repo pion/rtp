@@ -206,8 +206,6 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 		},
 	}
 	for name, testCase := range cases {
-		testCase := testCase
-
 		t.Run(name, func(t *testing.T) {
 			p := VP9Packet{}
 			raw, err := p.Unmarshal(testCase.b)
@@ -226,8 +224,8 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 func TestVP9Payloader_Payload(t *testing.T) {
 	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 	var rands [][2]byte
-	for i := 0; i < 10; i++ {
-		rands = append(rands, [2]byte{byte(r0>>8) | 0x80, byte(r0 & 0xFF)})
+	for range 10 {
+		rands = append(rands, [2]byte{byte(r0>>8) | 0x80, byte(r0 & 0xFF)}) //nolint:gosec // r0 is bounded to 0x7FFF
 		r0++
 	}
 
@@ -376,7 +374,7 @@ func TestVP9Payloader_Payload(t *testing.T) {
 			},
 		}
 		pPrev := VP9Packet{}
-		for i := 0; i < 0x8000; i++ {
+		for i := range 0x8000 {
 			res := pck.Payload(4, []byte{0x01})
 			packet := VP9Packet{}
 			_, err := packet.Unmarshal(res[0])

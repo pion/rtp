@@ -64,14 +64,14 @@ func TestH264Payloader_Payload(t *testing.T) {
 	// Multiple NALU in a single payload
 	res = pck.Payload(5, multiplepayload)
 	assert.Len(t, res, 2, "2 nal units should be broken out")
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		assert.Lenf(t, res[i], 1, "Payload %d of 2 is packed incorrectly", i+1)
 	}
 
 	// Multiple NALU in a single payload with 3-byte and 4-byte start sequences
 	res = pck.Payload(5, mixednalupayload)
 	assert.Len(t, res, 4, "4 nal units should be broken out")
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		assert.Lenf(t, res[i], 1, "Payload %d of 4 is packed incorrectly", i+1)
 	}
 
