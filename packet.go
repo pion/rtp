@@ -503,12 +503,23 @@ func (h *Header) DelExtension(id uint8) error {
 	for i, extension := range h.Extensions {
 		if extension.id == id {
 			h.Extensions = append(h.Extensions[:i], h.Extensions[i+1:]...)
+			if len(h.Extensions) == 0 {
+				h.Extension = false
+				h.ExtensionProfile = 0
+			}
 
 			return nil
 		}
 	}
 
 	return errHeaderExtensionNotFound
+}
+
+// ClearExtensions Removes all RTP Header extension.
+func (h *Header) ClearExtensions() {
+	h.Extensions = h.Extensions[:0]
+	h.Extension = false
+	h.ExtensionProfile = 0
 }
 
 // Marshal serializes the packet into bytes.
