@@ -266,6 +266,44 @@ func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
 	buf, err = parsedPacket.Marshal()
 	assert.NoError(t, err)
 	assert.Equal(t, rawPkt, buf)
+
+	// marshal packet after deleting extensions
+	rawPkt = []byte{
+		0xb0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0xBE, 0xDE, 0x00, 0x01, 0x10, 0xAA, 0x00, 0x00, 0x98, 0x00, 0x00, 0x00, 0x04,
+	}
+	parsedPacket = &Packet{
+		Header: Header{
+			Padding:          true,
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+			PaddingSize:    4,
+		},
+		Payload: rawPkt[20:21],
+	}
+	buf, err = parsedPacket.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, buf)
+	assert.NoError(t, parsedPacket.DelExtension(1), "Should successfully delete extension")
+	// should not include extensions and X bit should be unset after deleting all extensions
+	rawPkt = []byte{
+		0xa0, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x98, 0x00, 0x00, 0x00, 0x04,
+	}
+	buf, err = parsedPacket.Marshal()
+	assert.NoError(t, err)
+	assert.Equal(t, rawPkt, buf)
 }
 
 func TestExtension(t *testing.T) {
