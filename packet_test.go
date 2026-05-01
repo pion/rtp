@@ -680,6 +680,9 @@ func TestRFC8285DelExtension(t *testing.T) {
 				{1, []byte{
 					0xAA,
 				}},
+				{2, []byte{
+					0xBB,
+				}},
 			},
 			Version:        2,
 			PayloadType:    96,
@@ -693,6 +696,51 @@ func TestRFC8285DelExtension(t *testing.T) {
 	assert.NoError(t, packet.DelExtension(1), "Should successfully delete extension")
 	assert.Nil(t, packet.GetExtension(1), "Extension should not exist")
 	assert.Error(t, packet.DelExtension(1), "Should return error when deleting extension that doesnt exist")
+	assert.True(t, packet.Extension, "Extension flag should not be cleared if extensions are still present")
+	assert.NotZero(t, packet.ExtensionProfile, "ExtensionProfile should have a valid extension profile type")
+
+	assert.NotNil(t, packet.GetExtension(2), "Extension should exist")
+	assert.NoError(t, packet.DelExtension(2), "Should successfully delete extension")
+	assert.Nil(t, packet.GetExtension(2), "Extension should not exist")
+	assert.Error(t, packet.DelExtension(2), "Should return error when deleting extension that doesnt exist")
+	assert.False(t, packet.Extension, "Extension flag should be cleared if all extensions are deleted")
+	assert.Zero(t, packet.ExtensionProfile, "ExtensionProfile should be cleared")
+}
+
+func TestRFC8285ClearExtensions(t *testing.T) {
+	payload := []byte{
+		// Payload
+		0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+	packet := &Packet{
+		Header: Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 0xBEDE,
+			Extensions: []Extension{
+				{1, []byte{
+					0xAA,
+				}},
+				{2, []byte{
+					0xBB,
+				}},
+			},
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 27023,
+			Timestamp:      3653407706,
+			SSRC:           476325762,
+		},
+		Payload: payload,
+	}
+	assert.NotNil(t, packet.GetExtension(1), "Extension should exist")
+	assert.NotNil(t, packet.GetExtension(2), "Extension should exist")
+	packet.ClearExtensions()
+	assert.Nil(t, packet.GetExtension(1), "Extension should not exist")
+	assert.Nil(t, packet.GetExtension(2), "Extension should not exist")
+	assert.False(t, packet.Extension, "Extension flag should be cleared after clearing extensions")
+	assert.Zero(t, len(packet.Extensions), "Should not have any extensions")
+	assert.Zero(t, packet.ExtensionProfile, "ExtensionProfile should be reset")
 }
 
 func TestRFC8285GetExtensionIDs(t *testing.T) {
