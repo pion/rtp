@@ -303,7 +303,8 @@ func TestHeaderExtension_RFC8285TwoByteExtensionRewrite(t *testing.T) {
 
 func TestHeaderExtension_Raw(t *testing.T) {
 	ext := &RawExtension{}
-	expectedPayload := []byte{0xBE, 0xEF}
+	// 4-byte raw extension: profile=0xBEEF (not one-byte/two-byte), length=0 words
+	expectedPayload := []byte{0xBE, 0xEF, 0x00, 0x00}
 
 	assert.Error(t, ext.Set(5, expectedPayload))
 	assert.NoError(t, ext.Set(0, expectedPayload))
