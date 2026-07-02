@@ -452,8 +452,8 @@ func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) { // nolint
 	p.NG = 0
 
 	if p.Y {
-		p.Width = make([]uint16, NS)
-		p.Height = make([]uint16, NS)
+		p.Width = resizeUint16Slice(p.Width, int(NS))
+		p.Height = resizeUint16Slice(p.Height, int(NS))
 		for i := 0; i < int(NS); i++ {
 			if len(packet) <= (pos + 3) {
 				return pos, errShortPacket
@@ -482,16 +482,21 @@ func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) { // nolint
 
 		p.PGTID = append(p.PGTID, packet[pos]>>5)
 		p.PGU = append(p.PGU, packet[pos]&0x10 != 0)
-		R := (packet[pos] >> 2) & 0x3
+		reference := int((packet[pos] >> 2) & 0x3)
 		pos++
 
-		p.PGPDiff = append(p.PGPDiff, []uint8{})
+		if i >= cap(p.PGPDiff) {
+			p.PGPDiff = append(p.PGPDiff, []uint8{})
+		} else {
+			p.PGPDiff = p.PGPDiff[:i+1]
+			p.PGPDiff[i] = p.PGPDiff[i][:0]
+		}
 
-		if len(packet) <= (pos + int(R) - 1) {
+		if len(packet) <= (pos + reference - 1) {
 			return pos, errShortPacket
 		}
 
-		for j := 0; j < int(R); j++ {
+		for range reference {
 			p.PGPDiff[i] = append(p.PGPDiff[i], packet[pos])
 			pos++
 		}
