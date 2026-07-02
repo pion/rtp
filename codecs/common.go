@@ -38,3 +38,14 @@ func (d *videoDepacketizer) IsPartitionTail(marker bool, _ []byte) bool {
 func (d *videoDepacketizer) SetZeroAllocation(zeroAllocation bool) {
 	d.zeroAllocation = zeroAllocation
 }
+
+// resizeUint16Slice resizes the provided slice to the desired size, or
+// allocates a new slice if needed. The contents are unspecified; the
+// caller must overwrite every element.
+func resizeUint16Slice(s []uint16, desiredSize int) []uint16 {
+	if cap(s) >= desiredSize {
+		return s[:desiredSize]
+	}
+
+	return make([]uint16, desiredSize)
+}

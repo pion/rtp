@@ -221,6 +221,57 @@ func TestVP9Packet_Unmarshal(t *testing.T) {
 	}
 }
 
+// Two descriptors that populate every slice field.
+// The first also carries layer info and uses 3 spatial layers; the
+// second omits layer info and shrinks to 2 layers, so a reused packet must
+// shed the first packet's extra layer and layer-info values.
+//
+//nolint:gochecknoglobals
+var (
+	vp9SS3Layers = []byte{0xFE, 0x11, 0x51, 0x02, 0x58, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0x01, 0x14, 0x03, 0xAA}
+	vp9SS2Layers = []byte{0xDE, 0x12, 0x04, 0x38, 0, 7, 0, 8, 0, 9, 0, 10, 0x01, 0x14, 0x05, 0xBB}
+)
+
+// vp9TrimForReuse zeroes a VP9Packet while keeping its slices' capacity, the
+// reset a reuse-oriented caller performs between Unmarshal calls.
+func vp9TrimForReuse(p *VP9Packet) {
+	*p = VP9Packet{
+		PDiff:   p.PDiff[:0],
+		Width:   p.Width[:0],
+		Height:  p.Height[:0],
+		PGTID:   p.PGTID[:0],
+		PGU:     p.PGU[:0],
+		PGPDiff: p.PGPDiff[:0],
+	}
+}
+
+// Unmarshalling into a reused VP9Packet must produce exactly the same packet
+// as a fresh parse.
+func TestVP9Packet_Unmarshal_ReusedPacket(t *testing.T) {
+	fresh := VP9Packet{}
+	_, err := fresh.Unmarshal(vp9SS2Layers)
+	assert.NoError(t, err)
+
+	// After a trim, every field must match a fresh parse.
+	reused := VP9Packet{}
+	_, err = reused.Unmarshal(vp9SS3Layers)
+	assert.NoError(t, err)
+	vp9TrimForReuse(&reused)
+	_, err = reused.Unmarshal(vp9SS2Layers)
+	assert.NoError(t, err)
+	assert.Equal(t, fresh, reused)
+}
+
+func TestVP9Packet_Unmarshal_ReusedPacketDoesNotAllocate(t *testing.T) {
+	p := VP9Packet{}
+	allocs := testing.AllocsPerRun(100, func() {
+		vp9TrimForReuse(&p)
+		_, err := p.Unmarshal(vp9SS3Layers)
+		assert.NoError(t, err)
+	})
+	assert.Zero(t, allocs)
+}
+
 func TestVP9Payloader_Payload(t *testing.T) {
 	r0 := int(rand.New(rand.NewSource(0)).Int31n(0x7FFF)) //nolint:gosec
 	var rands [][2]byte
