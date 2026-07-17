@@ -21,6 +21,13 @@ func createTestH265Header(pType, layerID, tid uint8, f bool) H265NALUHeader {
 	return H265NALUHeader(uint16(tid) | (uint16(pType) << 9) | (uint16(layerID) << 3) | fVal | zVal)
 }
 
+func createTestH265NALU(pType uint8, payload []byte) []byte {
+	nalu := make([]byte, 0, h265NaluHeaderSize+len(payload))
+	nalu = binary.BigEndian.AppendUint16(nalu, uint16(createTestH265Header(pType, 0, 1, false)))
+
+	return append(nalu, payload...)
+}
+
 func TestH265_NALU_Header(t *testing.T) {
 	tt := [...]struct {
 		RawHeader []byte
@@ -677,6 +684,76 @@ func TestH265Packetizer_Aggregated(t *testing.T) {
 	)
 	assert.Equal(t, uint16(header), binary.BigEndian.Uint16(aggregated[16:18]), "Expected headers to match")
 	assert.Equal(t, payload, aggregated[18:], "Expected payloads to match")
+}
+
+func TestH265Payloader_Payload_VPS_SPS_PPS_handling(t *testing.T) {
+	packetizer := H265Payloader{}
+
+	vps := createTestH265NALU(h265NaluVpsType, []byte{0x00, 0x01})
+	sps := createTestH265NALU(h265NaluSpsType, []byte{0x02, 0x03})
+	pps := createTestH265NALU(h265NaluPpsType, []byte{0x04, 0x05})
+	vcl := createTestH265NALU(19, []byte{0x06, 0x07})
+
+	assert.Empty(t, packetizer.Payload(1500, vps), "VPS should be cached")
+	assert.Empty(t, packetizer.Payload(1500, sps), "SPS should be cached")
+	assert.Empty(t, packetizer.Payload(1500, pps), "PPS should be cached")
+
+	payloads := packetizer.Payload(1500, vcl)
+	assert.Len(t, payloads, 1)
+
+	aggregation, err := parseH265AggregationPacket(payloads[0], false)
+	assert.NoError(t, err)
+
+	packets, err := splitH265AggregationPacket(*aggregation)
+	assert.NoError(t, err)
+	assert.Len(t, packets, 4)
+	assert.Equal(t, uint8(h265NaluVpsType), packets[0].payloadHeader.Type())
+	assert.Equal(t, uint8(h265NaluSpsType), packets[1].payloadHeader.Type())
+	assert.Equal(t, uint8(h265NaluPpsType), packets[2].payloadHeader.Type())
+	assert.Equal(t, uint8(19), packets[3].payloadHeader.Type())
+	assert.Equal(t, []byte{0x06, 0x07}, packets[3].payload)
+}
+
+func TestH265Payloader_Payload_VPS_SPS_PPS_before_fragmented(t *testing.T) {
+	packetizer := H265Payloader{}
+
+	assert.Empty(t, packetizer.Payload(20, createTestH265NALU(h265NaluVpsType, []byte{0x00, 0x01})))
+	assert.Empty(t, packetizer.Payload(20, createTestH265NALU(h265NaluSpsType, []byte{0x02, 0x03})))
+	assert.Empty(t, packetizer.Payload(20, createTestH265NALU(h265NaluPpsType, []byte{0x04, 0x05})))
+
+	payload := make([]byte, 50)
+	for i := range payload {
+		payload[i] = uint8(i) //nolint:gosec // G115 test data
+	}
+	payloads := packetizer.Payload(20, createTestH265NALU(19, payload))
+	assert.Greater(t, len(payloads), 1)
+
+	aggregation, err := parseH265AggregationPacket(payloads[0], false)
+	assert.NoError(t, err)
+
+	packets, err := splitH265AggregationPacket(*aggregation)
+	assert.NoError(t, err)
+	assert.Len(t, packets, 3)
+	assert.Equal(t, uint8(h265NaluVpsType), packets[0].payloadHeader.Type())
+	assert.Equal(t, uint8(h265NaluSpsType), packets[1].payloadHeader.Type())
+	assert.Equal(t, uint8(h265NaluPpsType), packets[2].payloadHeader.Type())
+
+	fragmentHeader := H265NALUHeader(binary.BigEndian.Uint16(payloads[1][0:2]))
+	assert.True(t, fragmentHeader.IsFragmentationUnit())
+}
+
+func TestH265Payloader_Payload_SkipAggregation(t *testing.T) {
+	packetizer := H265Payloader{SkipAggregation: true}
+
+	vps := createTestH265NALU(h265NaluVpsType, []byte{0x00, 0x01})
+	sps := createTestH265NALU(h265NaluSpsType, []byte{0x02, 0x03})
+	pps := createTestH265NALU(h265NaluPpsType, []byte{0x04, 0x05})
+	vcl := createTestH265NALU(19, []byte{0x06, 0x07})
+
+	assert.Equal(t, [][]byte{vps}, packetizer.Payload(1500, vps))
+	assert.Equal(t, [][]byte{sps}, packetizer.Payload(1500, sps))
+	assert.Equal(t, [][]byte{pps}, packetizer.Payload(1500, pps))
+	assert.Equal(t, [][]byte{vcl}, packetizer.Payload(1500, vcl))
 }
 
 func TestH265Packetizer_Fragmented(t *testing.T) {
