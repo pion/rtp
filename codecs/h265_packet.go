@@ -40,6 +40,12 @@ const (
 	h265NaluPACIPacketType         = 50
 	h265AggregatedPacketMaxSize    = ^uint16(0)
 	h265AggregatedPacketLengthSize = 2
+
+	h265NaluVpsType    = 32
+	h265NaluSpsType    = 33
+	h265NaluPpsType    = 34
+	h265NaluAudType    = 35
+	h265NaluFillerType = 38
 )
 
 // H265NALUHeader is a H265 NAL Unit Header.
@@ -1723,12 +1729,16 @@ func (p *H265Packet) Packet() isH265Packet {
 // H265Payloader payloads H265 packets.
 type H265Payloader struct {
 	// Deprecated: Has no effect.
-	AddDONL         bool
+	AddDONL bool
+	// SkipAggregation disables H265 aggregation packets.
 	SkipAggregation bool
+	vpsNalu         *h265SingleNALUnitPacket
+	spsNalu         *h265SingleNALUnitPacket
+	ppsNalu         *h265SingleNALUnitPacket
 }
 
 // Payload fragments a H265 packet across one or more byte arrays.
-func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint:cyclop
+func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint:cyclop,gocognit
 	// SampleBuilder reuses the payload buffer so this is required
 	tmp := make([]byte, len(payload))
 	copy(tmp, payload)
@@ -1775,6 +1785,76 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint
 			nalu[2:],
 		}
 
+		if p.SkipAggregation {
+			p.vpsNalu = nil
+			p.spsNalu = nil
+			p.ppsNalu = nil
+			if len(nalu) > int(mtu) {
+				flushBuffer()
+				fragments, err := newH265FragmentationPackets(mtu, &packet)
+				if err != nil {
+					return
+				}
+				for _, fragment := range fragments {
+					payloads = append(payloads, fragment.serialize(make([]byte, 0)))
+				}
+			} else {
+				payloads = append(payloads, nalu)
+			}
+
+			return
+		}
+
+		switch header.Type() {
+		case h265NaluVpsType:
+			p.vpsNalu = &packet
+
+			return
+		case h265NaluSpsType:
+			p.spsNalu = &packet
+
+			return
+		case h265NaluPpsType:
+			p.ppsNalu = &packet
+
+			return
+		case h265NaluAudType, h265NaluFillerType:
+			return
+		}
+
+		pendingNalus := make([]h265SingleNALUnitPacket, 0, 4)
+		if p.vpsNalu != nil {
+			pendingNalus = append(pendingNalus, *p.vpsNalu)
+			p.vpsNalu = nil
+		}
+		if p.spsNalu != nil {
+			pendingNalus = append(pendingNalus, *p.spsNalu)
+			p.spsNalu = nil
+		}
+		if p.ppsNalu != nil {
+			pendingNalus = append(pendingNalus, *p.ppsNalu)
+			p.ppsNalu = nil
+		}
+
+		if len(nalu) <= int(mtu) {
+			pendingNalus = append(pendingNalus, packet)
+		}
+		for _, pending := range pendingNalus {
+			if len(naluBuffer) == 0 {
+				if canAggregateH265(mtu, &pending) {
+					naluBuffer = append(naluBuffer, pending)
+				} else {
+					payloads = append(payloads, pending.serialize(make([]byte, 0, pending.wireSize())))
+				}
+			} else {
+				// can't fit any more packets, just send what we have and make current first in buffer
+				if shouldAggregateH265Now(mtu, naluBuffer, pending) {
+					flushBuffer()
+				}
+				naluBuffer = append(naluBuffer, pending)
+			}
+		}
+
 		if len(nalu) > int(mtu) { // nolint: nestif
 			flushBuffer()
 			fragments, err := newH265FragmentationPackets(mtu, &packet)
@@ -1783,25 +1863,6 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint
 			}
 			for _, fragment := range fragments {
 				payloads = append(payloads, fragment.serialize(make([]byte, 0)))
-			}
-		} else {
-			if p.SkipAggregation {
-				payloads = append(payloads, nalu)
-
-				return
-			}
-			if len(naluBuffer) == 0 {
-				if canAggregateH265(mtu, &packet) {
-					naluBuffer = append(naluBuffer, packet)
-				} else {
-					payloads = append(payloads, nalu)
-				}
-			} else {
-				// can't fit any more packets, just send what we have and make current first in buffer
-				if shouldAggregateH265Now(mtu, naluBuffer, packet) {
-					flushBuffer()
-				}
-				naluBuffer = append(naluBuffer, packet)
 			}
 		}
 	})
