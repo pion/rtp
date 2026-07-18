@@ -1726,19 +1726,78 @@ func (p *H265Packet) Packet() isH265Packet {
 	return p.packet
 }
 
+type h265ParamSetEntry struct {
+	typ    uint8
+	id     uint32
+	packet h265SingleNALUnitPacket
+}
+
+// h265ParamSetCache holds the latest VPS/SPS/PPS for each type and parameter-set ID,
+// ordered by the latest occurrence of each parameter set in the bitstream.
+type h265ParamSetCache struct {
+	entries []h265ParamSetEntry
+}
+
 // H265Payloader payloads H265 packets.
 type H265Payloader struct {
 	// Deprecated: Has no effect.
 	AddDONL bool
 	// SkipAggregation disables H265 aggregation packets.
 	SkipAggregation bool
-	vpsNalu         *h265SingleNALUnitPacket
-	spsNalu         *h265SingleNALUnitPacket
-	ppsNalu         *h265SingleNALUnitPacket
+
+	// Parameter sets are cached by type and parameter-set ID.
+	cache *h265ParamSetCache
+}
+
+// HEVC parameter-set id spaces. as enforced by the RFC.
+const (
+	h265MaxVpsCount = 16
+	h265MaxSpsCount = 16
+	h265MaxPpsCount = 64
+)
+
+func newH265ParamSetCache() *h265ParamSetCache {
+	cache := &h265ParamSetCache{
+		entries: make([]h265ParamSetEntry, 0, 4),
+	}
+
+	return cache
+}
+
+func (c *h265ParamSetCache) add(typ uint8, id uint32, packet h265SingleNALUnitPacket) {
+	for i := range c.entries {
+		if c.entries[i].typ == typ && c.entries[i].id == id {
+			copy(c.entries[i:], c.entries[i+1:])
+			c.entries = c.entries[:len(c.entries)-1]
+
+			break
+		}
+	}
+
+	entry := h265ParamSetEntry{typ: typ, id: id, packet: packet}
+	c.entries = append(c.entries, entry)
+}
+
+func (c *h265ParamSetCache) appendPackets(packets []h265SingleNALUnitPacket) []h265SingleNALUnitPacket {
+	for _, entry := range c.entries {
+		packets = append(packets, entry.packet)
+	}
+
+	return packets
+}
+
+func (p *H265Payloader) cacheParameterSet(typ uint8, id uint32, packet h265SingleNALUnitPacket) {
+	if p.cache == nil {
+		p.cache = newH265ParamSetCache()
+	}
+	payload := make([]byte, len(packet.payload))
+	copy(payload, packet.payload)
+	packet.payload = payload
+	p.cache.add(typ, id, packet)
 }
 
 // Payload fragments a H265 packet across one or more byte arrays.
-func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint:cyclop,gocognit
+func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint:cyclop,gocognit,gocyclo
 	// SampleBuilder reuses the payload buffer so this is required
 	tmp := make([]byte, len(payload))
 	copy(tmp, payload)
@@ -1765,7 +1824,15 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint
 			payloads = append(payloads, packetized)
 		}
 	}
-
+	fragmentAndAppend := func(packet *h265SingleNALUnitPacket) {
+		fragments, err := newH265FragmentationPackets(mtu, packet)
+		if err != nil {
+			return
+		}
+		for _, fragment := range fragments {
+			payloads = append(payloads, fragment.serialize(make([]byte, 0)))
+		}
+	}
 	emitNalus(payload, func(nalu []byte) {
 		if len(nalu) < h265NaluHeaderSize {
 			return
@@ -1786,9 +1853,7 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint
 		}
 
 		if p.SkipAggregation {
-			p.vpsNalu = nil
-			p.spsNalu = nil
-			p.ppsNalu = nil
+			p.cache = nil
 			if len(nalu) > int(mtu) {
 				flushBuffer()
 				fragments, err := newH265FragmentationPackets(mtu, &packet)
@@ -1804,42 +1869,50 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint
 
 			return
 		}
-
 		switch header.Type() {
 		case h265NaluVpsType:
-			p.vpsNalu = &packet
+			if id, ok := h265VpsID(packet.payload); ok && id < h265MaxVpsCount {
+				p.cacheParameterSet(header.Type(), id, packet)
 
-			return
+				return
+			}
 		case h265NaluSpsType:
-			p.spsNalu = &packet
+			if id, ok := h265SpsID(header.LayerID(), packet.payload); ok && id < h265MaxSpsCount {
+				p.cacheParameterSet(header.Type(), id, packet)
 
-			return
+				return
+			}
 		case h265NaluPpsType:
-			p.ppsNalu = &packet
+			if id, ok := h265PpsID(packet.payload); ok && id < h265MaxPpsCount {
+				p.cacheParameterSet(header.Type(), id, packet)
 
-			return
+				return
+			}
 		case h265NaluAudType, h265NaluFillerType:
 			return
 		}
 
 		pendingNalus := make([]h265SingleNALUnitPacket, 0, 4)
-		if p.vpsNalu != nil {
-			pendingNalus = append(pendingNalus, *p.vpsNalu)
-			p.vpsNalu = nil
-		}
-		if p.spsNalu != nil {
-			pendingNalus = append(pendingNalus, *p.spsNalu)
-			p.spsNalu = nil
-		}
-		if p.ppsNalu != nil {
-			pendingNalus = append(pendingNalus, *p.ppsNalu)
-			p.ppsNalu = nil
+		if p.cache != nil {
+			pendingNalus = make([]h265SingleNALUnitPacket, 0, len(p.cache.entries)+1)
+			pendingNalus = p.cache.appendPackets(pendingNalus)
+			p.cache = nil
 		}
 
-		if len(nalu) <= int(mtu) {
-			pendingNalus = append(pendingNalus, packet)
-		}
+		pendingNalus = append(pendingNalus, packet)
 		for _, pending := range pendingNalus {
+			if pending.wireSize() > int(mtu) {
+				flushBuffer()
+				fragmentAndAppend(&pending)
+
+				continue
+			}
+			if pending.wireSize() <= h265NaluHeaderSize {
+				flushBuffer()
+				payloads = append(payloads, pending.serialize(make([]byte, 0, pending.wireSize())))
+
+				continue
+			}
 			if len(naluBuffer) == 0 {
 				if canAggregateH265(mtu, &pending) {
 					naluBuffer = append(naluBuffer, pending)
@@ -1854,20 +1927,198 @@ func (p *H265Payloader) Payload(mtu uint16, payload []byte) [][]byte { // nolint
 				naluBuffer = append(naluBuffer, pending)
 			}
 		}
-
-		if len(nalu) > int(mtu) { // nolint: nestif
-			flushBuffer()
-			fragments, err := newH265FragmentationPackets(mtu, &packet)
-			if err != nil {
-				return
-			}
-			for _, fragment := range fragments {
-				payloads = append(payloads, fragment.serialize(make([]byte, 0)))
-			}
-		}
 	})
 
 	flushBuffer()
 
 	return payloads
+}
+
+// h265ParamBits is a minimal parameter-set id reader.
+type h265ParamBits struct {
+	data []byte
+	pos  uint
+}
+
+func (r *h265ParamBits) u(n uint) (uint32, bool) {
+	bitLen := uint(len(r.data)) * 8
+	if r.pos > bitLen || n > bitLen-r.pos || n > 32 {
+		return 0, false
+	}
+
+	var v uint32
+	for range n {
+		v <<= 1
+		idx := r.pos >> 3
+		v |= uint32((r.data[idx] >> (7 - (r.pos & 7))) & 1)
+		r.pos++
+	}
+
+	return v, true
+}
+
+// exp-golomb value.
+func (r *h265ParamBits) ue() (uint32, bool) {
+	var zeros uint
+	for {
+		bit, ok := r.u(1)
+		if !ok {
+			return 0, false
+		}
+		if bit == 1 {
+			break
+		}
+		zeros++
+		if zeros > 31 {
+			return 0, false
+		}
+	}
+
+	suffix, ok := r.u(zeros)
+	if !ok {
+		return 0, false
+	}
+
+	return (uint32(1)<<zeros - 1) + suffix, true
+}
+
+// h265StripEmulation removes emulation_prevention_three_byte so
+// we can read parameter-set fields bit-exactly.
+func h265StripEmulation(b []byte) []byte {
+	hasEmulationPrevention := false
+	for i := 2; i < len(b); i++ {
+		if b[i-2] == 0 && b[i-1] == 0 && b[i] == 0x03 {
+			hasEmulationPrevention = true
+
+			break
+		}
+	}
+
+	if !hasEmulationPrevention {
+		return b
+	}
+
+	out := make([]byte, 0, len(b))
+	zeros := 0
+	for i := range b {
+		if zeros >= 2 && b[i] == 0x03 {
+			zeros = 0
+
+			continue
+		}
+		out = append(out, b[i])
+		if b[i] == 0 {
+			zeros++
+		} else {
+			zeros = 0
+		}
+	}
+
+	return out
+}
+
+// h265VpsID returns vps_video_parameter_set_id.
+func h265VpsID(rbsp []byte) (uint32, bool) {
+	if len(rbsp) < 1 {
+		return 0, false
+	}
+
+	return uint32(rbsp[0]>>4) & 0x0f, true
+}
+
+// h265PpsID returns pps_pic_parameter_set_id.
+func h265PpsID(rbsp []byte) (uint32, bool) {
+	r := &h265ParamBits{data: h265StripEmulation(rbsp)}
+
+	return r.ue()
+}
+
+// h265SpsID returns sps_seq_parameter_set_id.
+func h265SpsID(layerID uint8, rbsp []byte) (uint32, bool) {
+	reader := &h265ParamBits{data: h265StripEmulation(rbsp)}
+	if _, ok := reader.u(4); !ok { // sps_video_parameter_set_id
+		return 0, false
+	}
+	extOrMaxSubLayersMinus1, ok := reader.u(3)
+	if !ok {
+		return 0, false
+	}
+
+	if layerID != 0 && extOrMaxSubLayersMinus1 == 7 {
+		return reader.ue()
+	}
+	if extOrMaxSubLayersMinus1 > 6 {
+		return 0, false
+	}
+	if _, ok = reader.u(1); !ok { // sps_temporal_id_nesting_flag
+		return 0, false
+	}
+	if !h265SkipProfileTierLevel(reader, extOrMaxSubLayersMinus1) {
+		return 0, false
+	}
+
+	return reader.ue()
+}
+
+// h265SkipProfileTierLevel advances past a profile_tier_level(1, maxSubLayersMinus1).
+//
+//nolint:cyclop // Parameter-set syntax has optional sublayer fields.
+func h265SkipProfileTierLevel(rb *h265ParamBits, maxSubLayersMinus1 uint32) bool {
+	// general profile/tier/idc + compatibility + constraint flags
+	if _, ok := rb.u(32); !ok {
+		return false
+	}
+	if _, ok := rb.u(32); !ok {
+		return false
+	}
+	if _, ok := rb.u(24); !ok {
+		return false
+	}
+	if _, ok := rb.u(8); !ok { // general_level_idc
+		return false
+	}
+
+	if maxSubLayersMinus1 == 0 {
+		return true
+	}
+
+	var subProfilePresent [7]bool
+	var subLevelPresent [7]bool
+	for i := range maxSubLayersMinus1 {
+		value, ok := rb.u(1)
+		if !ok {
+			return false
+		}
+		subProfilePresent[i] = value == 1
+		value, ok = rb.u(1)
+		if !ok {
+			return false
+		}
+		subLevelPresent[i] = value == 1
+	}
+	for i := maxSubLayersMinus1; i < 8; i++ {
+		if _, ok := rb.u(2); !ok { // reserved_zero_2bits
+			return false
+		}
+	}
+	for i := range maxSubLayersMinus1 {
+		if subProfilePresent[i] {
+			if _, ok := rb.u(32); !ok {
+				return false
+			}
+			if _, ok := rb.u(32); !ok {
+				return false
+			}
+			if _, ok := rb.u(24); !ok {
+				return false
+			}
+		}
+		if subLevelPresent[i] {
+			if _, ok := rb.u(8); !ok { // sub_layer_level_idc
+				return false
+			}
+		}
+	}
+
+	return true
 }
