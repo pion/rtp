@@ -196,6 +196,94 @@ func TestH264Packet_Unmarshal(t *testing.T) {
 	assert.Equal(t, singlePayloadWithBrokenSecondUnmarshaledAVC, res)
 }
 
+func TestH264Packet_UnmarshalFUA(t *testing.T) {
+	// One IDR slice (nal_ref_idc 3, type 5) split into FU-A fragments.
+	// FU indicator 0x7c, FU header S=0x80, E=0x40, type 5.
+	fuStart := []byte{0x7c, 0x85, 0xaa, 0xaa}
+	fuMiddle := []byte{0x7c, 0x05, 0xbb, 0xbb}
+	fuEnd := []byte{0x7c, 0x45, 0xcc, 0xcc}
+	fuStartEnd := []byte{0x7c, 0xc5, 0xdd, 0xdd}
+
+	// A second NAL unit (nal_ref_idc 2, type 1) split into FU-A fragments.
+	otherStart := []byte{0x5c, 0x81, 0x11, 0x11}
+	otherEnd := []byte{0x5c, 0x41, 0x22, 0x22}
+
+	single := []byte{0x41, 0x33, 0x33}
+	stapA := []byte{0x78, 0x00, 0x02, 0x67, 0x42, 0x00, 0x02, 0x68, 0xce}
+
+	annexB := func(nalu ...byte) []byte {
+		return append([]byte{0x00, 0x00, 0x00, 0x01}, nalu...)
+	}
+
+	for _, test := range []struct {
+		name    string
+		packets [][]byte
+		want    [][]byte
+	}{
+		{
+			name:    "complete",
+			packets: [][]byte{fuStart, fuMiddle, fuEnd},
+			want:    [][]byte{annexB(0x65, 0xaa, 0xaa, 0xbb, 0xbb, 0xcc, 0xcc)},
+		},
+		{
+			name:    "start and end in one fragment",
+			packets: [][]byte{fuStartEnd},
+			want:    [][]byte{annexB(0x65, 0xdd, 0xdd)},
+		},
+		{
+			name:    "empty fragments",
+			packets: [][]byte{{0x7c, 0x85}, {0x7c, 0x05}, {0x7c, 0x45}},
+			want:    [][]byte{annexB(0x65)},
+		},
+		{
+			name:    "missing start",
+			packets: [][]byte{fuMiddle, fuEnd},
+		},
+		{
+			name:    "missing start and middle",
+			packets: [][]byte{fuEnd},
+		},
+		{
+			name:    "missing start then complete",
+			packets: [][]byte{fuMiddle, fuEnd, otherStart, otherEnd},
+			want:    [][]byte{annexB(0x41, 0x11, 0x11, 0x22, 0x22)},
+		},
+		{
+			name:    "missing end then new start",
+			packets: [][]byte{fuStart, fuMiddle, otherStart, otherEnd},
+			want:    [][]byte{annexB(0x41, 0x11, 0x11, 0x22, 0x22)},
+		},
+		{
+			name:    "repeated start",
+			packets: [][]byte{fuStart, fuStart, fuEnd},
+			want:    [][]byte{annexB(0x65, 0xaa, 0xaa, 0xcc, 0xcc)},
+		},
+		{
+			name:    "missing end then single NAL",
+			packets: [][]byte{fuStart, single, fuEnd},
+			want:    [][]byte{annexB(0x41, 0x33, 0x33)},
+		},
+		{
+			name:    "missing end then STAP-A",
+			packets: [][]byte{fuStart, stapA, fuEnd},
+			want:    [][]byte{append(annexB(0x67, 0x42), annexB(0x68, 0xce)...)},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			pkt := H264Packet{}
+			var got [][]byte
+			for _, payload := range test.packets {
+				out, err := pkt.Unmarshal(payload)
+				assert.NoError(t, err)
+				if len(out) > 0 {
+					got = append(got, out)
+				}
+			}
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
 func TestH264IsPartitionHead(t *testing.T) {
 	h264 := H264Packet{}
 

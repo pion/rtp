@@ -257,9 +257,14 @@ func (p *H264Packet) parseBody(payload []byte) ([]byte, error) { //nolint:cyclop
 	naluType := payload[0] & naluTypeBitmask
 	switch {
 	case naluType > 0 && naluType < 24:
+		// FUs of a NAL unit are sent back to back (RFC 6184 5.8),
+		// so any other packet means the pending NAL unit lost its end.
+		p.fuaBuffer = nil
+
 		return p.doPackaging(nil, payload), nil
 
 	case naluType == stapaNALUType:
+		p.fuaBuffer = nil
 		currOffset := int(stapaHeaderSize)
 		result := []byte{}
 		for currOffset < len(payload) {
@@ -290,8 +295,12 @@ func (p *H264Packet) parseBody(payload []byte) ([]byte, error) { //nolint:cyclop
 			return nil, errShortPacket
 		}
 
-		if p.fuaBuffer == nil {
+		// Discard lost partial fragments, and drop fragments whose
+		// start was never received (RFC 6184 5.8).
+		if payload[1]&fuStartBitmask != 0 {
 			p.fuaBuffer = []byte{}
+		} else if p.fuaBuffer == nil {
+			return []byte{}, nil
 		}
 
 		p.fuaBuffer = append(p.fuaBuffer, payload[fuaHeaderSize:]...)
