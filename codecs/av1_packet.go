@@ -29,7 +29,7 @@ type AV1Payloader struct{}
 // 5.3. https://aomediacodec.github.io/av1-spec/av1-spec.pdf#page=39
 // Returns AV1 RTP packets https://aomediacodec.github.io/av1-rtp-spec/
 // The payload is fragmented into multiple packets, each packet is a valid AV1 RTP payload.
-// nolint:cyclop
+// nolint:cyclop,gocognit
 func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 	// 2 is the minimum MTU for AV1 (aggregate header + 1 byte)
 	if mtu <= 1 || len(payload) == 0 {
@@ -72,6 +72,17 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 			obuSize = len(payload) - offset
 		}
 
+		if obuSize > len(payload)-offset {
+			break
+		}
+
+		// padding carries no media and causes chromium to stall.
+		if obuHeader.Type == obu.OBUPadding {
+			offset += obuSize
+
+			continue
+		}
+
 		// Each RTP packet MUST NOT contain OBUs that belong to different temporal units.
 		// If a sequence header OBU is present in an RTP packet, then it SHOULD be the first OBU in the packet.
 		// https://aomediacodec.github.io/av1-rtp-spec/#5-packetization-rules
@@ -85,10 +96,6 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 
 		if obuHeader.ExtensionHeader != nil {
 			currentPacketOBUHeader = obuHeader.ExtensionHeader
-		}
-
-		if obuSize > len(payload)-offset {
-			break
 		}
 
 		if len(currentOBUPayload) > 0 {
