@@ -1166,6 +1166,27 @@ func TestAV1Payloader_HandleMTUBasedFragmentation(t *testing.T) {
 	testAV1TestRun(t, tests)
 }
 
+func TestAV1Payloader_Padding(t *testing.T) {
+	sequence := testAV1OBUPayload{
+		Header:  &obu.Header{Type: obu.OBUSequenceHeader, HasSizeField: true},
+		Payload: []byte{0x01},
+	}
+	frame := testAV1OBUPayload{
+		Header:  &obu.Header{Type: obu.OBUFrame, HasSizeField: true},
+		Payload: []byte{0x02},
+	}
+	padding := testAV1OBUPayload{
+		Header:  &obu.Header{Type: obu.OBUPadding, HasSizeField: true},
+		Payload: make([]byte, 8192),
+	}
+	payloader := &AV1Payloader{}
+
+	assert.Empty(t, payloader.Payload(6, padding.Marshal()))
+	assert.Equal(t, [][]byte{{0x28, 0x02, 0x08, 0x01, 0x30, 0x02}},
+		payloader.Payload(6, (testAV1MultiOBUsPayload{padding, sequence, padding, frame, padding}).Marshal()),
+	)
+}
+
 func TestAV1Payloader_TemporalDelimiter(t *testing.T) {
 	tests := []testAV1Tests{
 		{
