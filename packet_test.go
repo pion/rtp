@@ -1708,3 +1708,48 @@ func BenchmarkUnmarshalHeader(b *testing.B) {
 		}
 	})
 }
+
+func TestSetExtensionFirstExtension(t *testing.T) {
+	t.Run("selects profile that can carry the extension", func(t *testing.T) {
+		cases := map[string]struct {
+			id      uint8
+			payload []byte
+			profile uint16
+		}{
+			"short payload": {1, []byte{0xAA}, ExtensionProfileOneByte},
+			"16 byte":       {14, make([]byte, 16), ExtensionProfileOneByte},
+			"17 byte":       {1, make([]byte, 17), ExtensionProfileTwoByte},
+			"255 byte":      {1, make([]byte, 255), ExtensionProfileTwoByte},
+			"id above 14":   {15, []byte{0xAA}, ExtensionProfileTwoByte},
+			"empty payload": {1, []byte{}, ExtensionProfileTwoByte},
+			"max id":        {255, []byte{0xAA}, ExtensionProfileTwoByte},
+		}
+		for name, testCase := range cases {
+			t.Run(name, func(t *testing.T) {
+				header := Header{Version: 2}
+				assert.NoError(t, header.SetExtension(testCase.id, testCase.payload))
+				assert.Equal(t, testCase.profile, header.ExtensionProfile)
+
+				raw, err := header.Marshal()
+				assert.NoError(t, err)
+
+				var parsed Header
+				_, err = parsed.Unmarshal(raw)
+				assert.NoError(t, err)
+				assert.Equal(t, []uint8{testCase.id}, parsed.GetExtensionIDs())
+				assert.Len(t, parsed.GetExtension(testCase.id), len(testCase.payload))
+			})
+		}
+	})
+
+	t.Run("rejects extensions that cannot be encoded", func(t *testing.T) {
+		header := Header{Version: 2}
+		assert.Error(t, header.SetExtension(1, make([]byte, 256)))
+		assert.Error(t, header.SetExtension(0, []byte{0xAA}))
+
+		// The failed calls must not leave a partial extension behind.
+		assert.False(t, header.Extension)
+		assert.Zero(t, header.ExtensionProfile)
+		assert.Empty(t, header.Extensions)
+	})
+}
