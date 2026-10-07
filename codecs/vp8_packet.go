@@ -39,7 +39,6 @@ func (p *VP8Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:c
 	usingHeaderSize := vp8HeaderSize
 	if p.EnablePictureID {
 		switch {
-		case p.pictureID == 0:
 		case p.pictureID < 128:
 			usingHeaderSize = vp8HeaderSize + 2
 		default:

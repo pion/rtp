@@ -143,6 +143,29 @@ func TestVP8Payloader_Payload(t *testing.T) {
 				},
 			},
 		},
+		"WithPictureID_wrap": {
+			payloader: VP8Payloader{
+				EnablePictureID: true,
+				pictureID:       0x7FFF,
+			},
+			mtu: 6,
+			payload: [][]byte{
+				{0x90, 0x90},
+				{0x91, 0x91},
+				{0x92, 0x92},
+			},
+			expected: [][][]byte{
+				{
+					{0x90, 0x80, 0xFF, 0xFF, 0x90, 0x90},
+				},
+				{
+					{0x90, 0x80, 0x00, 0x91, 0x91},
+				},
+				{
+					{0x90, 0x80, 0x01, 0x92, 0x92},
+				},
+			},
+		},
 	}
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
