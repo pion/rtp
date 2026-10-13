@@ -207,6 +207,10 @@ func (s *Spreader) Process(payload []byte) (outPayloads [][]byte, err error) { /
 		}
 	}
 
+	if s.Mtu-rtpHeaderSize-fuaOverhead <= 0 {
+		return nil, fmt.Errorf("mtu(%d) is too small for rtp header(%d)", s.Mtu, rtpHeaderSize) //nolint:err113
+	}
+
 	outPayloads, _, err = s.handleNalTooBigOrFua(outPayloads, seqNum, naluType, rtpHeaderData, nalData)
 	if err != nil {
 		return nil, err
@@ -230,7 +234,7 @@ func (s *Spreader) handleNalTooBigOrFua(cumulRTP [][]byte, seqNum uint16, naluTy
 }
 
 // relying on continuous seq number & start/end FU bits to sync ourselve, so not looking at RtpTimestamp.
-func (s *Spreader) spreadFua(cumulRTP [][]byte, firtSeqNum uint16, rtpHeader []byte, fua []byte) ([][]byte, uint16, error) { //nolint:lll
+func (s *Spreader) spreadFua(cumulRTP [][]byte, firtSeqNum uint16, rtpHeader []byte, fua []byte) ([][]byte, uint16, error) { //nolint:lll,cyclop
 	seqNum := firtSeqNum
 	if s.fuInProgress != nil {
 		expectedSeq := s.fuInProgress.LastSeq + 1
@@ -262,7 +266,8 @@ func (s *Spreader) spreadFua(cumulRTP [][]byte, firtSeqNum uint16, rtpHeader []b
 	reqSubSize := s.Mtu - lenRTPHeader - fuaOverhead
 	newData := fua[fuaOverhead:]
 	currentDataSize := len(s.fuInProgress.Trailing) + len(newData)
-	for currentDataSize > reqSubSize || (mustFinish && currentDataSize > 0) {
+	// an ending FU is always emitted, even empty, so that the end bit is not lost
+	for currentDataSize > reqSubSize || (mustFinish && (currentDataSize > 0 || lastFuHeader == nil)) {
 		bufSize := min(s.Mtu, lenRTPHeader+fuaOverhead+currentDataSize)
 		rtp := make([]byte, bufSize)
 		binary.BigEndian.PutUint16(rtpHeader[rtpSeqNumOffset:rtpSeqNumOffset+rtpSeqNumLength], seqNum)
@@ -293,11 +298,16 @@ func (s *Spreader) spreadFua(cumulRTP [][]byte, firtSeqNum uint16, rtpHeader []b
 		*lastFuHeader |= fuEndBitmask
 		s.fuInProgress = nil
 	} else {
-		copy(s.trailingBuf, newData)
-		s.fuInProgress.Trailing = s.trailingBuf[:len(newData)]
+		// trailing is still pending when nothing was emitted, new data goes after it
+		lenTrailing := len(s.fuInProgress.Trailing)
+		copy(s.trailingBuf[lenTrailing:], newData)
+		s.fuInProgress.Trailing = s.trailingBuf[:lenTrailing+len(newData)]
 	}
 
-	cumulRTP[len(cumulRTP)-1][rtpMPtOffset] |= entryMarker
+	// nothing is emitted when the whole fragment fits in the trailing buffer
+	if lastFuHeader != nil {
+		cumulRTP[len(cumulRTP)-1][rtpMPtOffset] |= entryMarker
+	}
 
 	return cumulRTP, seqNum, nil
 }
@@ -384,6 +394,10 @@ func (s *Spreader) explodeStapA(
 	seqNum := firtSeqNum
 	var err error
 	for currOffset < lenStapA {
+		if lenStapA < currOffset+stapaNALULengthSize {
+			return nil, seqNum, fmt.Errorf("STAP-A NALU size is truncated: %d", lenStapA-currOffset) //nolint:err113
+		}
+
 		naluSize := int(binary.BigEndian.Uint16(stapa[currOffset:]))
 		currOffset += stapaNALULengthSize
 

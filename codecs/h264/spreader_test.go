@@ -251,6 +251,112 @@ func TestChunkSlicing(t *testing.T) {
 	assert.Equal(slice17to4[4], []byte{17}, "Bad Slicing")
 }
 
+func TestStapATruncatedNaluSize(t *testing.T) {
+	assert := assert.New(t)
+
+	// arrange
+	spreader := NewSpreader(100)
+	stapa := append([]byte{0x18, 0x00, 0x78, 0x65}, make([]byte, 119)...)
+	stapa = append(stapa, 0x00) // stray byte where the next NALU size should be
+	rtpPkt := append(getRTPHeader(false), stapa...)
+
+	// act
+	out, err := spreader.Process(rtpPkt)
+
+	// assert
+	assert.Error(err, "should reject truncated STAP-A")
+	assert.Nil(out, "should not output pkts")
+}
+
+func TestFuaSmallerThanTrailingRoomIsBuffered(t *testing.T) {
+	assert := assert.New(t)
+
+	// arrange
+	spreader := NewSpreader(100)
+	fuaStart := append([]byte{0x7C, 0x85}, make([]byte, 136)...)
+	fua1 := append(getRTPHeaderOffSet(0, false), fuaStart...)
+	fua2 := append(getRTPHeaderOffSet(1, false), 0x7C, 0x05, 0xAA)
+	fua3 := append(getRTPHeaderOffSet(2, true), 0x7C, 0x45, 0xBB)
+
+	// act
+	out1, err1 := spreader.Process(fua1)
+	out2, err2 := spreader.Process(fua2)
+	out3, err3 := spreader.Process(fua3)
+
+	// assert
+	assert.NoError(err1, "failed to process pkt")
+	assert.NoError(err2, "failed to process pkt")
+	assert.NoError(err3, "failed to process pkt")
+
+	assert.Equal(1, len(out1), "bad pkt out count")
+	assert.Equal(0, len(out2), "middle FUA should be kept as trailing")
+	if assert.Equal(1, len(out3), "bad pkt out count") {
+		expectedEnd := append([]byte{0x7C, 0x45}, make([]byte, 50)...)
+		expectedEnd = append(expectedEnd, 0xAA, 0xBB)
+		assert.Equal(append(getRTPHeaderOffSet(1, true), expectedEnd...), out3[0], "bad payload end FUA")
+	}
+	assert.Equal(uint16(0xFFFF), spreader.RTPOffset, "Bad offset")
+}
+
+func TestFuaEmptyEndIsEmitted(t *testing.T) {
+	assert := assert.New(t)
+
+	// arrange
+	spreader := NewSpreader(100)
+	rtpPkt := append(getRTPHeader(true), 0x7C, 0x45)
+	rtpPkt[0] |= 0x20 // only the padding makes it larger than the mtu
+	rtpPkt = append(rtpPkt, make([]byte, 99)...)
+	rtpPkt = append(rtpPkt, 100)
+
+	// act
+	out, err := spreader.Process(rtpPkt)
+
+	// assert
+	if assert.NoError(err, "failed to process pkt") && assert.Equal(1, len(out), "bad pkt out count") {
+		assert.Equal(append(getRTPHeader(true), 0x7C, 0x45), out[0], "bad payload end FUA")
+	}
+}
+
+func TestRTPHeaderLargerThanMtu(t *testing.T) {
+	assert := assert.New(t)
+
+	// arrange
+	spreader := NewSpreader(100)
+	rtpPkt := []byte{0x90, 0x62, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x70, 0x1c, 0x77, 0x48, 0xBE, 0xDE, 0x00, 0x16}
+	rtpPkt = append(rtpPkt, make([]byte, 88)...) // extension
+	rtpPkt = append(rtpPkt, 0x65, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07)
+
+	// act
+	out, err := spreader.Process(rtpPkt)
+
+	// assert
+	assert.Error(err, "should reject header that leaves no room for payload")
+	assert.Nil(out, "should not output pkts")
+}
+
+func FuzzSpreaderProcess(f *testing.F) {
+	stapa := append(getRTPHeader(false), getH264StapADelimiterAndSpsAndPps()...)
+	sps := append(getRTPHeader(true), getH264SpsNal()...)
+	fuas := getRtpsFuaNonIdr()
+	f.Add(uint16(26), stapa, sps, stapa)
+	f.Add(uint16(24), sps, stapa, sps)
+	f.Add(uint16(1200), fuas[0], fuas[1], fuas[2])
+	f.Add(uint16(100), fuas[0], fuas[1], sps)
+
+	f.Fuzz(func(t *testing.T, mtu uint16, pkt1, pkt2, pkt3 []byte) {
+		spreader := NewSpreader(mtu)
+		for _, pkt := range [][]byte{pkt1, pkt2, pkt3} {
+			out, err := spreader.Process(pkt)
+			if err != nil {
+				continue
+			}
+			for _, rtpOut := range out {
+				assert.LessOrEqual(t, len(rtpOut), int(mtu), "pkt out is larger than mtu")
+			}
+		}
+	})
+}
+
 func getRTPHeader(mark bool) []byte {
 	rtpMarkerBitMask := byte(0x80)
 	rtpHeader := []byte{0x80, 0x62, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x70, 0x1c, 0x77, 0x48}
