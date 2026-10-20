@@ -4,10 +4,12 @@
 package rtp
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasic(t *testing.T) { // nolint:maintidx,cyclop
@@ -1707,4 +1709,37 @@ func BenchmarkUnmarshalHeader(b *testing.B) {
 			}
 		}
 	})
+}
+
+func TestMarshalToInitializesPadding(t *testing.T) {
+	for _, paddingSize := range []byte{0, 1, 4, 255} {
+		for _, api := range []string{"Packet", "MarshalPacketTo", "DeprecatedPaddingSize"} {
+			t.Run(fmt.Sprintf("%s/padding=%d", api, paddingSize), func(t *testing.T) {
+				packet := Packet{
+					Header:  Header{Version: 2, Padding: paddingSize > 0, PaddingSize: paddingSize},
+					Payload: []byte{1, 2, 3},
+				}
+				if api == "DeprecatedPaddingSize" {
+					packet.Header.PaddingSize = 0
+					packet.PaddingSize = paddingSize
+				}
+
+				// A fresh allocation provides the expected wire encoding.
+				// reusing buffer exposed media data for FlexFEC users.
+				expected, err := packet.Marshal()
+				require.NoError(t, err)
+				buf := bytes.Repeat([]byte{0xa5}, len(expected)+16)
+				var n int
+				if api == "MarshalPacketTo" {
+					n, err = MarshalPacketTo(buf, &packet.Header, packet.Payload)
+				} else {
+					n, err = packet.MarshalTo(buf)
+				}
+				require.NoError(t, err)
+				require.Equal(t, len(expected), n)
+				assert.Equal(t, expected, buf[:n])
+				assert.Equal(t, bytes.Repeat([]byte{0xa5}, 16), buf[n:], "bytes beyond the packet must be untouched")
+			})
+		}
+	}
 }
