@@ -117,10 +117,8 @@ func (d *AV1Depacketizer) Unmarshal(payload []byte) (buff []byte, err error) {
 				continue
 			}
 
-			obuBuffer = make([]byte, len(d.buffer)+lengthField)
-
-			copy(obuBuffer, d.buffer)
-			copy(obuBuffer[len(d.buffer):], payload[offset:offset+lengthField])
+			d.buffer = append(d.buffer, payload[offset:offset+lengthField]...)
+			obuBuffer = d.buffer
 			d.buffer = nil
 		} else {
 			obuBuffer = payload[offset : offset+lengthField]
@@ -128,6 +126,9 @@ func (d *AV1Depacketizer) Unmarshal(payload []byte) (buff []byte, err error) {
 		offset += lengthField
 
 		if isLast && obuY {
+			if !isFirst || !obuZ {
+				obuBuffer = append([]byte(nil), obuBuffer...)
+			}
 			d.buffer = obuBuffer
 
 			break

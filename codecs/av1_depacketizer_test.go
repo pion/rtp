@@ -8,6 +8,7 @@ import (
 
 	"github.com/pion/rtp/codecs/av1/obu"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Create an AV1 OBU for testing. Returns one without the obu_size_field and another with it included.
@@ -573,4 +574,21 @@ func FuzzAV1DepacketizerUnmarshal(f *testing.F) {
 		_, err := depacketizer.Unmarshal(data)
 		_ = err
 	})
+}
+
+func TestAV1Depacketizer_fragmentAllocationGrowth(t *testing.T) {
+	first := make([]byte, 1025)
+	first[0], first[1] = 0x50, 0x20
+	continuation := make([]byte, 1025)
+	continuation[0] = 0xd0
+	allocations := testing.AllocsPerRun(1, func() {
+		depacketizer := AV1Depacketizer{}
+		_, err := depacketizer.Unmarshal(first)
+		require.NoError(t, err)
+		for range 512 {
+			_, err = depacketizer.Unmarshal(continuation)
+			require.NoError(t, err)
+		}
+	})
+	assert.Less(t, allocations, float64(64))
 }
