@@ -18,7 +18,7 @@ var (
 		"header extension id must be between 1 and 14 for RFC 5285 one byte extensions",
 	)
 	errRFC8285OneByteHeaderSize = errors.New(
-		"header extension payload must be 16bytes or less for RFC 5285 one byte extensions",
+		"header extension payload must be between 1 and 16 bytes for RFC 5285 one byte extensions",
 	)
 
 	errRFC8285TwoByteHeaderIDRange = errors.New(

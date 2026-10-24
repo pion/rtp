@@ -474,6 +474,8 @@ func (e RawExtension) MarshalSize() int {
 }
 
 // Assert that id + value is valid for give Header Extension Profile.
+//
+//nolint:cyclop // The three wire formats have different ID and payload bounds.
 func headerExtensionCheck(extensionProfile uint16, id uint8, payload []byte) error {
 	switch extensionProfile {
 	// RFC 8285 RTP One Byte Header Extension
@@ -481,7 +483,7 @@ func headerExtensionCheck(extensionProfile uint16, id uint8, payload []byte) err
 		if id < 1 || id > 14 {
 			return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderIDRange, id)
 		}
-		if len(payload) > 16 {
+		if len(payload) == 0 || len(payload) > 16 {
 			return fmt.Errorf("%w actual(%d)", errRFC8285OneByteHeaderSize, len(payload))
 		}
 	// RFC 8285 RTP Two Byte Header Extension
