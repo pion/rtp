@@ -424,15 +424,16 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 	}
 
 	// No existing header extensions
-	h.Extension = true
-
-	switch payloadLen := len(payload); {
-	case payloadLen <= 16:
-		h.ExtensionProfile = ExtensionProfileOneByte
-	case payloadLen > 16 && payloadLen < 256:
-		h.ExtensionProfile = ExtensionProfileTwoByte
+	profile := uint16(ExtensionProfileOneByte)
+	if id > 14 || len(payload) == 0 || len(payload) > 16 {
+		profile = ExtensionProfileTwoByte
+	}
+	if err := headerExtensionCheck(profile, id, payload); err != nil {
+		return err
 	}
 
+	h.Extension = true
+	h.ExtensionProfile = profile
 	h.Extensions = append(h.Extensions, Extension{id: id, payload: payload})
 
 	return nil
@@ -440,7 +441,7 @@ func (h *Header) SetExtension(id uint8, payload []byte) error { //nolint:gocogni
 
 // SetExtensionWithProfile sets an RTP header extension and converts Header Extension Profile if needed.
 func (h *Header) SetExtensionWithProfile(id uint8, payload []byte, intendedProfile uint16) error {
-	if !h.Extension || h.ExtensionProfile == intendedProfile {
+	if h.Extension && h.ExtensionProfile == intendedProfile {
 		return h.SetExtension(id, payload)
 	}
 
@@ -449,15 +450,14 @@ func (h *Header) SetExtensionWithProfile(id uint8, payload []byte, intendedProfi
 		return err
 	}
 
-	// If downgrading assert that existing Extensions will work
-	if intendedProfile == ExtensionProfileOneByte {
-		for i := range h.Extensions {
-			if err := headerExtensionCheck(intendedProfile, h.Extensions[i].id, h.Extensions[i].payload); err != nil {
-				return err
-			}
+	// Validate existing extensions before changing the profile.
+	for i := range h.Extensions {
+		if err := headerExtensionCheck(intendedProfile, h.Extensions[i].id, h.Extensions[i].payload); err != nil {
+			return err
 		}
 	}
 
+	h.Extension = true
 	h.ExtensionProfile = intendedProfile
 
 	return h.SetExtension(id, payload)
