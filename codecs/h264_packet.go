@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"slices"
 )
 
 // H264Payloader payloads H264 packets.
@@ -172,9 +173,16 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:
 			return
 		}
 
+		// allocate all fragments of the NALU at once
+		fragmentCount := (naluRemaining + maxFragmentSize - 1) / maxFragmentSize
+		buf := make([]byte, fragmentCount*fuaHeaderSize+naluRemaining)
+		payloads = slices.Grow(payloads, fragmentCount)
+
 		for naluRemaining > 0 {
 			currentFragmentSize := minInt(maxFragmentSize, naluRemaining)
-			out := make([]byte, fuaHeaderSize+currentFragmentSize)
+			outSize := fuaHeaderSize + currentFragmentSize
+			out := buf[:outSize:outSize]
+			buf = buf[outSize:]
 
 			// +---------------+
 			// |0|1|2|3|4|5|6|7|
